@@ -1,0 +1,12 @@
+{
+  "name": "yocv-prototype",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Standalone YoCV claim-review and CV-generation prototype",
+  "scripts": {
+    "test": "node --test tests/core.test.cjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
