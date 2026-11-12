@@ -4,8 +4,12 @@
      GET  /api/status                      mode, provider, model, Yoma reachability
      POST /api/generate                    grounded claim generation (live or sample)
      GET  /api/yoma/opportunities?role=    Yoma learning opportunities for a role
-   Everything the browser gets is listed in STATIC; dotfiles, server/, tests/, docs/ and .env are never served.
-   Model keys never reach this file: config is passed through to the provider factory and never logged. */
+   YoCard (Phase 2) routes live in server/card/routes.js and are mounted when createApp receives `card` deps:
+     GET  /api/card/status, POST /api/card/account|draft|publish, POST /api/card/:id/check|withdraw,
+     GET  /c/:id[.svg|.json], POST /c/:id/check, GET /.well-known/jwks.json
+   Everything the browser gets is listed in STATIC; dotfiles, server/, tests/, docs/, data/cards/ and .env
+   are never served. Model keys never reach this file: config is passed through to the provider factory and
+   never logged. */
 
 const http=require('node:http');
 const fs=require('node:fs/promises');
@@ -13,6 +17,7 @@ const path=require('node:path');
 const {runGeneration}=require('./server/generation.js');
 const {ProviderError}=require('./server/providers/errors.js');
 const {createLocalProvider}=require('./server/providers/local.js');
+const {createCardRouter}=require('./server/card/routes.js');
 
 const MAX_BODY_BYTES=64*1024;
 const MAX_CONTEXT=120;
@@ -27,6 +32,9 @@ const STATIC={
   '/styles.css':'styles.css',
   '/core.js':'core.js',
   '/app.js':'app.js',
+  '/card.html':'card.html',
+  '/card.js':'card.js',
+  '/card.css':'card.css',
   '/data/sample-credential.json':'data/sample-credential.json'
 };
 const CONTENT_TYPES={
@@ -121,11 +129,15 @@ function validateGenerateInput(payload,roleKeys){
   return {input:{role,experience:trimmed,context:ctx,dates:dt},mode:mode??null};
 }
 
-function createApp({config,provider,yoma,roleSkills,core,rootDir=__dirname,maxInFlight=4}={}){
+// `card` = {accountSource, store, key} mounts the YoCard routes (main() builds them from config; tests
+// inject fakes). Without it the card routes are absent and only the Phase 1 routes answer.
+function createApp({config,provider,yoma,roleSkills,core,rootDir=__dirname,maxInFlight=4,card=null,publicUrl=null,now=Date.now}={}){
   if(!config)throw new Error('createApp needs a config');
   if(!roleSkills||typeof roleSkills!=='object')throw new Error('createApp needs roleSkills');
   const roleKeys=Object.keys(roleSkills);
   const liveConfigured=config.provider!=='local';
+  const cardBase=String(publicUrl||config.publicUrl||('http://'+config.host+':'+config.port)).replace(/\/+$/,'');
+  const cardRouter=card?createCardRouter({config,accountSource:card.accountSource,provider,store:card.store,key:card.key,yoma,publicUrl:cardBase,now,readJSONBody,maxInFlight}):null;
   let localProvider=provider&&provider.name==='local'?provider:null;
   const getLocalProvider=()=>{
     if(!localProvider)localProvider=createLocalProvider(core);
@@ -232,6 +244,10 @@ function createApp({config,provider,yoma,roleSkills,core,rootDir=__dirname,maxIn
       if(req.method!=='GET'&&req.method!=='HEAD')return sendError(res,405,'method_not_allowed',MESSAGES.methodNotAllowed,false,{allow:'GET'});
       return opportunities(res,url);
     }
+    if(cardRouter){
+      const handled=cardRouter.handle(req,res,url);
+      if(handled){await handled;return;}
+    }
     if(pathname.startsWith('/api/'))return sendError(res,404,'not_found',MESSAGES.notFound,false);
     return serveStatic(req,res,pathname);
   }
@@ -247,9 +263,10 @@ function createApp({config,provider,yoma,roleSkills,core,rootDir=__dirname,maxIn
   return server;
 }
 
-function banner(config,provider){
+function banner(config,provider,card){
   const mode=config.provider==='local'?'sample':'live';
-  return 'YoCV server on http://'+config.host+':'+config.port+' · mode: '+mode+' · provider: '+provider.name+' · Yoma: '+config.yomaBase;
+  return 'YoCV server on http://'+config.host+':'+config.port+' · mode: '+mode+' · provider: '+provider.name+' · Yoma: '+config.yomaBase+
+    (card?' · YoCard: '+card.accountSource.kind+' accounts, cards in '+card.store.dir:'');
 }
 
 function main(){
@@ -261,14 +278,19 @@ function main(){
   const config=loadConfig();
   const yoma=createYomaClient({baseUrl:config.yomaBase});
   const provider=createProvider(config,core);
-  const server=createApp({config,provider,yoma,roleSkills,core,rootDir:__dirname});
+  const {createAccountSource}=require('./server/card/account.js');
+  const {createCardStore}=require('./server/card/store.js');
+  const {loadOrCreateKey}=require('./server/card/sign.js');
+  const cardDir=path.join(__dirname,'data','cards');
+  const card={accountSource:createAccountSource({config,yoma}),store:createCardStore(cardDir),key:loadOrCreateKey(cardDir)};
+  const server=createApp({config,provider,yoma,roleSkills,core,rootDir:__dirname,card});
   server.on('error',err=>{
     if(err&&err.code==='EADDRINUSE')console.error('Port '+config.port+' on '+config.host+' is already in use. Set PORT in .env to use another port.');
     else console.error('YoCV server failed to start: '+(err?.message||err));
     process.exit(1);
   });
   server.listen(config.port,config.host,()=>{
-    console.log(banner(config,provider));
+    console.log(banner(config,provider,card));
   });
   const shutdown=()=>{server.close(()=>process.exit(0));server.closeAllConnections();};
   process.on('SIGINT',shutdown);
