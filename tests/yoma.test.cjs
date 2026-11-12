@@ -213,3 +213,75 @@ test('role-skills.json has the three roles with skill names and opportunity quer
  assert.deepEqual(roleSkills['Retail assistant'].opportunityQueries,['customer service','retail']);
  assert.ok(roleSkills['Retail assistant'].skillNames.includes('Customer Service'));
 });
+
+// --- opportunityInfo (YoCard, anonymous GET /opportunity/{id}/info) ---
+const INFO_ID='019a1062-2518-756d-bc33-1b68b8f67d96';
+const infoBody={
+ id:INFO_ID,title:'Financial Literacy for Gig Workers',description:'long text',type:'Learning',organizationId:'org-1',organizationName:'UNICEF Kenya',organizationLogoURL:'https://logo.example/unicef-kenya.png',
+ summary:'s',url:'https://online.atingi.org/x',verificationEnabled:true,verificationMethod:'Manual',participantCountCompleted:37,participantCountPending:0,status:'Active',published:true,
+ yomaInfoURL:'https://yoma.world/opportunities/'+INFO_ID,isCompletable:true,
+ skills:[{id:'757753d2-9981-4240-b2e1-183884d66bb1',name:'Financial Management',infoURL:'https://lightcast.io/open-skills/skills/KS123Y170JP7JBSFVBSS',extra:'drop'}],
+ verificationTypes:[{id:'vt-1',type:'FileUpload',displayName:'File Upload',description:'A file of your completion certificate'}],
+ customFields:[]
+};
+function infoRouter(url){
+ if(url.endsWith('/opportunity/'+INFO_ID+'/info'))return json(infoBody);
+ if(/\/opportunity\/[0-9a-f-]{36}\/info$/.test(url))return json([{type:'EntityNotFoundException',message:'does not exist'}],404);
+ return router(url);
+}
+
+test('opportunityInfo fetches the documented URL anonymously and maps the public fields',async()=>{
+ const fetch=fakeFetch(infoRouter);
+ const c=client(fetch);
+ assert.equal(typeof c.opportunityInfo,'function');
+ const result=await c.opportunityInfo(INFO_ID);
+ assert.equal(fetch.calls.length,1);
+ const [call]=fetch.calls;
+ assert.equal(call.url,BASE+'/opportunity/'+INFO_ID+'/info');
+ assert.equal((call.init.method||'GET').toUpperCase(),'GET');
+ assert.equal(call.init.headers['user-agent'],'YoCV-prototype');
+ assert.equal(call.init.headers['accept'],'application/json');
+ assert.equal(call.init.headers['authorization'],undefined);
+ assert.equal(result.source,'live');
+ assert.deepEqual(result.item,{
+  id:INFO_ID,title:'Financial Literacy for Gig Workers',organizationName:'UNICEF Kenya',organizationLogoURL:'https://logo.example/unicef-kenya.png',type:'Learning',
+  verificationEnabled:true,verificationMethod:'Manual',verificationTypes:[{type:'FileUpload',displayName:'File Upload',description:'A file of your completion certificate'}],
+  participantCountCompleted:37,yomaInfoURL:'https://yoma.world/opportunities/'+INFO_ID,published:true,isCompletable:true,
+  skills:[{id:'757753d2-9981-4240-b2e1-183884d66bb1',name:'Financial Management',infoURL:'https://lightcast.io/open-skills/skills/KS123Y170JP7JBSFVBSS'}]
+ });
+ assert.ok(!('description' in result.item));
+});
+
+test('opportunityInfo returns item null on a 404 and caches that answer',async()=>{
+ const fetch=fakeFetch(infoRouter);
+ const c=client(fetch);
+ const missing='019e6f89-b66b-798e-a380-cbf33d634de6';
+ assert.deepEqual(await c.opportunityInfo(missing),{item:null,source:'live'});
+ const again=await c.opportunityInfo(missing);
+ assert.equal(again.item,null);
+ assert.equal(again.source,'cache');
+ assert.equal(fetch.calls.length,1);
+});
+
+test('opportunityInfo rejects malformed ids without a request',async()=>{
+ const fetch=fakeFetch(infoRouter);
+ const c=client(fetch);
+ assert.deepEqual(await c.opportunityInfo('../admin'),{item:null,source:'live'});
+ assert.deepEqual(await c.opportunityInfo('019A1062-2518-756D-BC33-1B68B8F67D96'),{item:null,source:'live'});
+ assert.deepEqual(await c.opportunityInfo(''),{item:null,source:'live'});
+ assert.deepEqual(await c.opportunityInfo(undefined),{item:null,source:'live'});
+ assert.deepEqual(await c.opportunityInfo('019a1062-2518-756d-bc33-1b68b8f67d96x'),{item:null,source:'live'});
+ assert.equal(fetch.calls.length,0);
+});
+
+test('opportunityInfo follows the stale-or-throw rule for other failures',async()=>{
+ let t=0,down=false;
+ const fetch=fakeFetch((url)=>{if(down)return new Response('boom',{status:500});return infoRouter(url);});
+ const c=client(fetch,{now:()=>t,ttlMs:1000});
+ const first=await c.opportunityInfo(INFO_ID);
+ t=5000;down=true;
+ const second=await c.opportunityInfo(INFO_ID);
+ assert.deepEqual(second,{item:first.item,source:'cache'});
+ const cold=client(fakeFetch(()=>new Response('boom',{status:500})));
+ await assert.rejects(cold.opportunityInfo(INFO_ID),err=>err instanceof YomaUnavailable);
+});

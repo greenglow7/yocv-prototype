@@ -1,0 +1,253 @@
+[
+  {
+    "id": "thandi",
+    "displayName": "Thandi Mokoena",
+    "firstName": "Thandi",
+    "trade": "hair",
+    "tradeLabel": "Hairdresser",
+    "country": "South Africa",
+    "city": "Khayelitsha, Cape Town",
+    "dateOfBirth": "2002-03-15T00:00:00+00:00",
+    "phoneNumber": "+27735550147",
+    "phoneNumberConfirmed": true,
+    "emailConfirmed": true,
+    "yoIDOnboarded": true,
+    "dateYoIDOnboarded": "2025-02-12T09:41:00+00:00",
+    "dateCreated": "2025-02-10T14:03:00+00:00",
+    "photoURL": null,
+    "userId": "4c1d6f2e-8b3a-4e57-9d21-7f0a5c3b9e61",
+    "completions": [
+      {
+        "myOpportunityId": "a7e2c9d4-51b6-4f8e-9c3a-2d7b0e6f1a85",
+        "opportunityId": "019e6f89-b66b-798e-a380-cbf33d634de5",
+        "title": "Hair Styling: Blow-Dry, Cut, and Colour Like a Pro",
+        "organizationName": "Alison Learning",
+        "organizationLogoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/5d2bd805-affa-479b-b7e2-eca5adf9b244.png",
+        "dateCompleted": "2025-09-18T16:20:00+00:00",
+        "opportunityType": "Learning",
+        "verificationMethod": "Automatic",
+        "evidenceTypes": [],
+        "skills": [
+          {"id": "6e85a30a-008b-4340-a3de-eeb8e7f7ce88", "name": "Cosmetics", "infoURL": "https://lightcast.io/open-skills/skills/KS122FL69C9376N0WS3D"}
+        ]
+      },
+      {
+        "myOpportunityId": "b3f8d1a6-2c4e-4b9a-8e57-6a1d9c0f3b72",
+        "opportunityId": "019e6f11-51ae-7a56-bbdd-9ee548b58cda",
+        "title": "Customer Care Skills and Telephone Etiquette",
+        "organizationName": "Alison Learning",
+        "organizationLogoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/5d2bd805-affa-479b-b7e2-eca5adf9b244.png",
+        "dateCompleted": "2025-10-06T11:05:00+00:00",
+        "opportunityType": "Learning",
+        "verificationMethod": "Automatic",
+        "evidenceTypes": [],
+        "skills": [
+          {"id": "448bb36e-6e5a-4c5a-9150-78703666c37a", "name": "Customer Service", "infoURL": "https://lightcast.io/open-skills/skills/KS121Z26S4VJLQ1WXN21"}
+        ]
+      },
+      {
+        "myOpportunityId": "c9a4e7b2-6d1f-4c3e-b8a5-0f2e7d9c4a16",
+        "opportunityId": "019a1062-2518-756d-bc33-1b68b8f67d96",
+        "title": "Financial Literacy for Gig Workers",
+        "organizationName": "UNICEF Kenya",
+        "organizationLogoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/979cdb17-9bd7-41d9-b06b-14140c309444.png",
+        "dateCompleted": "2026-01-21T18:47:00+00:00",
+        "opportunityType": "Learning",
+        "verificationMethod": "Manual",
+        "evidenceTypes": ["FileUpload"],
+        "skills": [
+          {"id": "757753d2-9981-4240-b2e1-183884d66bb1", "name": "Financial Management", "infoURL": "https://lightcast.io/open-skills/skills/KS123Y170JP7JBSFVBSS"}
+        ]
+      }
+    ],
+    "skills": [
+      {"id": "6e85a30a-008b-4340-a3de-eeb8e7f7ce88", "name": "Cosmetics", "infoURL": "https://lightcast.io/open-skills/skills/KS122FL69C9376N0WS3D", "organizations": [{"id": "019e072e-dbf5-7098-83c6-d0bf7d88a87a", "name": "Alison Learning", "logoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/5d2bd805-affa-479b-b7e2-eca5adf9b244.png"}]},
+      {"id": "448bb36e-6e5a-4c5a-9150-78703666c37a", "name": "Customer Service", "infoURL": "https://lightcast.io/open-skills/skills/KS121Z26S4VJLQ1WXN21", "organizations": [{"id": "019e072e-dbf5-7098-83c6-d0bf7d88a87a", "name": "Alison Learning", "logoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/5d2bd805-affa-479b-b7e2-eca5adf9b244.png"}]},
+      {"id": "757753d2-9981-4240-b2e1-183884d66bb1", "name": "Financial Management", "infoURL": "https://lightcast.io/open-skills/skills/KS123Y170JP7JBSFVBSS", "organizations": [{"id": "90d0ee66-e06a-4da8-ae84-0de3f01b8b75", "name": "UNICEF Kenya", "logoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/979cdb17-9bd7-41d9-b06b-14140c309444.png"}]}
+    ]
+  },
+  {
+    "id": "brian",
+    "displayName": "Brian Otieno",
+    "firstName": "Brian",
+    "trade": "boda",
+    "tradeLabel": "Boda boda rider",
+    "country": "Kenya",
+    "city": "Kisumu",
+    "dateOfBirth": "2000-07-02T00:00:00+00:00",
+    "phoneNumber": "+254712550183",
+    "phoneNumberConfirmed": true,
+    "emailConfirmed": false,
+    "yoIDOnboarded": true,
+    "dateYoIDOnboarded": "2025-05-06T07:12:00+00:00",
+    "dateCreated": "2025-05-04T19:30:00+00:00",
+    "photoURL": null,
+    "userId": "9e5b2d7a-3f1c-4a8e-b6d4-1c8f7a2e5d93",
+    "completions": [
+      {
+        "myOpportunityId": "d2b7f4a9-8e3c-4d1b-a7f6-5c9e2b8d0f41",
+        "opportunityId": "019e6fa0-1b36-7cba-a344-44f23ab7619d",
+        "title": "Understanding Driving Safety and Laws",
+        "organizationName": "Alison Learning",
+        "organizationLogoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/5d2bd805-affa-479b-b7e2-eca5adf9b244.png",
+        "dateCompleted": "2025-08-11T13:55:00+00:00",
+        "opportunityType": "Learning",
+        "verificationMethod": "Automatic",
+        "evidenceTypes": [],
+        "skills": [
+          {"id": "ca0dbc9f-ae9b-4023-8faf-b9392fdce6d0", "name": "Law Enforcement", "infoURL": "https://lightcast.io/open-skills/skills/KS125R467HSMPWMRXWNB"}
+        ]
+      },
+      {
+        "myOpportunityId": "e6c1a8d3-5b2f-4e7a-9d8c-3a4f1e6b7c25",
+        "opportunityId": "019e6fb9-bfc4-7dd7-ac9d-c09a384c5160",
+        "title": "Basic First Aid Training",
+        "organizationName": "Alison Learning",
+        "organizationLogoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/5d2bd805-affa-479b-b7e2-eca5adf9b244.png",
+        "dateCompleted": "2026-04-22T10:18:00+00:00",
+        "opportunityType": "Learning",
+        "verificationMethod": "Automatic",
+        "evidenceTypes": [],
+        "skills": [
+          {"id": "d4e73cdf-35fe-4f16-bab6-52f6249ae0c9", "name": "First Aid", "infoURL": "https://lightcast.io/open-skills/skills/KS1200X6V3937RSF8VVM"}
+        ]
+      },
+      {
+        "myOpportunityId": "f1d9b6e4-7a3c-4f2d-8b5e-9c0a6d3f2e58",
+        "opportunityId": "019a1062-2518-756d-bc33-1b68b8f67d96",
+        "title": "Financial Literacy for Gig Workers",
+        "organizationName": "UNICEF Kenya",
+        "organizationLogoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/979cdb17-9bd7-41d9-b06b-14140c309444.png",
+        "dateCompleted": "2025-12-02T17:40:00+00:00",
+        "opportunityType": "Learning",
+        "verificationMethod": "Manual",
+        "evidenceTypes": ["FileUpload"],
+        "skills": [
+          {"id": "757753d2-9981-4240-b2e1-183884d66bb1", "name": "Financial Management", "infoURL": "https://lightcast.io/open-skills/skills/KS123Y170JP7JBSFVBSS"}
+        ]
+      }
+    ],
+    "skills": [
+      {"id": "ca0dbc9f-ae9b-4023-8faf-b9392fdce6d0", "name": "Law Enforcement", "infoURL": "https://lightcast.io/open-skills/skills/KS125R467HSMPWMRXWNB", "organizations": [{"id": "019e072e-dbf5-7098-83c6-d0bf7d88a87a", "name": "Alison Learning", "logoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/5d2bd805-affa-479b-b7e2-eca5adf9b244.png"}]},
+      {"id": "d4e73cdf-35fe-4f16-bab6-52f6249ae0c9", "name": "First Aid", "infoURL": "https://lightcast.io/open-skills/skills/KS1200X6V3937RSF8VVM", "organizations": [{"id": "019e072e-dbf5-7098-83c6-d0bf7d88a87a", "name": "Alison Learning", "logoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/5d2bd805-affa-479b-b7e2-eca5adf9b244.png"}]},
+      {"id": "757753d2-9981-4240-b2e1-183884d66bb1", "name": "Financial Management", "infoURL": "https://lightcast.io/open-skills/skills/KS123Y170JP7JBSFVBSS", "organizations": [{"id": "90d0ee66-e06a-4da8-ae84-0de3f01b8b75", "name": "UNICEF Kenya", "logoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/979cdb17-9bd7-41d9-b06b-14140c309444.png"}]}
+    ]
+  },
+  {
+    "id": "amara",
+    "displayName": "Amara Okafor",
+    "firstName": "Amara",
+    "trade": "tailor",
+    "tradeLabel": "Tailor",
+    "country": "Nigeria",
+    "city": "Enugu",
+    "dateOfBirth": "2004-05-20T00:00:00+00:00",
+    "phoneNumber": "+2348035550162",
+    "phoneNumberConfirmed": true,
+    "emailConfirmed": true,
+    "yoIDOnboarded": true,
+    "dateYoIDOnboarded": "2025-03-20T15:26:00+00:00",
+    "dateCreated": "2025-03-18T12:11:00+00:00",
+    "photoURL": null,
+    "userId": "2a7f4c9e-6d3b-4e1a-8c5f-9b0d2e7a4c36",
+    "completions": [
+      {
+        "myOpportunityId": "0b4e8a2d-9c6f-4a3e-b1d7-5e2c8f9a0d64",
+        "opportunityId": "019e6f0f-b3d6-7b5f-b2fa-08709752d809",
+        "title": "Basics of Sewing",
+        "organizationName": "Alison Learning",
+        "organizationLogoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/5d2bd805-affa-479b-b7e2-eca5adf9b244.png",
+        "dateCompleted": "2025-07-09T09:33:00+00:00",
+        "opportunityType": "Learning",
+        "verificationMethod": "Automatic",
+        "evidenceTypes": [],
+        "skills": [
+          {"id": "8336299a-61bb-485b-93a5-9d14538ccd9f", "name": "Fashion Design", "infoURL": "https://lightcast.io/open-skills/skills/ESED05D74592993DF9BE"},
+          {"id": "687bf581-70d4-41bf-9d29-487be258d22a", "name": "Sewing", "infoURL": "https://lightcast.io/open-skills/skills/KS440HZ62WR33Y87XTZF"}
+        ]
+      },
+      {
+        "myOpportunityId": "1c5f9b3e-0d7a-4b2f-a8e6-6f3d9a0b1e75",
+        "opportunityId": "1a1637fe-dd44-4845-b544-6908516836e3",
+        "title": "FUCAP 1.0 LevelUp: The Lean Entrepreneurship Skills Course",
+        "organizationName": "UNICEF Nigeria",
+        "organizationLogoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/6336d29c-8b16-44eb-9973-1fb07a4e44d8.png",
+        "dateCompleted": "2025-11-14T20:02:00+00:00",
+        "opportunityType": "Learning",
+        "verificationMethod": "Manual",
+        "evidenceTypes": ["FileUpload"],
+        "skills": [
+          {"id": "086d5e92-2e8e-43bc-902e-758d3ca62ca2", "name": "Creative Entrepreneurship", "infoURL": "https://lightcast.io/open-skills/skills/KS122HL6YBBNN54X6DP4"},
+          {"id": "8909cd8a-2feb-42b8-8157-412e9e1df389", "name": "Entrepreneurship", "infoURL": "https://lightcast.io/open-skills/skills/KS123KR6W35X39JP65MX"},
+          {"id": "dae78e54-b1a4-4cdb-b9b4-9467155f6155", "name": "Small Business Management", "infoURL": "https://lightcast.io/open-skills/skills/ES60A817F98B37250542"}
+        ]
+      },
+      {
+        "myOpportunityId": "2d6a0c4f-1e8b-4c3a-b9f7-7a4e0b1c2f86",
+        "opportunityId": "98b4dc3d-24a0-455d-981b-08da8fc2edc0",
+        "title": "Customer Care & Complaint Management",
+        "organizationName": "Atingi",
+        "organizationLogoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/d19a12f3-d8c4-4e3e-91c5-4a4d57eea704.png",
+        "dateCompleted": "2026-02-27T14:49:00+00:00",
+        "opportunityType": "Learning",
+        "verificationMethod": "Manual",
+        "evidenceTypes": ["FileUpload"],
+        "skills": [
+          {"id": "e5fd5064-f9e5-42ec-bcdf-5308f8887a12", "name": "Active Listening", "infoURL": "https://lightcast.io/open-skills/skills/KS1205H6HZDXGDV2R0QZ"},
+          {"id": "4049307d-45d8-4cd1-94de-e116a43d3c90", "name": "Conflict Resolution", "infoURL": "https://lightcast.io/open-skills/skills/KS1228S6YKWXMH4M4DL7"},
+          {"id": "7a67d869-e6cb-4cce-9551-98a126af8e33", "name": "Empathy", "infoURL": "https://lightcast.io/open-skills/skills/ES1C53496B6F1ECEDD9A"}
+        ]
+      }
+    ],
+    "skills": [
+      {"id": "8336299a-61bb-485b-93a5-9d14538ccd9f", "name": "Fashion Design", "infoURL": "https://lightcast.io/open-skills/skills/ESED05D74592993DF9BE", "organizations": [{"id": "019e072e-dbf5-7098-83c6-d0bf7d88a87a", "name": "Alison Learning", "logoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/5d2bd805-affa-479b-b7e2-eca5adf9b244.png"}]},
+      {"id": "687bf581-70d4-41bf-9d29-487be258d22a", "name": "Sewing", "infoURL": "https://lightcast.io/open-skills/skills/KS440HZ62WR33Y87XTZF", "organizations": [{"id": "019e072e-dbf5-7098-83c6-d0bf7d88a87a", "name": "Alison Learning", "logoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/5d2bd805-affa-479b-b7e2-eca5adf9b244.png"}]},
+      {"id": "8909cd8a-2feb-42b8-8157-412e9e1df389", "name": "Entrepreneurship", "infoURL": "https://lightcast.io/open-skills/skills/KS123KR6W35X39JP65MX", "organizations": [{"id": "b9653e67-115e-4dc5-872f-5b890cb647e1", "name": "UNICEF Nigeria", "logoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/6336d29c-8b16-44eb-9973-1fb07a4e44d8.png"}]},
+      {"id": "dae78e54-b1a4-4cdb-b9b4-9467155f6155", "name": "Small Business Management", "infoURL": "https://lightcast.io/open-skills/skills/ES60A817F98B37250542", "organizations": [{"id": "b9653e67-115e-4dc5-872f-5b890cb647e1", "name": "UNICEF Nigeria", "logoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/6336d29c-8b16-44eb-9973-1fb07a4e44d8.png"}]},
+      {"id": "086d5e92-2e8e-43bc-902e-758d3ca62ca2", "name": "Creative Entrepreneurship", "infoURL": "https://lightcast.io/open-skills/skills/KS122HL6YBBNN54X6DP4", "organizations": [{"id": "b9653e67-115e-4dc5-872f-5b890cb647e1", "name": "UNICEF Nigeria", "logoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/6336d29c-8b16-44eb-9973-1fb07a4e44d8.png"}]},
+      {"id": "e5fd5064-f9e5-42ec-bcdf-5308f8887a12", "name": "Active Listening", "infoURL": "https://lightcast.io/open-skills/skills/KS1205H6HZDXGDV2R0QZ", "organizations": [{"id": "e685f109-9ab1-43e7-b836-08dad9c6d345", "name": "Atingi", "logoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/d19a12f3-d8c4-4e3e-91c5-4a4d57eea704.png"}]},
+      {"id": "4049307d-45d8-4cd1-94de-e116a43d3c90", "name": "Conflict Resolution", "infoURL": "https://lightcast.io/open-skills/skills/KS1228S6YKWXMH4M4DL7", "organizations": [{"id": "e685f109-9ab1-43e7-b836-08dad9c6d345", "name": "Atingi", "logoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/d19a12f3-d8c4-4e3e-91c5-4a4d57eea704.png"}]},
+      {"id": "7a67d869-e6cb-4cce-9551-98a126af8e33", "name": "Empathy", "infoURL": "https://lightcast.io/open-skills/skills/ES1C53496B6F1ECEDD9A", "organizations": [{"id": "e685f109-9ab1-43e7-b836-08dad9c6d345", "name": "Atingi", "logoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/d19a12f3-d8c4-4e3e-91c5-4a4d57eea704.png"}]}
+    ]
+  },
+  {
+    "id": "sipho",
+    "displayName": "Sipho Dlamini",
+    "firstName": "Sipho",
+    "trade": "cleaner",
+    "tradeLabel": "Cleaner and general labourer",
+    "country": "South Africa",
+    "city": "Durban",
+    "dateOfBirth": "2007-08-09T00:00:00+00:00",
+    "phoneNumber": "+27825550131",
+    "phoneNumberConfirmed": true,
+    "emailConfirmed": false,
+    "yoIDOnboarded": true,
+    "dateYoIDOnboarded": "2026-06-05T08:50:00+00:00",
+    "dateCreated": "2026-06-03T17:22:00+00:00",
+    "photoURL": null,
+    "userId": "7b3e9d1f-4a6c-4f8b-a2d5-0e1c6b9f3a47",
+    "completions": [],
+    "skills": []
+  },
+  {
+    "id": "lerato",
+    "displayName": "Lerato Molefe",
+    "firstName": "Lerato",
+    "trade": "nails",
+    "tradeLabel": "Nail technician",
+    "country": "South Africa",
+    "city": "Soweto, Johannesburg",
+    "dateOfBirth": "2009-01-01T00:00:00+00:00",
+    "phoneNumber": "+27615550118",
+    "phoneNumberConfirmed": true,
+    "emailConfirmed": false,
+    "yoIDOnboarded": true,
+    "dateYoIDOnboarded": "2026-08-16T10:05:00+00:00",
+    "dateCreated": "2026-08-15T21:37:00+00:00",
+    "photoURL": null,
+    "userId": "5f8a2c6d-9e4b-4d7a-b3f1-8c2d5a0e7b19",
+    "completions": [],
+    "skills": []
+  }
+]

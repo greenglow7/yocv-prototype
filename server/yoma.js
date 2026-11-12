@@ -24,6 +24,17 @@ function mapOpportunity(item){
   return out;
 }
 function listOf(data){return Array.isArray(data)?data:Array.isArray(data?.items)?data.items:[];}
+const OPPORTUNITY_ID=/^[0-9a-f-]{36}$/;
+function mapOpportunityInfo(item){
+  const out=pick(item,['id','title','organizationName','organizationLogoURL','type','verificationMethod','yomaInfoURL']);
+  out.verificationEnabled=item?.verificationEnabled===true;
+  out.verificationTypes=Array.isArray(item?.verificationTypes)?item.verificationTypes.map(t=>pick(t,['type','displayName','description'])):[];
+  out.participantCountCompleted=Number.isFinite(item?.participantCountCompleted)?item.participantCountCompleted:0;
+  out.published=item?.published===true;
+  out.isCompletable=item?.isCompletable===true;
+  out.skills=Array.isArray(item?.skills)?item.skills.map(mapSkill):[];
+  return out;
+}
 
 function createYomaClient({baseUrl,fetch=globalThis.fetch,now=Date.now,ttlMs=3600000,reachTtlMs=300000,timeoutMs=10000}={}){
   if(!baseUrl)throw new Error('createYomaClient needs a baseUrl');
@@ -37,7 +48,8 @@ function createYomaClient({baseUrl,fetch=globalThis.fetch,now=Date.now,ttlMs=360
   }
 
   // Returns {data, source:'live'|'cache'}. `force` skips the fresh-cache read (used by reachable()).
-  async function request(method,path,body,{ttl=ttlMs,force=false}={}){
+  // `notFoundIsNull` turns a 404 into a cached `data: null` instead of a stale-or-throw failure.
+  async function request(method,path,body,{ttl=ttlMs,force=false,notFoundIsNull=false}={}){
     const url=base+path;
     const serialised=body===undefined?'':JSON.stringify(body);
     const key=method+' '+url+' '+serialised;
@@ -54,6 +66,7 @@ function createYomaClient({baseUrl,fetch=globalThis.fetch,now=Date.now,ttlMs=360
       response=await fetch(url,{method,headers,body:body===undefined?undefined:serialised,signal:AbortSignal.timeout(timeoutMs)});
     }catch(err){return fallback(err?.name==='TimeoutError'?'timeout':'network error');}
     if(response.status===400)throw badRequest('Yoma rejected the request to '+path+' (400): check query parameters');
+    if(response.status===404&&notFoundIsNull){cache.set(key,{data:null,at:now()});return {data:null,source:'live'};}
     if(response.status<200||response.status>=300)return fallback('HTTP '+response.status);
     const parsed=await readJSON(response);
     if(!parsed.ok)return fallback('non-JSON body');
@@ -92,6 +105,14 @@ function createYomaClient({baseUrl,fetch=globalThis.fetch,now=Date.now,ttlMs=360
     return {items,totalCount,source};
   }
 
+  // Anonymous opportunity details (YoCard): `item: null` when the id is malformed (no request) or the
+  // opportunity is not published (404, cached). Other failures follow the stale-or-throw rule above.
+  async function opportunityInfo(id){
+    if(!OPPORTUNITY_ID.test(String(id??'')))return {item:null,source:'live'};
+    const {data,source}=await request('GET','/opportunity/'+id+'/info',undefined,{notFoundIsNull:true});
+    return {item:data&&typeof data==='object'?mapOpportunityInfo(data):null,source};
+  }
+
   async function reachable(){
     if(reach&&now()-reach.at<reachTtlMs)return reach.value;
     let value=false;
@@ -100,7 +121,7 @@ function createYomaClient({baseUrl,fetch=globalThis.fetch,now=Date.now,ttlMs=360
     return value;
   }
 
-  return {skillByName,opportunityTypes,learningTypeId,searchLearningOpportunities,reachable,baseUrl:base};
+  return {skillByName,opportunityTypes,learningTypeId,searchLearningOpportunities,opportunityInfo,reachable,baseUrl:base};
 }
 
 module.exports={createYomaClient,YomaUnavailable};
