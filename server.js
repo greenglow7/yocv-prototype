@@ -110,6 +110,7 @@ function validateGenerateInput(payload,roleKeys){
   if(typeof experience!=='string')throw new InputError(MESSAGES.experienceShort);
   const trimmed=experience.trim();
   if(trimmed.length<12||trimmed.split(/\s+/).length<3)throw new InputError(MESSAGES.experienceShort);
+  if((trimmed.match(/\p{L}{2,}/gu)||[]).length<3)throw new InputError(MESSAGES.experienceShort); // numbers or symbols alone are not a responsibility
   if(trimmed.length>4000)throw new InputError(MESSAGES.experienceLong);
   if(context!==undefined&&context!==null&&typeof context!=='string')throw new InputError(MESSAGES.context);
   if(dates!==undefined&&dates!==null&&typeof dates!=='string')throw new InputError(MESSAGES.dates);

@@ -52,7 +52,7 @@
   }
   function localExperienceClaims(input){
     const experience=String(input.experience??'').trim();
-    if(experience.length<12||experience.split(/\s+/).length<3)throw new Error('Tell us one concrete responsibility, such as who you helped and what you did.');
+    if(experience.length<12||experience.split(/\s+/).length<3||(experience.match(/\p{L}{2,}/gu)||[]).length<3)throw new Error('Tell us one concrete responsibility, such as who you helped and what you did.');
     if(experience.length>4000)throw new Error('Keep your experience under 4,000 characters for this demo.');
     const source={sourceId:'experience',sourceLabel:input.context||'Your experience',sourceText:experience,category:'self',originalCategory:'self',context:input.context||'',dates:input.dates||'',decision:'pending',edited:false};
     const sentences=experience.split(/\n+|(?<=[.!?])\s+/).map(s=>({sourceQuote:s.trim(),text:polish(s)})).filter(s=>s.text);

@@ -218,14 +218,19 @@ test('POST /api/generate maps a ProviderError to 502 with code and retryable, ne
  assert.equal(authJson.error.retryable,false);
 });
 test('POST /api/generate returns 200 with empty claims when nothing grounded survives (Review Focus 1)',async()=>{
- const numbers='2024 2025 2026 2027 2028 2029';
  const output={experience:[{text:'Managed shop accounts.',sourceQuote:'managed the shop accounts',reason:'r'}],skills:[]};
  const {base}=await boot({provider:fakeProvider(output)});
- const res=await post(base,{...body,experience:numbers});
+ const res=await post(base,{...body,experience:'I swept the floor every morning.'});
  assert.equal(res.status,200);
  const json=await res.json();
  assert.deepEqual(json.claims,[]);
  assert.equal(json.generation.rejected[0].reason,'quote_not_in_source');
+});
+test('POST /api/generate rejects a numbers-only experience as invalid input',async()=>{
+ const {base}=await boot({provider:fakeProvider({experience:[],skills:[]})});
+ const res=await post(base,{...body,experience:'2024 2025 2026 2027 2028 2029'});
+ assert.equal(res.status,400);
+ assert.equal((await res.json()).error.code,'invalid_input');
 });
 test('POST /api/generate returns 500 internal_error for an unexpected failure',async()=>{
  const {base}=await boot({provider:fakeProvider(new TypeError('boom'))});
