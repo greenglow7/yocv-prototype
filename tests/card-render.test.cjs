@@ -196,3 +196,25 @@ test('public page nudges an empty-state card to Yoma opportunities for the trade
  assert.match(html,/Find verified opportunities for cleaner on Yoma/);
  assert.match(html,/No services listed yet/);
 });
+
+test('sample-persona cards are labelled as fictional on the public page and in the SVG; token-backed cards are not',()=>{
+ const sentence='Fictional sample account: this card was built from a sample persona, not a real Yoma user. The completions reference real Yoma opportunities.';
+ assert.equal(render.STRINGS.sampleAccount,sentence);
+ assert.equal(render.STRINGS.sampleSvg,'Sample card · fictional persona');
+ const sampleHtml=publicPage({record:record({accountSource:'sample'}),status:'ok',publicUrl:PUBLIC_URL});
+ assert.ok(sampleHtml.includes(sentence),'sample page carries the sample sentence');
+ assert.ok(sampleHtml.indexOf(sentence)>sampleHtml.indexOf("Read from Thandi's Yoma account on"),'sample sentence follows the header line');
+ assert.ok(sampleHtml.indexOf(sentence)<sampleHtml.indexOf('Confirmed from Yoma'),'sample sentence precedes the confirmed section');
+ const tokenHtml=publicPage({record:record({accountSource:'token'}),status:'ok',publicUrl:PUBLIC_URL});
+ assert.ok(!tokenHtml.includes(sentence),'token page has no sample sentence');
+ assert.ok(!tokenHtml.includes('sample persona'));
+ const sampleSvg=cardSvg({record:record({accountSource:'sample'}),publicUrl:PUBLIC_URL,qrSvgFn:qrSvg});
+ assert.ok(sampleSvg.includes('Sample card · fictional persona'));
+ assert.ok(!sampleSvg.includes('A work card read from a Yoma account'));
+ const tokenSvg=cardSvg({record:record({accountSource:'token'}),publicUrl:PUBLIC_URL,qrSvgFn:qrSvg});
+ assert.ok(tokenSvg.includes('A work card read from a Yoma account'));
+ assert.ok(!tokenSvg.includes('fictional persona'));
+ const withdrawnSvg=cardSvg({record:record({accountSource:'sample'}),publicUrl:PUBLIC_URL,qrSvgFn:qrSvg,withdrawn:true});
+ assert.ok(withdrawnSvg.includes('This card was withdrawn by its owner.'));
+ assert.ok(!sampleHtml.includes('verified by Yoma'));
+});

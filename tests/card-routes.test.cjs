@@ -148,6 +148,27 @@ test('POST /api/card/account keeps stored opportunity details when Yoma is unrea
  assert.equal(json.snapshot.completions[0].live,null);
  assert.equal(json.snapshot.completions[0].organizationName,'Alison Learning');
 });
+// Token-mode account reads: the route maps the source's errors (account.js) to 502 with the source's code.
+function tokenSourceThrowing(err){return {kind:'token',apiBase:liveConfig.yomaBase,listPersonas:()=>[],async read(){throw err;}};}
+test('POST /api/card/account answers 502 yoma_unavailable (retryable) when the token read cannot reach Yoma',async()=>{
+ const {base}=await boot({config:{...liveConfig,yomaAccessToken:'t'},accountSource:tokenSourceThrowing(new YomaUnavailable())});
+ const res=await post(base,'/api/card/account',{});
+ assert.equal(res.status,502);
+ const json=await res.json();
+ assert.equal(json.error.code,'yoma_unavailable');
+ assert.equal(json.error.retryable,true);
+ assert.equal(json.error.message,'Yoma could not be reached. Try again in a moment.');
+});
+test('POST /api/card/account answers 502 yoma_auth (not retryable) when Yoma rejects the token',async()=>{
+ const authErr=new Error('Yoma rejected the access token. Refresh YOMA_ACCESS_TOKEN on the server; sample mode still works.');authErr.code='yoma_auth';
+ const {base}=await boot({config:{...liveConfig,yomaAccessToken:'t'},accountSource:tokenSourceThrowing(authErr)});
+ const res=await post(base,'/api/card/account',{});
+ assert.equal(res.status,502);
+ const json=await res.json();
+ assert.equal(json.error.code,'yoma_auth');
+ assert.equal(json.error.retryable,false);
+ assert.equal(json.error.message,authErr.message);
+});
 
 test('POST /api/card/draft runs the pipeline with the model and reports dropped lines',async()=>{
  const {base,provider}=await boot();

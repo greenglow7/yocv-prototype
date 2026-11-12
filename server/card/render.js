@@ -18,6 +18,8 @@ const STRINGS={
   noServices:'No services listed yet',
   liveMissing:'Opportunity details could not be checked with Yoma',
   withdrawn:(date)=>'This card was withdrawn by its owner on '+date,
+  sampleAccount:'Fictional sample account: this card was built from a sample persona, not a real Yoma user. The completions reference real Yoma opportunities.',
+  sampleSvg:'Sample card · fictional persona',
   notFound:'No card with this code',
   checkUnavailable:'Could not check with Yoma right now',
   confirmedTitle:'Confirmed from Yoma',
@@ -118,7 +120,7 @@ const CSS=[
   '.identity{display:flex;gap:14px;align-items:center}.identity img{width:72px;height:72px;border-radius:50%;object-fit:cover;background:var(--line)}',
   '.trade{font-size:16px;margin:0}.meta{font-size:14px;color:var(--muted);margin:4px 0 0}',
   'ul{list-style:none;margin:0;padding:0}li{padding:8px 0;border-top:1px solid var(--line)}li:first-child{border-top:0}',
-  '.small{font-size:13px;color:var(--muted)}.chip{display:inline-block;background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:4px 10px;margin:4px 4px 0 0;font-size:14px}',
+  '.small{font-size:13px;color:var(--muted)}.small.sample{margin:8px 0 0;padding:8px 12px;border:1px dashed var(--line);border-radius:8px;background:var(--card)}.chip{display:inline-block;background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:4px 10px;margin:4px 4px 0 0;font-size:14px}',
   '.stated{background:var(--stated)}.stated h2{color:var(--grey)}.price{float:right;color:var(--muted)}',
   '.wa{display:block;text-align:center;background:#1f8f4c;border-color:#1f8f4c;margin-top:8px}',
   '.safety{font-weight:600;text-align:center;margin:16px 0}',
@@ -257,6 +259,7 @@ function publicPage({record,status='ok',check=null,withdrawn=null,publicUrl='',n
 
   let body='<header><span>'+escapeHtml(STRINGS.readFrom(first,fullDate(record?.snapshotReadAt),timeOfDay(record?.snapshotReadAt)))+'</span>'+
     '<form method="post" action="/c/'+escapeHtml(id)+'/check" id="check-form" data-api="/api/card/'+escapeHtml(id)+'/check"><button type="submit">'+escapeHtml(STRINGS.checkNow)+'</button></form></header>';
+  if(record?.accountSource==='sample')body+='<p class="small sample">'+escapeHtml(STRINGS.sampleAccount)+'</p>';
   body+=checkSection(check,notice);
   body+='<section><div class="identity">'+(photo?'<img src="'+escapeHtml(photo)+'" alt="" loading="lazy">':'')+
     '<div><h1>'+escapeHtml(name)+'</h1>'+(trade?'<p class="trade">'+escapeHtml(trade)+(area?' · '+escapeHtml(area):'')+'</p>':(area?'<p class="trade">'+escapeHtml(area)+'</p>':''))+
@@ -313,7 +316,7 @@ function cardSvg({record,publicUrl='',qrSvgFn,withdrawn=false}={}){
     '<rect width="'+W+'" height="'+H+'" fill="#ffffff"/>',
     '<rect width="'+W+'" height="220" fill="#5b2a86"/>',
     svgText(60,96,'YoCard',{size:44,weight:700,fill:'#ffffff'}),
-    svgText(60,150,'A work card read from a Yoma account',{size:28,fill:'#e9ddf5'})];
+    svgText(60,150,record?.accountSource==='sample'?STRINGS.sampleSvg:'A work card read from a Yoma account',{size:28,fill:'#e9ddf5'})];
   if(withdrawn){
     parts.push(svgText(60,420,'This card was withdrawn by its owner.',{size:44,weight:700}));
     parts.push(svgText(60,480,'Open the link to see the current status.',{size:30,fill:'#5d5566'}));

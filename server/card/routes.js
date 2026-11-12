@@ -297,7 +297,7 @@ function createCardRouter({config,accountSource,provider,store,key,yoma,publicUr
     if(!Array.isArray(disclose.completions??[])||!Array.isArray(disclose.skills??[]))return sendError(res,400,'invalid_input',MESSAGES.disclose,false);
     if(wantCompletions.some(id=>typeof id!=='string'||!knownCompletions.has(id))||wantSkills.some(id=>typeof id!=='string'||!knownSkills.has(id)))return sendError(res,400,'invalid_input',MESSAGES.disclose,false);
     if(!isPlainObject(payload.selfDeclared))return sendError(res,400,'invalid_input',MESSAGES.selfDeclared,false);
-    // Spec §3.3: organisation names from the account's live organisation list must not appear in the
+    // Spec §3.3: organisation names from the account snapshot must not appear in the
     // self-declared text. The draft applies this from the snapshot; the worker may edit the fields after
     // the draft, so publish applies the same list again.
     const organisationNames=[...new Set([

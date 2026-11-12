@@ -1,6 +1,6 @@
 # Testing log — Week 6 (2026-11-12)
 
-Environment: macOS, Node v25.8.1, server in sample mode (no model key available), Yoma production API reachable. Automated suite: `npm test` → 151 tests, 150 pass, 1 skipped (live model smoke test).
+Environment: macOS, Node v25.8.1, server in sample mode (no model key available), Yoma production API reachable. Automated suite: `npm test` → 253 tests, 251 pass, 0 fail, 2 skipped (the two credential-gated live model tests); 151 was the Phase 1 count before YoCard.
 
 Provider exercised live: **none**. The Azure OpenAI and OpenAI-compatible adapters are unit-tested with an injected `fetch` only. First action for the next sprint: run `npm test` with a real `.env`.
 
@@ -24,8 +24,10 @@ Provider exercised live: **none**. The Azure OpenAI and OpenAI-compatible adapte
 | 14 | Static allowlist | `/server/config.js`, `/.env`, `/tests/core.test.cjs`, `/docs/x`, `/data/role-skills.json` → 404; `/data/sample-credential.json` → 200. |
 | 15 | Opportunities per role | Retail assistant → "customer service" (4 items), Customer support assistant → "customer service" (4), Community outreach assistant → "community" (4). Cached responses labelled "From Yoma (cached)". |
 | 16 | 360 px viewport on the preview step | No horizontal overflow (`scrollWidth === innerWidth`); opportunity cards stack; pill truncates with ellipsis. |
-| 17 | Keyboard and screen reader | Error block is focusable and receives focus on failure; busy text sits in an `aria-live="polite"` region; the mode pill carries an `aria-label`; opportunity links have descriptive text. Not tested with VoiceOver. |
+| 17 | Keyboard and screen reader | Error block is focusable and receives focus on failure; busy text sits in an `aria-live="polite"` region; the mode pill is a `role="status"` live region; opportunity links have descriptive text. Not tested with VoiceOver. |
 | 18 | Concurrency guard | Covered by `tests/server.test.cjs` (fifth concurrent generate → 503 busy). Not reproduced manually. |
+| 19 | 375 px: header buttons keep a visible label and a 44 px target; muted text raised to 4.5:1; body text floor 11 px | Pass after fix. Previously the header label was hidden on phones, several greys sat below 4.5:1 and some text was 9 to 10 px. Checked in the browser pane at 375 px: `scrollWidth === 375`, header and footer buttons 44 px tall. |
+| 20 | Stalled request (server accepts the connection but never answers) | Client-side 30 s deadline (`withDeadline` in `app.js`, `AbortController`) → "The server did not answer in time. You can retry." with Retry and Continue in sample mode; exercised by stubbing `fetch` to reject with an `AbortError`. |
 
 ## Open issues for the next sprint
 
@@ -40,7 +42,7 @@ Provider exercised live: **none**. The Azure OpenAI and OpenAI-compatible adapte
 
 # YoCard (Phase 2) — 2026-11-12
 
-Automated: `npm test` → see the final count at the end of this file. Suites added: qr, card-sign, card-store, card-account, card-draft, card-render, card-routes.
+Automated: `npm test` → 253 tests, 251 pass, 0 fail, 2 skipped (both live model tests; no key on this machine). Suites added: qr, card-sign, card-store, card-account, card-draft, card-render, card-routes.
 
 | # | Scenario | Result |
 | --- | --- | --- |
@@ -56,6 +58,11 @@ Automated: `npm test` → see the final count at the end of this file. Suites ad
 | 10 | 360 px public page | No horizontal overflow. |
 | 11 | Token account path | Unit-tested with injected fetch only. Not exercised against stage or production (no token). |
 | 12 | Live model draft | Not exercised (no key). The template draft was used throughout. |
+| 13 | YoCard server unreachable from the browser (connection dropped, 375 px) | Pass. With `fetch` stubbed to reject on the connect step: error block "The YoCard server could not be reached. Check your connection and try again." with a Retry button, pill "Sample mode (offline)". Restoring the connection and pressing Retry reads the account, clears the error and returns the pill to "Sample mode" (`card.js` `api()` maps a rejected fetch to `{code:'network', retryable:true}` and re-checks `/api/card/status` once the server answers again). |
+| 14 | Model endpoint unreachable during draft (server started with `OPENAI_API_KEY=fake OPENAI_BASE_URL=http://127.0.0.1:9/v1 PORT=4196`; `POST /api/card/account {persona:'thandi'}` then `POST /api/card/draft`) | 502 `provider_error`, `retryable: true`, message "The AI service returned an error. You can retry or continue in sample mode." (connection refused maps to `provider_error`, not `provider_timeout`). Posting the same draft again with `mode: 'sample'` → 200, `generation.mode: 'sample'`, provider `local`, one service "Braids and cornrows" R150–R400, three confirms lines. |
+| 15 | Yoma unreachable or token rejected during the account read | Covered by two route tests in `tests/card-routes.test.cjs`: a token source whose `read()` throws `YomaUnavailable` → 502 `yoma_unavailable`, `retryable: true`; a `yoma_auth` error → 502 `yoma_auth`, `retryable: false`, message echoed. Both pass; no route change was needed. |
+| 16 | Non-English description through the template draft (sample mode, `runDraft` with `provider: null` against `server/card/draft.js`) | No crash, three confirms lines, no validator rejections. isiZulu "Ngenza izinwele eKhayelitsha, R150 kuya ku-R400. 8am kuya ku-6pm. Ngikhuluma isiZulu nesiNgisi." → languages `["isiZulu"]`, hours "8am kuya ku-6pm", but the price range splits: service 1 "Ngenza izinwele eKhayelitsha" with no price, service 2 named "Kuya ku-R400" with `priceFrom: 150`, `priceTo: null`, ZAR. Kiswahili "Nasuka nywele Kibera, KSh 300 hadi KSh 800. Jumatatu hadi Jumamosi. Ninazungumza Kiswahili na Kiingereza." → languages `["Kiswahili"]`, hours empty (the days land in notes), service 2 named "Hadi KSh 800" with `priceFrom: 300`, `priceTo: null`, KES. The worker can correct both in review. Live model behaviour untested. |
+| 17 | Public page and SVG for a sample persona | Pass. Published Thandi on PORT=4196 (template draft): the page carries "Fictional sample account: this card was built from a sample persona, not a real Yoma user. The completions reference real Yoma opportunities." after the "Read from …" header, the SVG subtitle reads "Sample card · fictional persona" (not "A work card read from a Yoma account"), and "verified by Yoma" appears in neither. Page 7,338 bytes. Card withdrawn afterwards. |
 
 Open issues for the next sprint:
 
@@ -66,7 +73,7 @@ Open issues for the next sprint:
 5. Lookalike-domain risk: trust is domain trust until the card is hosted under yoma.world.
 6. SVG footer text overflows the image width (reviewer note); shorten or wrap on the image.
 7. Minor: `check` endpoints are unauthenticated and write `lastCheck` to disk; add a per-card rate limit.
-ℹ tests 249
-ℹ pass 248
-ℹ fail 0
-ℹ skipped 1
+8. The template price parser only understands "-", "–" and "to" as range words, so "R150 kuya ku-R400" and "KSh 300 hadi KSh 800" split into two services (scenario 16); add per-language range words (kuya ku, hadi, à) or rely on the live model.
+9. The server's provider error message says "continue in sample mode" while the YoCard button says "Continue with template draft"; align the wording.
+
+Final automated count after Phase 2: `npm test` → 253 tests, 251 pass, 0 fail, 2 skipped (the two live model tests in `tests/live.test.cjs`, skipped without a model key; the two live Yoma tests ran against api.yoma.world).

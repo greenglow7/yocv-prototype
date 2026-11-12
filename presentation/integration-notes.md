@@ -10,7 +10,7 @@
 | No Yoma data | Live learning opportunities per role from Yoma's public API on the CV page |
 | Synthetic "Demo Learning Partner" credential | Representative sample based on Yoma's wallet credential model |
 | "Sample mode" pill, static | Mode pill reflects the server's real state: Live AI, Sample mode, or Sample mode (offline) |
-| 10 tests | 151 tests, including route, provider, validator and Yoma client suites with injected fakes, plus a live smoke test that runs only with credentials |
+| 10 tests | 253 tests (151 after Phase 1), including route, provider, validator and Yoma client suites with injected fakes, the YoCard suites (qr, card-sign, card-store, card-account, card-draft, card-render, card-routes), two live Yoma tests that run on every connected run, and two live model smoke tests that run only with credentials |
 
 ## Yoma data sources used
 
@@ -69,10 +69,17 @@ So the only honest "verification" this week is a consented read of the account, 
 | Endpoint | Auth | Used for |
 | --- | --- | --- |
 | `GET /opportunity/{id}/info` | none | Organisation, verification method, evidence types, participant counts, yoma.world link for each completion (real, live, cached one hour) |
-| `GET /opportunity/search/filter/organization` | none | Organisation names used to keep organisation claims out of the self-declared block |
 | `GET /user` | bearer (token mode) | Display name, Yo-ID flags, phone confirmed, counts, date of birth (age gate only, never stored) |
 | `GET /user/skills` | bearer (token mode) | Skills with the organisations that awarded them (production has no verified/self-attested split yet) |
 | `POST /myOpportunity/search` `{action:'Verification', verificationStatuses:['Completed']}` | bearer (token mode) | Completed opportunities with evidence types from `verifications[]` |
+
+The organisation-name check on the self-declared block is not a Yoma call. It uses the organisation names already in the account snapshot (each completion's `organizationName` and each skill's `organizations[].name`; see `snapshotOrganisations` in `server/card/draft.js` and the publish check in `server/card/routes.js`), so an organisation the worker has no record with is not blocked.
+
+## How YoCard maps onto Yoma's codebase
+
+- Entry point: the Yo-ID dashboard (`src/web/src/pages/yoid/*` in didx-xyz/yoma), next to the credentials and skills views, is where a "work card" would live. Under a Keycloak session the connect step disappears: the token adapter in `server/card/account.js` (which today reads a copied bearer token or a sample persona) is replaced by direct calls to `GET /user`, `GET /user/skills` and `POST /myOpportunity/search` on the user's own session, and the sample personas go away.
+- Portable server modules: `server/card/draft.js` (with `server/validate.js` and `server/providers/*`, both shared with YoCV) becomes the drafting and grounding step of a card service, with the model deployment Yoma controls; `server/card/sign.js` becomes a signing key Yoma holds, so the record is signed by Yoma rather than by a third-party host; `server/card/store.js` becomes a card entity in Yoma's API (consented fields, disclosure flags, withdrawal) instead of JSON files; `server/card/render.js` and `server/qr.js` become an anonymous public route that renders the page, the SVG and the signed record from that entity.
+- The public page `/c/:id` becomes a yoma.world route served through the existing ActionLink and QR machinery (`ActionLinkEntityType` extended from Opportunity to a card or profile entity), which gives it Yoma's domain for WhatsApp previews and zero-rating and removes the lookalike-domain problem.
 
 ## What a real integration needs, in order
 

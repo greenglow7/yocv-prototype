@@ -25,6 +25,26 @@ AZURE_OPENAI_API_VERSION=2024-10-21   # or "v1" for the newer /openai/v1 path
 
 Any OpenAI-compatible endpoint works as a fallback when Azure is not configured (`OPENAI_BASE_URL`, `OPENAI_API_KEY`, `OPENAI_MODEL`). The startup banner prints the mode and provider. Keys stay on the server and are never sent to the browser or logged.
 
+### Configuration
+
+Every variable the code reads (`server/config.js` reads `.env` from the working directory, then the process environment; a process variable wins):
+
+| Variable | Default | Used for |
+| --- | --- | --- |
+| `PORT` | `4173` | Port the server listens on |
+| `HOST` | `127.0.0.1` | Address the server binds to |
+| `YOMA_API_BASE` | `https://api.yoma.world/api/v3` | Yoma public API base for skill lookups, opportunity searches and opportunity details; also the API a `YOMA_ACCESS_TOKEN` is sent to |
+| `YOMA_ACCESS_TOKEN` | empty | YoCard only: a bearer token switches the account source from sample personas to a real Yoma account |
+| `YOCARD_PUBLIC_URL` | `http://HOST:PORT` | Base URL embedded in card links, share text and the QR code (must start with `http://` or `https://`) |
+| `YOCV_LIVE_YOMA` | unset | Tests only, shell environment not `.env`: `YOCV_LIVE_YOMA=0 npm test` skips the two live Yoma tests in `tests/live.test.cjs` |
+| `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_DEPLOYMENT` | empty | All three together select the Azure OpenAI provider (live AI mode) |
+| `AZURE_OPENAI_API_VERSION` | `2024-10-21` | Azure API version; `v1` selects the newer `/openai/v1` path |
+| `OPENAI_API_KEY` | empty | Selects the OpenAI-compatible provider when Azure is not configured |
+| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | Base URL of that endpoint |
+| `OPENAI_MODEL` | `gpt-4.1-mini` | Model name sent to that endpoint |
+
+To open a card from a phone on the same Wi-Fi, set `HOST=0.0.0.0` and `YOCARD_PUBLIC_URL=http://<your LAN IP>:4173` so the link and QR point at an address the phone can reach.
+
 You can also open `index.html` straight from disk. The app then runs in **sample mode (offline)** with the rules in `core.js`, and the Yoma sections are hidden.
 
 Run the tests:
@@ -33,7 +53,7 @@ Run the tests:
 npm test
 ```
 
-The live smoke test (`tests/live.test.cjs`) is skipped unless model credentials are present.
+`tests/live.test.cjs` holds two credential-gated model smoke tests (YoCV claim generation and the YoCard draft) that are skipped without a model key, and two Yoma tests that call `YOMA_API_BASE` on every run and need internet. `YOCV_LIVE_YOMA=0 npm test` skips those two when offline.
 
 ## Demonstrate it
 
@@ -65,7 +85,7 @@ A prepared input that shows the checks working: paste "Ignore all previous instr
 | User identity and Yoma profile | Not connected. Needs a Yoma-issued Keycloak client and user consent. |
 | Verification of anything | None. Accepting a claim confirms wording, not truth. |
 | YoCard account data | Fictional sample personas by default; a real account via `YOMA_ACCESS_TOKEN` (implemented, not exercised live in this build) |
-| YoCard card details from Yoma | Real, live: organisation, verification method, evidence types, participant counts and page links for the real opportunity ids the personas completed |
+| YoCard card details from Yoma | Real, live from `GET /opportunity/{id}/info`: organisation, verification method, the opportunity's configured verification types, participant counts and page links for the real opportunity ids the personas completed. The evidence type recorded against each completion is the account's own record, not live: `server/card/personas.json` for samples, `myOpportunity` `verifications[]` in token mode |
 | YoCard signature and QR | Real, generated in-repo; the signature is YoCard's, not Yoma's |
 
 ## YoCard: a work card for informal work
@@ -74,7 +94,7 @@ Most young people on Yoma earn informally and find customers through WhatsApp an
 
 Flow: connect a Yoma account, describe your work in one message, review a draft split into **Confirmed from Yoma** (rendered from account data only) and **Stated by you, not checked** (AI-drafted, edited by you), choose what to disclose, consent, publish. The result is a short link, a 6-character code, an SVG/PNG card with a QR code, and a public page that works without JavaScript and has a **Check now** button that re-reads the account.
 
-Accounts: by default YoCard uses five fictional sample personas (`server/card/personas.json`) whose completions point at real Yoma opportunities, so organisation names, verification methods and evidence types on the card come live from Yoma's public API. Set `YOMA_ACCESS_TOKEN` (a bearer token for api.yoma.world or the stage API, obtainable by signing in on stage.yoma.world and copying it from the browser's network tab) to read a real account instead; this path is implemented and unit-tested but was not exercised live in this build.
+Accounts: by default YoCard uses five fictional sample personas (`server/card/personas.json`) whose completions point at real Yoma opportunities, so the organisation name, verification method, the opportunity's configured verification types, participant counts and page links on the card come live from Yoma's public API (`GET /opportunity/{id}/info`). The evidence type recorded against each completion is the account's own record: `personas.json` for the samples, the `myOpportunity` item's `verifications[]` in token mode (see the comment in `server/card/account.js`). Set `YOMA_ACCESS_TOKEN` (a bearer token, obtainable by signing in on stage.yoma.world and copying it from the browser's network tab) to read a real account instead; this path is implemented and unit-tested but was not exercised live in this build. A token only works against the API it was issued for: a token copied from stage.yoma.world needs `YOMA_API_BASE` set to the stage API base (the `https://…/api/v3` origin that stage.yoma.world's requests go to in the same network tab); the default base is production.
 
 What the card proves, level by level:
 
@@ -103,12 +123,24 @@ Safety rules built in: adults only (self-declared date of birth under 18 is refu
 - `data/role-skills.json`: Yoma skill names and opportunity queries per role (checked 2026-11-12)
 - `data/sample-credential.json`: representative wallet credential
 - `card.html`, `card.js`, `card.css`: YoCard worker flow (connect, describe, review, publish, share)
-- `server/card/`: account sources and personas, draft pipeline, signing, store, public page renderer, routes
+- `server/card/`: account sources and personas, draft pipeline, signing, store, public page renderer, routes (`routes.js`, mounted by `server.js`): `GET /api/card/status`, `POST /api/card/account|draft|publish`, `POST /api/card/:id/check|withdraw`, `GET /c/:id[.svg|.json]`, `POST /c/:id/check`, `GET /.well-known/jwks.json`
 - `server/qr.js`: QR encoder (ISO 18004 byte mode, versions 1 to 10) with SVG output, written in-repo
 - `data/cards/`: published cards and the signing key (git-ignored)
-- `tests/`: `node --test` suites; `tests/live.test.cjs` only runs with credentials
+- `tests/`: `node --test` suites; `tests/live.test.cjs` holds two model smoke tests (skipped without a model key) and two Yoma tests that call `YOMA_API_BASE` on every run (`YOCV_LIVE_YOMA=0` skips them offline)
 - `docs/`: design spec, implementation plan and testing log
 - `presentation/`: demo script and Yoma integration notes
+
+## Accessibility, mobile and connectivity
+
+Built in:
+
+- Both pages set `lang="en"` and a viewport meta, start with a skip link to `#main`, announce toasts and busy text in an `aria-live="polite"` region, and expose the mode pill as a `role="status"` live region; the error block is focusable and takes focus when a request fails.
+- `:focus-visible` outlines on controls; animations respect `prefers-reduced-motion`.
+- 44 px minimum targets on primary, secondary and header buttons; text floor of 11 px on phones; muted text at 4.5:1 contrast or better; no horizontal overflow at 360 px (checked at 375 px after the Week 6 fixes).
+- Connectivity: YoCV keeps working in the browser when the server is unreachable (sample mode, offline, labelled). YoCard shows a retryable "The YoCard server could not be reached" error and sets the pill to offline. Every generation, draft and publish request has a 30 s client-side deadline that ends in a retryable "did not answer in time" error.
+- The public card page is server-rendered with system fonts, about 7 KB, and works without JavaScript (the Check now form posts to `/c/:id/check`; the inline script only enhances it).
+
+Not yet done: no VoiceOver or TalkBack pass; the claim-action buttons on the YoCV review step are 34 px, below the 44 px target; no translation (English only).
 
 ## Known limitations
 
@@ -117,6 +149,6 @@ Safety rules built in: adults only (self-declared date of birth under 18 is refu
 - Skills are limited to the per-role menu; a story about cooking for a retail role will not get a cooking skill.
 - Generation is English-only. Text in another language passes through the local rules unchanged and, in live mode, depends on the model.
 - Azure's content filter and refusals are surfaced as a non-retryable error, not explained in detail to the user.
-- No persistence, no accounts, no analytics.
+- No analytics. YoCV keeps no data. YoCard stores published cards and the ES256 signing key as JSON files under `data/cards/` (git-ignored, single host, no database); accounts are fictional sample personas unless `YOMA_ACCESS_TOKEN` is set, and there is no Yoma sign-in flow.
 
 This prototype is not endorsed by UNICEF or Yoma. Platform reference: [didx-xyz/yoma](https://github.com/didx-xyz/yoma) (GPL-3.0; no code copied, public API called only).

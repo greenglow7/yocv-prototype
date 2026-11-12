@@ -32,12 +32,12 @@ function go(step){state.step=step;state.maxStep=Math.max(step,state.maxStep);sta
 function renderSteps(){steps.innerHTML=stepNames.map((name,i)=>`<button class="step-button ${i===state.step?'active':i<state.step?'completed':''}" data-step="${i}" ${i>state.maxStep||state.published?'disabled':''} ${i===state.step?'aria-current="step"':''}><span class="step-number">${i<state.step?'✓':String(i+1).padStart(2,'0')}</span><span>${name}</span></button>`).join('');}
 function intro(kicker,title,text){return `<div class="intro"><span class="eyebrow">${kicker}</span><h1 tabindex="-1">${title}</h1><p>${text}</p></div>`;}
 function modePillText(){return status.offline?'Sample mode (offline)':isLive()?'Live AI · '+(status.model.model||status.model.provider):'Sample mode';}
-function updatePill(){if(!pill)return;const text=modePillText();pill.className='mode-pill '+(status.offline?'offline':isLive()?'live':'sample');pill.innerHTML=`<span></span> ${E(text)}`;pill.setAttribute('aria-label','Generation mode: '+text);}
+function updatePill(){if(!pill)return;const text=modePillText();pill.className='mode-pill '+(status.offline?'offline':isLive()?'live':'sample');pill.innerHTML=`<span></span> ${E(text)}`;}
 function confirmAction(title,copy,label,fn){pendingAction=fn;document.querySelector('#confirm-title').textContent=title;document.querySelector('#confirm-copy').textContent=copy;document.querySelector('#confirm-action').textContent=label;document.querySelector('#confirm-dialog').showModal();}
 
 /* Step 1: connect */
 function connect(){
- if(status.offline)return `${intro('STEP 01 / CONNECT YOMA','Start the YoCard server.','This page needs the local server to read an account, draft a card and publish it.')}<div class="notice">Run <code>npm start</code> in the project folder and reload this page. Published cards are served by the same server.</div>`;
+ if(status.offline)return `${intro('STEP 01 / CONNECT YOMA','Start the YoCard server.','This page needs the local server to read an account, draft a card and publish it.')}<div class="notice">Run <code>npm start</code> in the project folder and reload this page. Published cards are served by the same server.</div>${errorHTML()}`;
  const sample=status.accountSource==='sample';
  return `${intro('STEP 01 / CONNECT YOMA','What Yoma already knows about you.',sample?'These are fictional sample accounts. A real account needs a Yoma-issued sign-in client, which this prototype does not have.':'This server is configured with a Yoma access token. It reads the account behind that token.')}${sample?`<div class="section-kicker">PICK A SAMPLE ACCOUNT</div><div class="persona-list" role="group" aria-label="Sample accounts">${status.personas.map(p=>`<button class="persona-card ${p.id===state.persona?'selected':''}" data-persona="${E(p.id)}" aria-pressed="${p.id===state.persona}"><span class="persona-avatar" aria-hidden="true">${E(p.displayName.split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase())}</span><span class="persona-text"><strong>${E(p.displayName)}</strong><small>${E(tradeLabel(p.trade))}${p.city?' · '+E(p.city):''}</small></span><span class="radio-dot" aria-hidden="true"></span></button>`).join('')}</div>`:''}${errorHTML()}<div class="busy-note" aria-live="polite">${state.busy?E(state.busyText):''}</div><div class="action-row"><button class="primary" data-action="read-account" ${state.busy||(sample&&!state.persona)?'disabled':''}>${sample?'Read this account':'Read my Yoma account'} ${arrow()}</button></div><p class="tiny-note">YoCard is for adults. Accounts whose Yoma date of birth shows under 18 are refused.</p>${state.snapshot?accountSummary():''}`;
 }
@@ -84,12 +84,25 @@ function published(){
  const p=state.published;
  return `${intro('YOUR CARD IS LIVE','Share it. Print it. Show it.','Customers open the link, see what Yoma recorded and what you say, and can check it again any time.')}<div class="result-grid"><section><div class="card-preview" id="card-preview"><img src="${E(p.svgUrl)}" alt="Your YoCard image with QR code" id="card-image"></div><div class="ladder"><h3>What this card proves, and what it does not</h3><ol><li>The image proves nothing; it says so and carries the code <strong>${E(p.code)}</strong> so a customer can match it to the page.</li><li>The page is signed by YoCard: it has not been edited since you published. Not a Yoma signature.</li><li>The green block was read from your Yoma account at a stated time. “Check now” reads it again.</li><li>The WhatsApp button, if on, goes only to the phone Yoma confirmed by code. That is not an ID check.</li><li>Each completion links to its live page on yoma.world, so the programme and organisation can be checked.</li></ol></div></section><aside><div class="link-box"><h3>Your link</h3><code id="card-link">${E(p.url)}</code><div class="tiny-note">Card code</div><div class="big-code">${E(p.code)}</div><button class="primary" data-action="share">Share to WhatsApp</button><button class="secondary" data-action="copy-link">Copy link</button><button class="secondary" data-action="download-png">Download image (PNG)</button><a class="secondary" href="${E(p.url)}" target="_blank" rel="noopener noreferrer">Open the public page ↗</a><button class="text-button" data-action="print">Print QR</button><div class="secret-box">Owner secret (keep it; it is the only way to withdraw this card):<code id="owner-secret">${E(p.ownerSecret)}</code><button class="text-button" data-action="withdraw">Withdraw this card</button></div></div></aside></div>`;
 }
-function render(){renderSteps();view.innerHTML=[connect,describe,review,publishStep][state.step]();view.setAttribute('aria-busy',String(state.busy));}
+/* Focus preservation across innerHTML replacement. */
+function focusSnapshot(){try{const a=document.activeElement;if(!a||!view.contains(a))return null;const key=a.tagName==='BUTTON'?['role','example','persona','trade','action'].find(k=>a.dataset[k]!==undefined):undefined;if(!a.id&&!key)return null;const sel=typeof a.selectionStart==='number'&&typeof a.selectionEnd==='number'?[a.selectionStart,a.selectionEnd]:null;return {id:a.id,key,val:key?a.dataset[key]:null,sel};}catch{return null;}}
+function focusRestore(f){if(!f)return;try{const esc=v=>window.CSS&&CSS.escape?CSS.escape(v):String(v).replace(/["\\]/g,'\\$&');const el=f.id?document.getElementById(f.id):view.querySelector(`button[data-${f.key}="${esc(f.val)}"]`);if(!el||el.disabled)return;el.focus({preventScroll:true});if(f.sel&&typeof el.setSelectionRange==='function')el.setSelectionRange(f.sel[0],f.sel[1]);}catch{}}
+function render(){const f=focusSnapshot();renderSteps();view.innerHTML=[connect,describe,review,publishStep][state.step]();view.setAttribute('aria-busy',String(state.busy));focusRestore(f);}
 
 /* Server access */
+function withDeadline(ms){const c=new AbortController();const t=setTimeout(()=>c.abort(),ms);return {signal:c.signal,clear:()=>clearTimeout(t)};}
 async function api(path,body){
- const res=await fetch(path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+ const d=withDeadline(30000);let res;
+ try{res=await fetch(path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body),signal:d.signal});}
+ catch(e){
+  const timedOut=!!(e&&e.name==='AbortError');
+  const err=new Error(timedOut?'The server did not answer in time. You can retry.':'The YoCard server could not be reached. Check your connection and try again.');
+  err.code=timedOut?'timeout':'network';err.retryable=true;err.status=0;
+  if(!timedOut)loadStatus();
+  throw err;
+ }finally{d.clear();}
  const data=await res.json().catch(()=>({}));
+ if(status.offline)await loadStatus();
  if(res.ok)return data;
  const err=new Error(data.error?.message||'Something went wrong.');err.code=data.error?.code||'error';err.retryable=!!data.error?.retryable;err.status=res.status;err.details=data.error;throw err;
 }
@@ -107,7 +120,7 @@ async function readAccount(){
   state.disclose={completions:d.snapshot.completions.map(c=>c.evidenceId),skills:d.snapshot.skills.map(s=>s.evidenceId),photo:!!d.snapshot.user.photoURL,whatsapp:false};
   const p=status.personas.find(p=>p.id===state.persona);if(p&&!state.trade)state.trade=p.trade;
   render();notify('Account read. Nothing is public yet.');document.querySelector('.account-summary h3')?.scrollIntoView({behavior:'smooth',block:'start'});
- }catch(err){state.busy=false;setError(err.message,err.code==='yoma_unavailable'?{retryable:true}:null);render();focusError();}
+ }catch(err){state.busy=false;setError(err.message,(err.retryable===true||err.code==='yoma_unavailable')?{retryable:true}:null);render();focusError();}
 }
 async function draftCard(mode){
  if(state.busy)return;
@@ -119,7 +132,7 @@ async function draftCard(mode){
  }catch(err){
   state.busy=false;
   const allowSample=err.status===502&&mode!=='sample';
-  setError(err.message,(err.retryable||allowSample)?{retryable:!!err.retryable,allowSample}:null);render();focusError();
+  setError(err.message,(err.retryable===true||allowSample)?{retryable:err.retryable===true,allowSample}:null);render();focusError();
  }
 }
 async function publishCard(){
@@ -133,7 +146,7 @@ async function publishCard(){
   state.busy=false;
   const detail=err.details?.rejected?.length?' Dropped: '+err.details.rejected.map(r=>r.field?r.field+' ('+r.reason+')':r.reason).join(', ')+'.':'';
   if(err.code==='session_expired'){setError(err.message);state.maxStep=0;}
-  else setError(err.message+detail);
+  else setError(err.message+detail,err.retryable===true?{retryable:true}:null);
   render();focusError();
  }
 }
@@ -189,7 +202,7 @@ view.addEventListener('click',async event=>{
  if(action==='to-describe')go(1);
  if(action==='back')go(state.step-1);
  if(action==='draft')await draftCard();
- if(action==='retry-draft')await draftCard();
+ if(action==='retry-draft'){if(state.step===0)await readAccount();else if(state.step===3)await publishCard();else await draftCard();}
  if(action==='sample-draft')await draftCard('sample');
  if(action==='add-service'){state.selfDeclared.services.push({name:'',priceFrom:null,priceTo:null,currency:''});render();document.querySelector(`[data-service="${state.selfDeclared.services.length-1}"][data-key="name"]`)?.focus();}
  if(action==='remove-service'){state.selfDeclared.services.splice(Number(button.dataset.index),1);render();}
