@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#41204b"><meta name="description" content="YoCV helps you turn everyday experience into a CV, with control over every claim.">
+  <title>YoCV — Your experience counts</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='14' fill='%2341204b'/%3E%3Cpath d='M15 13h13l6 6v16H15z' fill='none' stroke='white' stroke-width='2'/%3E%3Cpath d='m20 26 4 4 7-8' fill='none' stroke='%23b6edcf' stroke-width='3'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="core.js"></script><script defer src="app.js"></script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="topbar">
+  <a class="brand" href="#" aria-label="YoCV home"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="m9 13 2 2 4-5"/></svg></span><span>Yo<span class="brand-light">CV</span></span><span class="concept-tag">A Yoma concept</span></a>
+  <div class="top-actions"><span class="mode-pill"><span></span> Sample mode</span><button class="text-button" id="about-button">About this demo <span aria-hidden="true">↗</span></button></div>
+</header>
+<div class="app-shell">
+  <aside class="sidebar" aria-label="CV progress">
+    <div class="sidebar-title">YOUR NEXT CHAPTER</div>
+    <nav id="steps"></nav>
+    <div class="sidebar-bottom"><div class="small-symbol" aria-hidden="true">♡</div><strong>Every experience counts.</strong><p>A first job. Helping at home. Showing up for your community.</p><div class="privacy-mini"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 11h12v10H6zM8 11V7a4 4 0 0 1 8 0v4"/></svg>Your draft stays in this session.</div></div>
+  </aside>
+  <main id="main" tabindex="-1"><div id="view"></div></main>
+</div>
+<footer class="app-footer"><span>Made for your next opportunity.</span><span>Independent student prototype <span aria-hidden="true">·</span> Synthetic demo data</span><button class="text-button" id="reset-button">Reset demo</button></footer>
+<div id="toast" role="status" aria-live="polite"></div>
+<dialog id="about-dialog" aria-labelledby="about-title"><div class="dialog-top"><span class="eyebrow">A LOOK BEHIND THE DEMO</span><button class="icon-button close-dialog" aria-label="Close dialog">×</button></div><h2 id="about-title">Useful wording.<br>Transparent sources.</h2><p>YoCV is an independent student concept for Yoma. It helps young people review how their experience appears in a CV.</p><div class="about-grid"><section><span class="tag green">Working now</span><h3>A complete CV journey</h3><p>Role selection, local sample suggestions, individual claim review, source records, CV preview and downloads.</p></section><section><span class="tag amber">Demonstrated with samples</span><h3>Evidence and generation</h3><p>Credentials are synthetic. The generator uses local rules and templates, with no live AI call. Selected files stay on your device; this prototype records their names and your descriptions only.</p></section></div><h3>Proposed Yoma integration</h3><p>Enter through Yo-ID’s existing CV placeholder or an opportunity. With consent, retrieve profile, skills and credential details. Add a server-side model service and an access-controlled claim review record. Live Yoma sign-in, AI, document verification and job submission are future work.</p><p class="fine-print">Approving a sentence does not verify it. An issuer’s credential supports only the achievement it actually records. No UNICEF or Yoma endorsement is implied.</p><a class="source-link" href="https://github.com/Devin-Fitzpatrick06/yoma" target="_blank" rel="noopener noreferrer">Platform reference: Devin-Fitzpatrick06/yoma ↗</a></dialog>
+<dialog id="confirm-dialog" aria-labelledby="confirm-title"><div class="dialog-top"><span class="eyebrow">BEFORE YOU CONTINUE</span><button class="icon-button close-dialog" aria-label="Close dialog">×</button></div><h2 id="confirm-title">Start a fresh review?</h2><p id="confirm-copy">Changing the source or role replaces your suggestions and clears their review decisions.</p><div class="dialog-actions"><button class="secondary close-dialog">Keep my draft</button><button class="primary" id="confirm-action">Start fresh</button></div></dialog>
+<noscript><p class="notice">Please enable JavaScript to use the CV builder.</p></noscript>
+</body></html>
