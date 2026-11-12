@@ -1,48 +1,50 @@
-# YoCV integration and prototype status
+# YoCV integration notes (Week 6)
 
-## Repository reference
+## What changed since the midterm
 
-The intended repository is [Devin-Fitzpatrick06/yoma](https://github.com/Devin-Fitzpatrick06/yoma), a fork of didx-xyz/yoma. Inspected through the connected GitHub account on October 31, 2026. GitHub reported pull and push access to the fork. No branch, commit, pull request or file was created in that repository during this task.
-
-The [Yo-ID dashboard](https://github.com/Devin-Fitzpatrick06/yoma/blob/master/src/web/src/pages/yoid/index.tsx#L201-L214) contains a static CV placeholder. Its original CV card entered the recorded history on [July 29, 2024](https://github.com/Devin-Fitzpatrick06/yoma/commit/71b83eb1b4b0b6e58a66ebbaa52e50de3807e5be). The [August 1, 2024 update](https://github.com/Devin-Fitzpatrick06/yoma/commit/233f765d78fdf4b2425daf982db1554d0561215d) introduced the current “Coming soon...” wording. This history establishes a reserved UI area, not current development status or a committed roadmap.
-
-## What works in this prototype
-
-| Area | Implemented behavior |
+| Midterm | Week 6 |
 | --- | --- |
-| Role | Three illustrative entry-level roles; role affects suggested skill prioritisation |
-| Inputs | Editable profile, informal responsibilities, optional dates, synthetic credential, optional file metadata and user statement |
-| Suggestions | Local text cleanup and source-linked skill rules. No invented metrics, dates or employers |
-| Review | Individual accept/edit/reject; unresolved review blocks export; all-rejected draft blocks an empty CV |
-| Evidence | Self-reported, awaiting-verification and synthetic issuer-achievement categories; source and original wording retained |
-| Edits | Edited wording becomes self-reported. Edits to issuer-based wording clear the displayed source date while preserving it as related-source metadata |
-| Output | Reviewed CV preview, print/Save as PDF, plain-text CV, HTML evidence record and JSON evidence record |
-| Privacy | In-memory session, explicit downloads and reset; no CV content or selected files sent to an external service |
-| Accessibility | Labelled controls, keyboard focus, status messages, native dialogs, non-colour category labels and reduced-motion styling |
+| Generation used local rules in the browser; no AI call | A Node server calls a configured model (Azure OpenAI or OpenAI-compatible) with a strict JSON schema; local rules remain as the labelled sample mode |
+| No grounding beyond templates | Server-side validators reject suggestions whose quote is not in the user's text, that contain invented numbers, that assert credentials, or that duplicate others; rejections are shown in the evidence record |
+| Skills were free text from rules | Skills are resolved against Yoma's live skill taxonomy and carry the Yoma skill id and Lightcast link |
+| No Yoma data | Live learning opportunities per role from Yoma's public API on the CV page |
+| Synthetic "Demo Learning Partner" credential | Representative sample based on Yoma's wallet credential model |
+| "Sample mode" pill, static | Mode pill reflects the server's real state: Live AI, Sample mode, or Sample mode (offline) |
+| 10 tests | 151 tests, including route, provider, validator and Yoma client suites with injected fakes, plus a live smoke test that runs only with credentials |
 
-## Simulated and future elements
+## Yoma data sources used
 
-The local template generator is not a live language model. The current runtime has no supplied model credential or built-in model connection. No live-model adapter has been shipped or tested. The product must continue displaying “Sample mode” until a real model is connected and validated. This remains the principal gap against a deliverable requiring real AI inference.
+All calls go from the YoCV server to `https://api.yoma.world/api/v3`, the same public API the yoma.world site uses. They are unauthenticated, read-only, and no API client or approval has been requested. Checked on 2026-11-12.
 
-All issuer credentials are synthetic fixtures. The document picker does not upload or read content. There is no production sign-in, real Yoma data retrieval, cryptographic validation, document authenticity check, opportunity application or recruiter-sharing endpoint. The app is an independent student concept and implies no UNICEF or Yoma endorsement.
+| Endpoint | Used for | Notes |
+| --- | --- | --- |
+| `GET /lookup/skill?nameContains=<name>&pageNumber=1&pageSize=20` | Resolve each role's skill names to `{id, name, infoURL}` | Substring match, alphabetical; the client keeps only the exact (case-insensitive) name. `nameContains` must be 3 to 50 characters; pagination is mandatory. |
+| `GET /opportunity/type` | Find the "Learning" type id | Production types on 2026-11-12: Event, Job, Learning, Task, Other. |
+| `POST /opportunity/search` `{pageNumber, pageSize, valueContains, types:[learningId]}` | Learning opportunities for a role | `valueContains` is a phrase match, 3 to 50 characters. Items carry `title, organizationName, organizationLogoURL, summary, yomaInfoURL, commitmentIntervalDescription, difficulty, skills[{id,name,infoURL}], zltoReward, isCompletable`. |
 
-## Verified code interfaces in the intended fork
+Observed limits: requests need a non-default user agent (Python's default was refused with HTTP 403; Node's `fetch` and curl are accepted). Verified counts for Learning-type searches: "customer service" 45, "customer" 72, "community" 30, "retail" 22, "volunteer" 1, "customer support" 1, "community outreach" 0, "retail customer service" 0. Query phrases per role live in `data/role-skills.json`.
 
-- The [frontend package](https://github.com/Devin-Fitzpatrick06/yoma/blob/master/src/web/package.json) specifies Next.js 16.2.6. This standalone app uses buildless HTML/CSS/JavaScript for portability; eventual integration would follow Yoma’s existing frontend conventions.
-- The [user service](https://github.com/Devin-Fitzpatrick06/yoma/blob/master/src/web/src/api/services/user.ts) retrieves the profile with `GET /user` and skills with `GET /user/skills`. This fork’s client call does not take the newer upstream verified-skill filter. Confirm the backend response and classification before treating any skill as verified.
-- The [credential service](https://github.com/Devin-Fitzpatrick06/yoma/blob/master/src/web/src/api/services/credentials.ts) uses `POST /ssi/wallet/user/search` and `POST /ssi/wallet/user/{id}`. Read credential details rather than assuming a title establishes a skill. Existing comments and mocks in that file are not evidence that live credentials were tested here.
-- The [credential model](https://github.com/Devin-Fitzpatrick06/yoma/blob/master/src/web/src/api/models/credential.ts) includes issuer, issue date and detail attributes. Preserve the signed achievement separately from rewritten CV prose.
+Every skill name in `data/role-skills.json` was confirmed to exist in the taxonomy on 2026-11-12 (for example "Customer Service" is `448bb36e-6e5a-4c5a-9150-78703666c37a`). Names such as "Communication", "Attention To Detail", "Volunteering" and "Sales" do not exist as plain entries and are not used. Menu entries containing "certif", "licens", "diploma" or "degree" are filtered out so the model cannot attach a certification-style skill to self-reported text.
 
-## Proposed implementation inside Yoma
+## Credential sample
 
-1. Replace or link the existing CV placeholder with a YoCV route. Offer a second entry from a selected opportunity when the product team approves that journey.
-2. Reuse Yoma’s existing session and authorisation. Ask the user which profile details, achievements and skills they want to use.
-3. Build a backend generation endpoint. Keep provider keys server-side. Send role requirements and selected experience rather than contact details. Set a retention policy, validate structured results and preserve input when a request fails. The actual provider remains a product-team decision.
-4. Store each source separately from each proposed claim. Suggested fields: source ID/type, source text, issuer/date, scope and verification status; original and final claim text; source links; review decision; generation mode/version; and review timestamps. Revisions must invalidate old approvals.
-5. Treat issuer verification as a property of the original achievement. User approval is a separate property of CV wording. Rewritten or expanded claims do not inherit cryptographic verification.
-6. Create an evidence-access policy before sharing. A public CV should not automatically expose uploaded files or private profile data. The prototype’s downloadable local evidence record is not a production sharing scheme.
-7. Pilot with synthetic data first. Measure statement accuracy, evidence-category comprehension, task completion and usefulness. Do not report these as improvements until measured.
+`data/sample-credential.json` follows the shape of Yoma's credential model (`src/web/src/api/models/credential.ts` in didx-xyz/yoma, read 2026-11-12: `id, artifactType, schemaType, issuer, issuerLogoURL, title, dateIssued, attributes[]`). The issuing organisation named is a real Yoma partner (Atingi) but the credential was not issued by Yoma. Reading a user's actual credentials needs the holder's own session: `POST /ssi/wallet/user/search` and `POST /ssi/wallet/user/{id}` are authorised to the logged-in user only.
 
-## Verification performed
+## How the feature maps onto Yoma's codebase
 
-Ten core behavioral tests pass, including two regressions found in independent review. Browser checks cover the full desktop and 390px mobile journeys, review gating, edits, rejection, downloads, PDF printing, reset, empty input, stale-source blocking and regeneration. All five mobile screens had no horizontal overflow at both 390px and 360px. Testing used synthetic data and did not sign in to Yoma.
+- Entry point: the Yo-ID dashboard's "CV, coming soon" placeholder (`src/web/src/pages/yoid/index.tsx`) is the natural home. YoCV's buildless frontend would be re-implemented in Yoma's Next.js app following its conventions; the server logic (`server/generation.js`, `server/validate.js`, `server/providers/*`) is framework-independent and could move into a Yoma API service.
+- Profile and skills: replace the self-typed profile with `GET /user` and the sample credential with `POST /ssi/wallet/user/search`, both under the user's Keycloak session. On stage and master `GET /user/skills?type=Verified` separates verified from self-attested skills; production does not yet expose the `type` field, so a production integration must treat all `/user/skills` as "earned on Yoma" until it ships.
+- Skill taxonomy: Yoma already stores Lightcast skills; a server-side integration would read them from the database rather than the public lookup.
+- Evidence record: store each source separately from each proposed claim (source id and type, source text, issuer and date, original and final wording, review decision, generation mode and model, validator rejections, timestamps). Edits must invalidate earlier approvals. Rewritten wording never inherits a credential's verification.
+
+## What a live GenU integration still needs
+
+1. A Keycloak client in realm `yoma` (stage first) for the YoCV service, scopes `openid profile email yoma-api`, issued by Yoma support. `yoma-web` is confidential and cannot be reused.
+2. A consent step listing exactly which profile fields, skills and credentials are used, matching the Terms' "full profile never visible unless you consent".
+3. A model deployment Yoma controls (Azure OpenAI in a region acceptable under Yoma's data terms), with the same strict schema and grounding checks; only the experience text is sent, never contact details.
+4. A decision on where the evidence record lives and who can read it. A public CV must not expose uploaded files or private profile data.
+5. A pilot with synthetic data first, measuring statement accuracy, comprehension of evidence categories, completion and usefulness.
+
+## Not done and not claimed
+
+No Yoma sign-in, no reading of the user's real credentials, no document reading or verification, no cryptographic checks, no job application or recruiter sharing. The live model path is implemented and unit-tested but was not exercised with real credentials in this build. This prototype implies no UNICEF or Yoma endorsement.
