@@ -190,7 +190,11 @@ function confirmedSection(record){
   let html='<section><h2>'+escapeHtml(STRINGS.confirmedTitle)+'</h2>';
   html+='<p class="small">'+phoneLine+'</p>';
   if(completions.length)html+='<ul>'+completions.map(completionItem).join('')+'</ul>';
-  else html+='<p class="empty">No completed opportunities shared on this card.</p>';
+  else{
+    const trade=str(record?.trade).trim();
+    const nudge=trade?' <a href="https://yoma.world/opportunities?query='+encodeURIComponent(trade)+'" rel="noopener">Find verified opportunities for '+escapeHtml(trade.toLowerCase())+' on Yoma</a>, which add issuer-recorded completions to this card.':'';
+    html+='<p class="empty">No completed opportunities shared on this card.'+nudge+'</p>';
+  }
   if(skills.length)html+='<p>'+skills.map(skillChip).join('')+'</p>';
   if(confirms.length){
     html+='<h2>'+escapeHtml(STRINGS.whatConfirms)+'</h2><ul>'+confirms.map(l=>'<li>'+escapeHtml(l?.text)+'</li>').join('')+'</ul>';

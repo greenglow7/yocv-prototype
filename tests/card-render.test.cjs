@@ -186,3 +186,13 @@ test('cardSvg shows the fixed strings whole: the stated-by line clips the name, 
  assert.ok(line[1].length<=18,line[1]);
  assert.ok(line[1].startsWith('Nomvula-Precious'));
 });
+
+test('public page nudges an empty-state card to Yoma opportunities for the trade',()=>{
+ const {publicPage}=require('../server/card/render.js');
+ const record={cardId:'ABCDEFGHJK',code:'ABC234',publishedAt:'2026-11-12T10:00:00Z',trade:'Cleaner',selfDeclared:{headline:'',services:[],area:'Durban',hours:'',languages:[],notes:''},confirms:[],disclosed:{completions:[],skills:[]},user:{displayName:'Sipho Dlamini',firstName:'Sipho',photoURL:null,country:'ZA',city:'Durban',dateYoIDOnboarded:'2026-01-01T00:00:00Z',dateCreated:'2026-01-01T00:00:00Z',phoneNumberConfirmed:true,phoneLast3:'131',opportunityCountCompleted:0},whatsapp:{enabled:false},accountSource:'sample',personaId:'sipho',snapshotReadAt:'2026-11-12T10:00:00Z',generation:null};
+ const html=publicPage({record,publicUrl:'http://127.0.0.1:4173'});
+ assert.match(html,/No completed opportunities shared on this card\./);
+ assert.match(html,/https:\/\/yoma\.world\/opportunities\?query=Cleaner/);
+ assert.match(html,/Find verified opportunities for cleaner on Yoma/);
+ assert.match(html,/No services listed yet/);
+});
