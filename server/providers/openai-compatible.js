@@ -60,8 +60,9 @@ async function callChatCompletions({url,headers,body,fetch=globalThis.fetch,slee
   }
 }
 
-// Extracts and validates choices[0].message.content against the strict shape.
-function completionToOutput(json,menuNames){
+// Extracts choices[0].message.content and parses it as JSON. Refusal, a
+// truncated answer and non-JSON content all map to provider_bad_output.
+function completionToJson(json){
   const bad=(retryable=true)=>new ProviderError('provider_bad_output',messages.provider_bad_output,{retryable,status:200});
   const choice=Array.isArray(json?.choices)?json.choices[0]:undefined;
   if(!choice||typeof choice!=='object')throw bad();
@@ -71,10 +72,14 @@ function completionToOutput(json,menuNames){
   if(choice.finish_reason==='length')throw bad();
   if(choice.finish_reason==='content_filter')throw new ProviderError('provider_bad_output',messages.provider_content_filter,{retryable:false,status:200});
   if(typeof message.content!=='string')throw bad();
-  let output;
-  try{output=JSON.parse(message.content);}catch{throw bad();}
+  try{return JSON.parse(message.content);}catch{throw bad();}
+}
+
+// Extracts and validates choices[0].message.content against the strict YoCV shape.
+function completionToOutput(json,menuNames){
+  const output=completionToJson(json);
   const check=validateOutput(output,menuNames);
-  if(!check.ok)throw bad();
+  if(!check.ok)throw new ProviderError('provider_bad_output',messages.provider_bad_output,{retryable:true,status:200});
   return output;
 }
 
@@ -94,6 +99,20 @@ function createChatProvider({name,model,url,headers,bodyExtra={}},{fetch=globalT
       };
       const json=await callChatCompletions({url,headers,body,fetch,sleep,timeoutMs,signal});
       return {output:completionToOutput(json,menuNames)};
+    },
+    // Generic structured completion (YoCard draft pipeline): the caller owns
+    // the messages and the strict schema; this only transports and parses.
+    async complete({schemaName,schema,messages:chat,maxTokens=900,temperature=0.2}={},{signal}={}){
+      if(typeof schemaName!=='string'||!schemaName||!schema||typeof schema!=='object'||!Array.isArray(chat))throw new TypeError('complete() needs schemaName, schema and messages');
+      const body={
+        ...bodyExtra,
+        messages:chat,
+        response_format:{type:'json_schema',json_schema:{name:schemaName,strict:true,schema}},
+        temperature,
+        max_tokens:maxTokens
+      };
+      const json=await callChatCompletions({url,headers,body,fetch,sleep,timeoutMs,signal});
+      return completionToJson(json);
     }
   };
 }
@@ -111,4 +130,4 @@ function createOpenAICompatibleProvider(openaiConfig,deps={}){
   },deps);
 }
 
-module.exports={createOpenAICompatibleProvider,createChatProvider,callChatCompletions,completionToOutput,RETRY_DELAY_MS};
+module.exports={createOpenAICompatibleProvider,createChatProvider,callChatCompletions,completionToOutput,completionToJson,RETRY_DELAY_MS};

@@ -310,3 +310,55 @@ test('local provider maps rule-based skill names to Yoma names present in the me
  const noMenu=await provider.generate(input);
  assert.deepEqual(noMenu.output.skills.map(s=>s.name),['Customer communication']);
 });
+
+test('complete() on an OpenAI-compatible provider sends the given schema name and returns the parsed JSON',async()=>{
+ const {fetch,calls}=fakeFetch([{status:200,body:completion({headline:'Braids in Khayelitsha',services:[]})}]);
+ const provider=compat.createOpenAICompatibleProvider(openaiConfig,{fetch,sleep:fakeSleep().sleep});
+ assert.equal(typeof provider.complete,'function');
+ const schema={type:'object',properties:{headline:{type:'string'},services:{type:'array',items:{type:'string'}}},required:['headline','services'],additionalProperties:false};
+ const messages=[{role:'system',content:'Output JSON only.'},{role:'user',content:'Braids in Khayelitsha'}];
+ const result=await provider.complete({schemaName:'yocard_self_declared',schema,messages});
+ assert.deepEqual(result,{headline:'Braids in Khayelitsha',services:[]});
+ assert.equal(calls.length,1);
+ assert.equal(calls[0].url,'https://api.openai.com/v1/chat/completions');
+ assert.equal(calls[0].init.headers.authorization,'Bearer '+KEY);
+ const body=JSON.parse(calls[0].init.body);
+ assert.equal(body.model,'gpt-4.1-mini');
+ assert.deepEqual(body.messages,messages);
+ assert.equal(body.response_format.type,'json_schema');
+ assert.equal(body.response_format.json_schema.name,'yocard_self_declared');
+ assert.equal(body.response_format.json_schema.strict,true);
+ assert.deepEqual(body.response_format.json_schema.schema,schema);
+ assert.equal(body.temperature,0.2);assert.equal(body.max_tokens,900);
+ const tuned=fakeFetch([{status:200,body:completion({ok:true})}]);
+ await compat.createOpenAICompatibleProvider(openaiConfig,{fetch:tuned.fetch,sleep:fakeSleep().sleep}).complete({schemaName:'x',schema,messages,maxTokens:300,temperature:0});
+ const tunedBody=JSON.parse(tuned.calls[0].init.body);
+ assert.equal(tunedBody.max_tokens,300);assert.equal(tunedBody.temperature,0);
+});
+
+test('complete() on the Azure adapter uses the same transport and maps refusal, length and non-JSON to provider_bad_output',async()=>{
+ const schema={type:'object',properties:{ok:{type:'boolean'}},required:['ok'],additionalProperties:false};
+ const messages=[{role:'user',content:'hi'}];
+ const good=fakeFetch([{status:200,body:completion({ok:true})}]);
+ const provider=azure.createAzureProvider(azureConfig,{fetch:good.fetch,sleep:fakeSleep().sleep});
+ assert.deepEqual(await provider.complete({schemaName:'yocard_confirms',schema,messages}),{ok:true});
+ assert.equal(good.calls[0].init.headers['api-key'],KEY);
+ assert.equal(JSON.parse(good.calls[0].init.body).response_format.json_schema.name,'yocard_confirms');
+ const cases=[
+  {status:200,body:{choices:[{finish_reason:'stop',message:{role:'assistant',content:null,refusal:'No.'}}]}},
+  {status:200,body:completion({ok:true},{finish_reason:'length'})},
+  {status:200,body:completion('{"ok": ')}
+ ];
+ for(const step of cases){
+  const {fetch}=fakeFetch([step]);
+  await assert.rejects(azure.createAzureProvider(azureConfig,{fetch,sleep:fakeSleep().sleep}).complete({schemaName:'x',schema,messages}),err=>{assert.ok(err instanceof errors.ProviderError);assert.equal(err.code,'provider_bad_output');return true;});
+ }
+ const auth=fakeFetch([{status:401,body:'nope'}]);
+ await assert.rejects(azure.createAzureProvider(azureConfig,{fetch:auth.fetch,sleep:fakeSleep().sleep}).complete({schemaName:'x',schema,messages}),err=>{assert.equal(err.code,'provider_auth');return true;});
+});
+
+test('the local provider has no complete()',()=>{
+ const provider=local.createLocalProvider(require('../core.js'));
+ assert.equal(typeof provider.complete,'undefined');
+ assert.equal(typeof provider.generate,'function');
+});

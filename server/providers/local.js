@@ -1,6 +1,8 @@
 'use strict';
 // Local adapter (spec §5.5): wraps the rule-based generator in core.js so
 // sample mode runs through the same pipeline, validators and metadata.
+// It deliberately has no complete(): the YoCard draft pipeline treats a
+// provider without complete() as sample mode and uses its own local draft.
 const {ProviderError}=require('./errors.js');
 
 // The rule-based generator uses plain-language skill names. Map each to the

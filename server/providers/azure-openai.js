@@ -1,6 +1,7 @@
 'use strict';
 // Azure OpenAI chat completions adapter (spec §5.1). Shares HTTP, retry and
-// error mapping with the OpenAI-compatible adapter via createChatProvider.
+// error mapping with the OpenAI-compatible adapter via createChatProvider,
+// which also supplies the generic complete() used by the YoCard draft pipeline.
 const {ProviderError,messages}=require('./errors.js');
 const {createChatProvider}=require('./openai-compatible.js');
 
