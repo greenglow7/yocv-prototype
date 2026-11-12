@@ -1,0 +1,14 @@
+{
+  "Retail assistant": {
+    "skillNames": ["Customer Service", "Cash Handling", "Merchandising", "Stock Control", "Inventory Management", "Retail Sales", "Teamwork", "Organizational Skills", "Time Management", "Reliability", "Willingness To Learn"],
+    "opportunityQueries": ["retail", "customer service"]
+  },
+  "Customer support assistant": {
+    "skillNames": ["Customer Support", "Customer Service", "Active Listening", "Problem Solving", "Interpersonal Communications", "Conflict Resolution", "Record Keeping", "Scheduling", "Digital Literacy", "Computer Literacy", "Data Entry", "Multitasking"],
+    "opportunityQueries": ["customer service", "customer"]
+  },
+  "Community outreach assistant": {
+    "skillNames": ["Community Outreach", "Event Planning", "Public Speaking", "Teamwork", "Interpersonal Communications", "Organizational Skills", "Social Media", "Gardening", "Caregiving", "Cooking", "Reliability", "Willingness To Learn"],
+    "opportunityQueries": ["community", "volunteer"]
+  }
+}
