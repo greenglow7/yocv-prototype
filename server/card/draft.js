@@ -299,7 +299,7 @@ const NUMBER='\\d[\\d,]*(?:\\.\\d+)?';
 const PRICE=new RegExp('(?:^|(?<=[\\s(]))(?:(?<sym>'+SYMBOLS+')\\s?|(?<letter>[RN]))(?<from>'+NUMBER+')(?:\\s*(?:-|–|to)\\s*(?:'+SYMBOLS+'\\s?|[RN])?(?<to>'+NUMBER+'))?','u');
 const CURRENCY_OF={ZAR:'ZAR',KSH:'KES',KES:'KES',NGN:'NGN','₦':'NGN','US$':'USD',USD:'USD','$':'USD','GH₵':'GHS',GHS:'GHS',UGX:'UGX',TZS:'TZS',R:'ZAR',N:'NGN'};
 const COUNTRY_CURRENCY=[[/south africa/i,'ZAR'],[/kenya/i,'KES'],[/nigeria/i,'NGN'],[/ghana/i,'GHS'],[/uganda/i,'UGX'],[/tanzania/i,'TZS'],[/zambia/i,'ZMW'],[/malawi/i,'MWK'],[/zimbabwe/i,'ZWL'],[/rwanda/i,'RWF'],[/ethiopia/i,'ETB']];
-const HOURS=/\b(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*\b|\bdaily\b|\bevery ?day\b|\bweekends?\b|\bweekdays?\b|24\/7|\b\d{1,2}(?::\d{2})?\s?(?:am|pm)\b/i;
+const HOURS=/\b(?:mon(?:day)?|tues?(?:day)?|wed(?:nesday)?|thu(?:rs?(?:day)?)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)s?\b|\bdaily\b|\bevery ?day\b|\bweekends?\b|\bweekdays?\b|24\/7|\b\d{1,2}(?::\d{2})?\s?(?:am|pm)\b/i;
 const NOT_A_PLACE=new Set(['i','we','monday','tuesday','wednesday','thursday','friday','saturday','sunday','mon','tue','wed','thu','fri','sat','sun','january','february','march','april','may','june','july','august','september','october','november','december','whatsapp','yoma']);
 const AREA=/\b(?:in|around|near|based in|from|at)\s+((?:[A-Z][\p{L}'’-]*)(?:\s+(?:[A-Z][\p{L}'’-]*|and|&|of|de))*(?:\s+(?:town|city|township|market|area|road|street|estate|village|district|suburb|cbd|central))?)/u;
 // A price clause whose only other word is a unit ("per trip", "a job") belongs to the service before it.

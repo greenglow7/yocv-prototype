@@ -236,3 +236,10 @@ test('ProviderError from the model propagates and malformed output maps to provi
  const shape=fakeProvider({yocard_self_declared:'not an object',yocard_confirms:goodConfirms});
  await assert.rejects(runDraft({snapshot:thandi,trade:'hair',description,provider:shape}),err=>{assert.ok(err instanceof ProviderError);assert.equal(err.code,'provider_bad_output');return true;});
 });
+
+test('local draft does not mistake "mobile money" or "monthly" for opening hours',()=>{
+ const snapshot={user:{country:'KE'},completions:[],skills:[]};
+ const out=draft.localDraft({snapshot,trade:'boda',description:'Boda boda rides in Kisumu, KSh 50 per trip, mobile money accepted, monthly contracts possible. Mon-Sat 6am-8pm.'});
+ assert.doesNotMatch(out.selfDeclared.hours,/mobile|monthly/i);
+ assert.match(out.selfDeclared.hours,/Mon-Sat/);
+});
