@@ -248,6 +248,15 @@ test('the local provider runs through the same pipeline in sample mode',async()=
  assert.equal(exp[0].sourceQuote,'I helped customers find products and packed orders at my aunt’s shop.');
  assert.equal(exp[0].text,'Helped customers find products and packed orders at my aunt’s shop.');
  assert.ok(claims.every(c=>c.generated==='local'));
+ const skill=claims.find(c=>c.kind==='skill');
+ assert.ok(skill,'the rule skill "Customer communication" is mapped to the Yoma skill "Customer Service" present in the menu');
+ assert.equal(skill.text,'Customer Service');
+ assert.equal(skill.yomaSkill.name,'Customer Service');
+ assert.deepEqual(g.rejected,[]);
+});
+test('the local provider skill is rejected when no Yoma alias is in the menu',async()=>{
+ const rs={'Retail assistant':{skillNames:['Cash Handling'],opportunityQueries:['retail']}};
+ const {claims,generation:g}=await runGeneration({input,provider:createLocalProvider(core),yoma:fakeYoma(),roleSkills:rs,core});
  assert.equal(claims.filter(c=>c.kind==='skill').length,0);
  assert.deepEqual(g.rejected,[{kind:'skill',text:'Customer communication',reason:'skill_not_in_menu'}]);
 });

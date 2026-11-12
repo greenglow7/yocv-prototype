@@ -265,14 +265,14 @@ test('GET /api/generate is not allowed',async()=>{
 });
 
 test('GET /api/yoma/opportunities returns completable items from the first phrase with results',async()=>{
- const yoma=fakeYoma({opportunities:{'customer service':[opportunity('a'),opportunity('b',false),opportunity('c'),opportunity('d'),opportunity('e'),opportunity('f')]}});
+ const yoma=fakeYoma({opportunities:{retail:[opportunity('a'),opportunity('b',false),opportunity('c'),opportunity('d'),opportunity('e'),opportunity('f')]}});
  const {base}=await boot({yoma});
  const res=await fetch(base+'/api/yoma/opportunities?role=Retail%20assistant');
  assert.equal(res.status,200);
  assert.equal(res.headers.get('cache-control'),'no-store');
  const json=await res.json();
- assert.deepEqual(yoma.calls.searches,['retail','customer service']);
- assert.equal(json.matchedQuery,'customer service');
+ assert.deepEqual(yoma.calls.searches,['customer service','retail']);
+ assert.equal(json.matchedQuery,'retail');
  assert.equal(json.totalCount,6);
  assert.equal(json.source,'live');
  assert.equal(json.unavailable,false);

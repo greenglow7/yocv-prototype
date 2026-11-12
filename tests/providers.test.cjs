@@ -299,3 +299,14 @@ test('createProvider picks the adapter from config.provider',()=>{
  assert.throws(()=>index.createProvider({provider:'something-else'},core,deps),/provider/i);
  assert.equal(index.ProviderError,errors.ProviderError);
 });
+
+test('local provider maps rule-based skill names to Yoma names present in the menu',async()=>{
+ const provider=local.createLocalProvider(require('../core.js'));
+ const input={role:'Retail assistant',experience:'I helped customers find products at my aunt’s shop.\nI packed orders and kept the shelves organised.',context:'',dates:''};
+ const withMenu=await provider.generate({...input,menuNames:['Cash Handling','Customer Service','Teamwork']});
+ assert.deepEqual(withMenu.output.skills.map(s=>s.name),['Customer Service']);
+ const noMatch=await provider.generate({...input,menuNames:['Cash Handling']});
+ assert.deepEqual(noMatch.output.skills.map(s=>s.name),['Customer communication']);
+ const noMenu=await provider.generate(input);
+ assert.deepEqual(noMenu.output.skills.map(s=>s.name),['Customer communication']);
+});

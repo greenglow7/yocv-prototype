@@ -3,6 +3,25 @@
 // sample mode runs through the same pipeline, validators and metadata.
 const {ProviderError}=require('./errors.js');
 
+// The rule-based generator uses plain-language skill names. Map each to the
+// Yoma (Lightcast) skill names it corresponds to, in preference order; the
+// first alias present in the request's skill menu is used. Unmatched names are
+// passed through unchanged and the pipeline records them as skill_not_in_menu.
+const SKILL_ALIASES={
+  'customer communication':['Customer Service','Customer Support','Interpersonal Communications'],
+  'organisation':['Organizational Skills','Scheduling','Time Management'],
+  'teamwork':['Teamwork'],
+  'attention to detail':['Stock Control','Inventory Management','Record Keeping'],
+  'basic digital skills':['Digital Literacy','Computer Literacy']
+};
+function toYomaName(name,menuNames){
+  const aliases=SKILL_ALIASES[String(name).trim().toLowerCase()];
+  if(!aliases||!Array.isArray(menuNames))return name;
+  const lower=menuNames.map(n=>String(n).toLowerCase());
+  const hit=aliases.find(a=>lower.includes(a.toLowerCase()));
+  return hit||name;
+}
+
 function createLocalProvider(core){
   if(!core||typeof core.localExperienceClaims!=='function')throw new ProviderError('provider_not_configured','The local provider needs core.localExperienceClaims.',{retryable:false});
   return {
@@ -16,7 +35,7 @@ function createLocalProvider(core){
         if(!claim||typeof claim!=='object')continue;
         const sourceQuote=String(claim.sourceQuote??claim.sourceText??experience);
         const reason=String(claim.reason??'');
-        if(claim.kind==='skill')output.skills.push({name:String(claim.text??''),sourceQuote,reason});
+        if(claim.kind==='skill')output.skills.push({name:toYomaName(String(claim.text??''),input?.menuNames),sourceQuote,reason});
         else if(claim.kind==='experience')output.experience.push({text:String(claim.text??''),sourceQuote,reason});
       }
       return {output};

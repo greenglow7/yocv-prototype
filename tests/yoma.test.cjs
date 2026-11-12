@@ -210,6 +210,6 @@ test('role-skills.json has the three roles with skill names and opportunity quer
   assert.ok(Array.isArray(entry.opportunityQueries)&&entry.opportunityQueries.length>0);
   assert.ok(entry.opportunityQueries.every(q=>q.length>=3&&q.length<=50));
  }
- assert.deepEqual(roleSkills['Retail assistant'].opportunityQueries,['retail','customer service']);
+ assert.deepEqual(roleSkills['Retail assistant'].opportunityQueries,['customer service','retail']);
  assert.ok(roleSkills['Retail assistant'].skillNames.includes('Customer Service'));
 });
