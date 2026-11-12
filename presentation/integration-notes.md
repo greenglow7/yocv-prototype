@@ -48,3 +48,40 @@ Every skill name in `data/role-skills.json` was confirmed to exist in the taxono
 ## Not done and not claimed
 
 No Yoma sign-in, no reading of the user's real credentials, no document reading or verification, no cryptographic checks, no job application or recruiter sharing. The live model path is implemented and unit-tested but was not exercised with real credentials in this build. This prototype implies no UNICEF or Yoma endorsement.
+
+# YoCard integration notes (Week 6, Phase 2)
+
+## Why a card and not a CV
+
+GenU's own framing: more than three quarters of young workers, and about 96 percent of employed 15 to 24 year olds in sub-Saharan Africa (ILO), work informally. They get customers through WhatsApp, referrals and trust. A CV is the wrong artifact for them; a checkable card backed by what Yoma already recorded is closer to how they already work.
+
+## What Yoma can and cannot back today (verified in the didx-xyz/yoma source and live API on 2026-11-12)
+
+- Yo-ID is the youth's Keycloak login plus a custodial wallet Yoma holds for them. Yoma issues one Yo-ID credential and one credential per verified opportunity completion, all signed by Yoma (per-organisation signing is future work).
+- There is no third-party verification: the wallet endpoints `POST /ssi/wallet/user/search` and `POST /ssi/wallet/user/{id}` require the holder's own token; the wallet's "Verified" badge is documented as a display result, not a signature check; share links with QR exist only for opportunities (`ActionLinkEntityType = Opportunity`); the raw signed credential is never returned to clients.
+- Production still runs the Aries provider (artifact types JWS and AnonCreds); stage and master run didx:me Wallet Lite with SD-JWT. didx:me supports presentation requests (`POST /me-creds/api/v1/presentations/request`, `GET /me-creds/api/v1/presentations/{id}` returning `isValid` and trust signals) but needs a verifier client issued manually by DIDx.
+- `AccountVerificationMethods` and `phoneNumberConfirmed` are explicitly "not KYC, proof of identity or verification of the user's self-declared profile".
+
+So the only honest "verification" this week is a consented read of the account, labelled as such, plus public cross-checks against live opportunity pages. The card's signature proves integrity of what the worker published, not that Yoma vouches for it.
+
+## Endpoints YoCard uses
+
+| Endpoint | Auth | Used for |
+| --- | --- | --- |
+| `GET /opportunity/{id}/info` | none | Organisation, verification method, evidence types, participant counts, yoma.world link for each completion (real, live, cached one hour) |
+| `GET /opportunity/search/filter/organization` | none | Organisation names used to keep organisation claims out of the self-declared block |
+| `GET /user` | bearer (token mode) | Display name, Yo-ID flags, phone confirmed, counts, date of birth (age gate only, never stored) |
+| `GET /user/skills` | bearer (token mode) | Skills with the organisations that awarded them (production has no verified/self-attested split yet) |
+| `POST /myOpportunity/search` `{action:'Verification', verificationStatuses:['Completed']}` | bearer (token mode) | Completed opportunities with evidence types from `verifications[]` |
+
+## What a real integration needs, in order
+
+1. A Keycloak client in realm `yoma` on stage for YoCard (authorization code, scopes `openid profile email phone yoma-api offline_access`), issued by Yoma support; `yoma-web` is confidential and cannot be reused. Replaces the sample personas and the copied token.
+2. A Yoma-side consented public card: extend `ActionLinkEntityType` to a card or profile entity so the existing link and QR machinery serves it, plus an anonymous endpoint returning only the fields the user consented to. This moves the signature and the "read from Yoma" claim into Yoma and removes the need for a third-party host or stored tokens.
+3. Hosting under yoma.world so WhatsApp link previews carry Yoma's domain and Airtel zero-rating in Nigeria applies.
+4. For L6: Yoma registered as a didx:me verifier, a presentation preset over the Opportunity credential restricted to Yoma's issuer DID, Yoma auto-answering on the custodial holder's behalf with consent, and production cutover from Aries to SD-JWT.
+5. Governance: a consent record per card, POPIA (plus Kenya DPA and Nigeria NDPA) responsible-party decision since Yoma's policy cites GDPR/UK only, UNICEF child-safeguarding review (adults-only is a policy line based on self-declared date of birth, not a control), brand permission, a takedown owner, and Azure AI Content Safety on the self-declared text (classifier coverage of African languages is weak; documented, not built).
+
+## Honest limits of this build
+
+Sample personas are fictional; their completions reference real Yoma opportunities so the live cross-check is real, but no real youth data was read. Check now on a sample card re-reads the same persona and says `simulated: true`. The model draft path uses the same adapters as YoCV and was not exercised against a real key in this build; the template draft is what the demo shows unless a key is configured. The QR encoder was verified against an independent decoder and the browser's BarcodeDetector.

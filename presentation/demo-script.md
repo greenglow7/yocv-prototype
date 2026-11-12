@@ -47,3 +47,50 @@ If the model key is missing or the call fails live: click **Continue in sample m
 - **What does the model receive?** Role, context, dates and the experience text. Never the name, email, city or phone.
 - **Does the file picker read a certificate?** No. It records the filename and the user's statement only.
 - **What should a pilot measure?** Statement accuracy against supplied facts, comprehension of evidence categories, completion rate and usefulness; none measured yet.
+
+---
+
+# YoCard — three-minute live demonstration
+
+Before presenting: `npm start`, open `http://127.0.0.1:4173/card.html`. Have a second phone or a second browser window ready for the customer view.
+
+## 0:00–0:25 — Why a card
+
+**Show:** the YoCard connect screen.
+
+**Say:** "About 96 percent of employed young people in sub-Saharan Africa work informally. They find customers on WhatsApp, not with CVs. So we pivoted: YoCard turns what a worker already has on Yoma into a card a customer can check. The hard constraint we found in Yoma's code is that there is no third-party verification endpoint today, so this card never says 'verified by Yoma'. It says what Yoma's account recorded and when."
+
+## 0:25–0:55 — Connect and describe
+
+**Do:** pick **Thandi Mokoena** (fictional), click **Read this account**. Point at Yo-ID, phone confirmed "(not an ID check)", three completions. Click **Describe my work**, keep **Hairdresser**, paste: *I do braids, cornrows and relaxing in Khayelitsha, R150 to R400. Monday to Saturday, 8am to 6pm. I come to your home. Mobile money accepted. I speak isiXhosa and English.* Click **Draft my card**.
+
+**Say:** "Only that message goes to the AI. Her name and phone never do."
+
+## 0:55–1:35 — Two blocks, two meanings
+
+**Do:** on the review screen, point to the green **Confirmed from Yoma** block: each completion shows the organisation, the date, and what the organisation checked (file upload or automatic), with a link to the live yoma.world page. Point to the grey **Stated by Thandi, not checked** block with the parsed services and prices. Turn on the WhatsApp button and read the "Who can see this" line.
+
+**Say:** "Green is rendered from data; the model never touches it. The plain-language lines each cite the record they come from, and any line that cannot cite one is dropped. Grey is her own words. Prices must appear in her message; the block cannot claim certifications or name organisations."
+
+## 1:35–2:10 — Publish and share
+
+**Do:** click **Choose how to publish**, read the consent list, tick, **Publish my card**. Show the card image, the QR, the code. Click **Share to WhatsApp** or **Open the public page** on the second device.
+
+**Say:** "The record is signed by YoCard so a customer can tell it was not edited after publishing. Not signed by Yoma; we are explicit about that. The QR is generated in our code and scans with any camera."
+
+## 2:10–2:40 — The customer's view
+
+**Do:** on the public page, point to "Read from Thandi's Yoma account on <date>", tap **Check now**, show the green signals and the timestamp, tap a completion to land on yoma.world, show the masked number and the WhatsApp button, and the "Never pay before the work is done" line.
+
+**Say:** "No app, no login, under 40 KB, works with JavaScript off. The customer can re-check, open the real programme page, and message only the number Yoma confirmed."
+
+## 2:40–3:00 — What is real and what is next
+
+**Say:** "Real: the live Yoma opportunity data, the signature, the QR, the grounding checks. Sample: the accounts, because reading a real account needs a Yoma-issued sign-in client. Next: that client, a Yoma-side consented card endpoint so the signature is Yoma's, and the didx:me presentation flow once production moves to SD-JWT."
+
+## Short answers
+
+- **Is this verified by Yoma?** No. It is a consented read of account data, labelled with the time it was read, plus links to live Yoma pages. The signature is ours.
+- **Can a scammer copy the card?** The image proves nothing and says so. The page is on our domain, the WhatsApp button goes only to the confirmed number, and the code on the image must match the page. Real protection needs hosting under yoma.world.
+- **What about minors?** Adults only, from the self-declared date of birth; a policy line, not a control. Flagged for UNICEF safeguarding review.
+- **What happens with no completions?** The card still shows Yo-ID and confirmed phone, and the page links to opportunities for the trade on Yoma.

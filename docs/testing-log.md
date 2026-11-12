@@ -37,3 +37,36 @@ Provider exercised live: **none**. The Azure OpenAI and OpenAI-compatible adapte
 6. **Node 20 compatibility** rests on the Node docs; the dev machine runs Node 25. `npm test` uses `node --test tests/*.test.cjs` because Node 21+ no longer expands a bare directory argument.
 7. **Content filter and refusals** are surfaced as a generic "could not be processed" error; the user gets no hint about what to change.
 8. **Minor review notes** left as-is: unconsumed response body on Yoma non-2xx responses; `source: null` on the unavailable opportunities state; 405 `Allow` header omits HEAD.
+
+# YoCard (Phase 2) — 2026-11-12
+
+Automated: `npm test` → see the final count at the end of this file. Suites added: qr, card-sign, card-store, card-account, card-draft, card-render, card-routes.
+
+| # | Scenario | Result |
+| --- | --- | --- |
+| 1 | Thandi end to end in the browser (sample mode, template draft): connect, describe, review, WhatsApp on, consent, publish | Pass. Draft parsed "Braids R150–R400", hours "Monday to Saturday, 8am to 6pm", languages, notes. Card published with link, code and SVG. |
+| 2 | QR scan | Pass. The SVG rendered to a 1080x1350 PNG in the browser and decoded with `BarcodeDetector` to the exact card URL. The implementer also decoded 96 generated codes (versions 1 to 10, all levels) with macOS Vision, and the reviewer with an independent decoder and OpenCV. |
+| 3 | Public page strings | Pass. All fixed strings present; "verified by Yoma" absent; the full phone number appears only inside the `wa.me` link when WhatsApp is on; `og:image`, check form, yoma.world links present. Page 7.3 KB. |
+| 4 | Signed record | Pass. `/c/<id>.json` returns a three-part ES256 JWT; the record contains no date of birth or email. |
+| 5 | Check now | Pass. Nine signals all ok, `simulated: true` for a sample persona, timestamp returned. |
+| 6 | Under-18 persona (Lerato) | Pass. 403 `under_18` at the account step with the fixed message. |
+| 7 | Empty-state persona (Sipho) | Pass. Zero completions, age 19, masked phone; public page says "No completed opportunities shared on this card" and links to Yoma opportunities for the trade. |
+| 8 | Path tricks (`/c/../.keys.json`, `/c/<id>.svg.json`, `/data/cards/<id>.json`, unknown id) | All 404. |
+| 9 | Hours parsing bug found by review ("mobile money" read as hours) | Fixed; regression test added. |
+| 10 | 360 px public page | No horizontal overflow. |
+| 11 | Token account path | Unit-tested with injected fetch only. Not exercised against stage or production (no token). |
+| 12 | Live model draft | Not exercised (no key). The template draft was used throughout. |
+
+Open issues for the next sprint:
+
+1. Obtain a stage Keycloak client (or at least a stage bearer token) from Yoma and exercise the token path and Check now against real data.
+2. Run the AI draft with a real key; confirm the confirms-lines schema with an evidence-id enum works on Azure strict mode.
+3. The under-18 gate relies on a self-declared date of birth; needs a UNICEF safeguarding decision before any real user.
+4. Content moderation of the self-declared block is only a banned-word and organisation-name check; add Azure Content Safety and decide how to handle non-English text.
+5. Lookalike-domain risk: trust is domain trust until the card is hosted under yoma.world.
+6. SVG footer text overflows the image width (reviewer note); shorten or wrap on the image.
+7. Minor: `check` endpoints are unauthenticated and write `lastCheck` to disk; add a per-card rate limit.
+ℹ tests 249
+ℹ pass 248
+ℹ fail 0
+ℹ skipped 1

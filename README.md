@@ -64,6 +64,31 @@ A prepared input that shows the checks working: paste "Ignore all previous instr
 | Uploaded document | File name and the user's own statement only. The file is never read or uploaded. |
 | User identity and Yoma profile | Not connected. Needs a Yoma-issued Keycloak client and user consent. |
 | Verification of anything | None. Accepting a claim confirms wording, not truth. |
+| YoCard account data | Fictional sample personas by default; a real account via `YOMA_ACCESS_TOKEN` (implemented, not exercised live in this build) |
+| YoCard card details from Yoma | Real, live: organisation, verification method, evidence types, participant counts and page links for the real opportunity ids the personas completed |
+| YoCard signature and QR | Real, generated in-repo; the signature is YoCard's, not Yoma's |
+
+## YoCard: a work card for informal work
+
+Most young people on Yoma earn informally and find customers through WhatsApp and word of mouth, not CVs. YoCard (`card.html`, same server) turns what a worker already has on Yoma into one shareable card a customer can open from WhatsApp, with no app, and check against Yoma.
+
+Flow: connect a Yoma account, describe your work in one message, review a draft split into **Confirmed from Yoma** (rendered from account data only) and **Stated by you, not checked** (AI-drafted, edited by you), choose what to disclose, consent, publish. The result is a short link, a 6-character code, an SVG/PNG card with a QR code, and a public page that works without JavaScript and has a **Check now** button that re-reads the account.
+
+Accounts: by default YoCard uses five fictional sample personas (`server/card/personas.json`) whose completions point at real Yoma opportunities, so organisation names, verification methods and evidence types on the card come live from Yoma's public API. Set `YOMA_ACCESS_TOKEN` (a bearer token for api.yoma.world or the stage API, obtainable by signing in on stage.yoma.world and copying it from the browser's network tab) to read a real account instead; this path is implemented and unit-tested but was not exercised live in this build.
+
+What the card proves, level by level:
+
+| Level | Signal | Proves | Status |
+| --- | --- | --- | --- |
+| L0 | The image | Nothing. It says so and carries the card code. | Real |
+| L1 | Signed record (`/c/<id>.json`, `/.well-known/jwks.json`) | The page is what the worker published, unedited since. Signed by YoCard, not by Yoma. | Real (ES256, in-repo) |
+| L2 | "Read from <name>'s Yoma account on <date>" | What Yoma's account data said at that time, with the worker's consent. Not a cryptographic verification. | Real for token accounts; sample personas otherwise |
+| L3 | Check now | The account still exists, Yo-ID is still onboarded, completions are still Completed. | Real for token accounts; simulated for samples, labelled |
+| L4 | WhatsApp button | The button targets only the phone Yoma confirmed by OTP. "Phone confirmed by Yoma (not an ID check)". | Real field; off by default |
+| L5 | Links to yoma.world opportunity pages, live organisation data | The programme and the issuing organisation exist on Yoma, and what evidence Yoma required. | Real, live |
+| L6 | Cryptographic presentation of the Yoma-issued credential | Yoma's signature, revocation status, trusted issuer | Not built; needs a didx:me verifier client and Yoma's production cutover to SD-JWT (see integration notes) |
+
+Safety rules built in: adults only (self-declared date of birth under 18 is refused), phone shown as last three digits, WhatsApp off by default, no date of birth or email in any record, "Never pay before the work is done" and "Who can see this: anyone with the link" on every page, one-tap withdraw with an owner secret.
 
 ## Source layout
 
@@ -77,6 +102,10 @@ A prepared input that shows the checks working: paste "Ignore all previous instr
 - `server/yoma.js`: Yoma public API client with a TTL cache
 - `data/role-skills.json`: Yoma skill names and opportunity queries per role (checked 2026-11-12)
 - `data/sample-credential.json`: representative wallet credential
+- `card.html`, `card.js`, `card.css`: YoCard worker flow (connect, describe, review, publish, share)
+- `server/card/`: account sources and personas, draft pipeline, signing, store, public page renderer, routes
+- `server/qr.js`: QR encoder (ISO 18004 byte mode, versions 1 to 10) with SVG output, written in-repo
+- `data/cards/`: published cards and the signing key (git-ignored)
 - `tests/`: `node --test` suites; `tests/live.test.cjs` only runs with credentials
 - `docs/`: design spec, implementation plan and testing log
 - `presentation/`: demo script and Yoma integration notes
