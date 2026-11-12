@@ -4,7 +4,8 @@
   "private": true,
   "description": "Standalone YoCV claim-review and CV-generation prototype",
   "scripts": {
-    "test": "node --test tests/core.test.cjs"
+    "start": "node server.js",
+    "test": "node --test tests/*.test.cjs"
   },
   "engines": {
     "node": ">=20"
