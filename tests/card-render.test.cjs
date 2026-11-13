@@ -78,6 +78,9 @@ test('publicPage contains every fixed string, the masked phone, the check form a
  assert.ok(html.includes('On Yoma since 2025'));
  assert.ok(html.includes('3 verified completions'));
  assert.ok(html.includes('12 November 2026'));
+ assert.ok(html.includes('--accent:#41204b'));
+ assert.ok(!html.includes('text-transform'));
+ assert.ok(!html.includes('border-radius:999px'));
  assert.ok(Buffer.byteLength(html)<40*1024,'page under 40 KB');
 });
 
@@ -153,6 +156,10 @@ test('cardSvg is a 1080x1350 image with the name, trade, QR path, code and the n
  assert.ok(svg.includes('Phone confirmed by Yoma (not an ID check)'));
  assert.ok(svg.includes('Braids'));
  assert.ok(!svg.includes('27735550147'));
+ assert.ok(svg.includes('fill="#41204b"'));
+ assert.ok(svg.includes('Confirmed from Yoma'));
+ assert.ok(!svg.includes('CONFIRMED FROM YOMA'));
+ assert.ok(svg.includes('rx="8"'));
 });
 
 test('cardSvg escapes text, uses the injected QR function and shows the empty state',()=>{

@@ -110,23 +110,23 @@ function evidenceLabel(completion){
 // ---------- HTML ----------
 
 const CSS=[
-  ':root{--ink:#1a1024;--muted:#5d5566;--line:#e6e0ea;--ok:#1b7f3b;--bad:#b3261e;--grey:#6b6672;--bg:#faf8fb;--card:#fff;--accent:#5b2a86;--stated:#f1eef3}',
-  '*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:'+FONT+';line-height:1.45;-webkit-text-size-adjust:100%}',
+  ':root{--ink:#1f1a22;--muted:#5d5566;--line:#d9d5dc;--ok:#387f6a;--bad:#b3261e;--grey:#5d5566;--bg:#f6f5f3;--card:#fff;--accent:#41204b;--stated:#f1f0f2}',
+  '*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:'+FONT+';line-height:1.5;-webkit-text-size-adjust:100%}',
   'main{max-width:640px;margin:0 auto;padding:16px}',
   'header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;font-size:14px;color:var(--muted)}',
-  'header form{margin:0}button,.btn{font:inherit;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:999px;padding:8px 16px;cursor:pointer;text-decoration:none;display:inline-block}',
-  'section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}',
-  'h1{font-size:24px;margin:0 0 4px}h2{font-size:16px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}',
-  '.identity{display:flex;gap:14px;align-items:center}.identity img{width:72px;height:72px;border-radius:50%;object-fit:cover;background:var(--line)}',
+  'header form{margin:0}button,.btn{font:inherit;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:4px;padding:8px 16px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-block}',
+  'section{background:var(--card);border:1px solid var(--line);border-radius:4px;padding:16px;margin:12px 0}',
+  'h1{font-size:24px;margin:0 0 4px}h2{font-size:18px;font-weight:700;margin:0 0 8px;color:var(--ink)}',
+  '.identity{display:flex;gap:16px;align-items:center}.identity img{width:72px;height:72px;border-radius:50%;object-fit:cover;background:var(--line)}',
   '.trade{font-size:16px;margin:0}.meta{font-size:14px;color:var(--muted);margin:4px 0 0}',
   'ul{list-style:none;margin:0;padding:0}li{padding:8px 0;border-top:1px solid var(--line)}li:first-child{border-top:0}',
-  '.small{font-size:13px;color:var(--muted)}.small.sample{margin:8px 0 0;padding:8px 12px;border:1px dashed var(--line);border-radius:8px;background:var(--card)}.chip{display:inline-block;background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:4px 10px;margin:4px 4px 0 0;font-size:14px}',
+  '.small{font-size:14px;color:var(--muted)}.small.sample{margin:8px 0 0;padding:8px 12px;border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:4px;background:var(--card)}.chip{display:inline-block;background:var(--stated);border:0;border-radius:4px;padding:2px 6px;margin:4px 4px 0 0;font-size:14px}',
   '.stated{background:var(--stated)}.stated h2{color:var(--grey)}.price{float:right;color:var(--muted)}',
-  '.wa{display:block;text-align:center;background:#1f8f4c;border-color:#1f8f4c;margin-top:8px}',
+  '.wa{display:block;text-align:center;background:var(--accent);border-color:var(--accent);margin-top:8px}',
   '.safety{font-weight:600;text-align:center;margin:16px 0}',
-  '.ok{color:var(--ok)}.bad{color:var(--bad)}.grey{color:var(--grey)}.check li::before{content:"● ";font-size:11px}',
-  'footer{font-size:13px;color:var(--muted);text-align:center;padding:16px 0 32px}footer a{color:var(--accent)}',
-  '.notice{background:#fff6e5;border-color:#f1d9a6}a{color:var(--accent)}.empty{color:var(--grey);font-style:italic}'
+  '.ok{color:var(--ok)}.bad{color:var(--bad)}.grey{color:var(--grey)}.check li{font-size:14px}',
+  'footer{font-size:14px;color:var(--muted);text-align:center;padding:16px 0 32px}footer a{color:var(--accent)}',
+  '.notice{background:var(--card);border-left:4px solid var(--accent)}a{color:var(--accent)}.empty{color:var(--grey);font-style:italic}'
 ].join('');
 
 const SCRIPT=[
@@ -291,7 +291,7 @@ function clip(text,max){
   const s=str(text).replace(/\s+/g,' ').trim();
   return s.length<=max?s:s.slice(0,Math.max(0,max-1)).trimEnd()+'…';
 }
-function svgText(x,y,text,{size=28,weight=400,fill='#1a1024',anchor='start',family=FONT}={}){
+function svgText(x,y,text,{size=28,weight=400,fill='#1f1a22',anchor='start',family=FONT}={}){
   return '<text x="'+x+'" y="'+y+'" font-family="'+escapeHtml(family)+'" font-size="'+size+'" font-weight="'+weight+'" fill="'+fill+'" text-anchor="'+anchor+'">'+escapeHtml(text)+'</text>';
 }
 // Places the QR (its own <svg>) inside the card by wrapping it; the nested svg keeps its viewBox so any
@@ -314,9 +314,9 @@ function cardSvg({record,publicUrl='',qrSvgFn,withdrawn=false}={}){
   const code=str(record?.code);
   const parts=['<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 '+W+' '+H+'" width="'+W+'" height="'+H+'" role="img" aria-label="YoCard">',
     '<rect width="'+W+'" height="'+H+'" fill="#ffffff"/>',
-    '<rect width="'+W+'" height="220" fill="#5b2a86"/>',
+    '<rect width="'+W+'" height="220" fill="#41204b"/>',
     svgText(60,96,'YoCard',{size:44,weight:700,fill:'#ffffff'}),
-    svgText(60,150,record?.accountSource==='sample'?STRINGS.sampleSvg:'A work card read from a Yoma account',{size:28,fill:'#e9ddf5'})];
+    svgText(60,150,record?.accountSource==='sample'?STRINGS.sampleSvg:'A work card read from a Yoma account',{size:28,fill:'#d9d5dc'})];
   if(withdrawn){
     parts.push(svgText(60,420,'This card was withdrawn by its owner.',{size:44,weight:700}));
     parts.push(svgText(60,480,'Open the link to see the current status.',{size:30,fill:'#5d5566'}));
@@ -336,8 +336,8 @@ function cardSvg({record,publicUrl='',qrSvgFn,withdrawn=false}={}){
 
   // Confirmed strip
   let y=470;
-  parts.push('<rect x="60" y="'+(y-40)+'" width="960" height="330" rx="20" fill="#f5f0fa"/>');
-  parts.push(svgText(90,y,'CONFIRMED FROM YOMA',{size:24,weight:700,fill:'#5b2a86'}));
+  parts.push('<rect x="60" y="'+(y-40)+'" width="960" height="330" rx="8" fill="#e6f5f3"/>');
+  parts.push(svgText(90,y,STRINGS.confirmedTitle,{size:24,weight:700,fill:'#387f6a'}));
   y+=50;
   const lines=[];
   const since=monthYear(user.dateYoIDOnboarded);
@@ -353,9 +353,9 @@ function cardSvg({record,publicUrl='',qrSvgFn,withdrawn=false}={}){
 
   // Stated block
   y=830;
-  parts.push('<rect x="60" y="'+(y-40)+'" width="960" height="250" rx="20" fill="#f1eef3"/>');
+  parts.push('<rect x="60" y="'+(y-40)+'" width="960" height="250" rx="8" fill="#f1f0f2"/>');
   // The fixed string stays verbatim (as on the HTML page); only the name is clipped.
-  parts.push(svgText(90,y,STRINGS.statedBy(clip(first,18)),{size:24,weight:700,fill:'#6b6672'}));
+  parts.push(svgText(90,y,STRINGS.statedBy(clip(first,18)),{size:24,weight:700,fill:'#5d5566'}));
   y+=50;
   const services=list(record?.selfDeclared?.services).slice(0,3);
   if(services.length){
@@ -365,17 +365,17 @@ function cardSvg({record,publicUrl='',qrSvgFn,withdrawn=false}={}){
       if(price)parts.push(svgText(990,y,clip(price,24),{size:28,fill:'#5d5566',anchor:'end'}));
       y+=46;
     }
-  }else parts.push(svgText(90,y,STRINGS.noServices,{size:28,fill:'#6b6672'}));
+  }else parts.push(svgText(90,y,STRINGS.noServices,{size:28,fill:'#5d5566'}));
 
   // QR, link, code
   const qr=typeof qrSvgFn==='function'?qrSvgFn(url,{cellSize:4,margin:2}):'';
   if(qr)parts.push(placeQr(qr,60,1070,220));
   parts.push(svgText(310,1120,clip(shortUrl,44),{size:30,weight:600}));
-  parts.push(svgText(310,1172,'Code '+code,{size:34,weight:700,fill:'#5b2a86'}));
+  parts.push(svgText(310,1172,'Code '+code,{size:34,weight:700,fill:'#41204b'}));
   parts.push(svgText(310,1220,STRINGS.notProof,{size:26,fill:'#5d5566'}));
   parts.push(svgText(310,1262,STRINGS.neverPay,{size:26,fill:'#5d5566'}));
   // Centred and small enough to fit the 1080 px width whole; the fixed string is never clipped.
-  parts.push(svgText(540,H-28,STRINGS.footer,{size:18,fill:'#8a8290',anchor:'middle'}));
+  parts.push(svgText(540,H-28,STRINGS.footer,{size:18,fill:'#5d5566',anchor:'middle'}));
   parts.push('</svg>');
   return parts.join('');
 }
