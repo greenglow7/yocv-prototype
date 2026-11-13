@@ -10,7 +10,7 @@
 | No Yoma data | Live learning opportunities per role from Yoma's public API on the CV page |
 | Synthetic "Demo Learning Partner" credential | Representative sample based on Yoma's wallet credential model |
 | "Sample mode" pill, static | Mode pill reflects the server's real state: Live AI, Sample mode, or Sample mode (offline) |
-| 10 tests | 253 tests (151 after Phase 1), including route, provider, validator and Yoma client suites with injected fakes, the YoCard suites (qr, card-sign, card-store, card-account, card-draft, card-render, card-routes), two live Yoma tests that run on every connected run, and two live model smoke tests that run only with credentials |
+| 10 tests | 256 tests (151 after Phase 1), including route, provider, validator and Yoma client suites with injected fakes, the YoCard suites (qr, card-sign, card-store, card-account, card-draft, card-render, card-routes), two live Yoma tests that run on every connected run, and two live model smoke tests that run only with credentials |
 
 ## Yoma data sources used
 

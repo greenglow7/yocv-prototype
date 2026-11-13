@@ -50,7 +50,7 @@ Colours, eight in total:
 | `--page` | `#f6f5f3` | page background |
 | `--panel` | `#ffffff` | panels, inputs, sidebar |
 | `--accent` | `#41204b` | primary buttons, links, active step, focus ring |
-| `--recorded` | `#387f6a` on tint `#e6f5f3` | "Recorded by Yoma" tags and the confirmed tier only |
+| `--recorded` | `#2b6a57` on tint `#e6f5f3` (darkened from Yoma's `#387f6a` after the build: the lighter green measured 4.24:1 on the tint, under AA for 14 px text) | "Recorded by Yoma" tags and the confirmed tier only |
 | `--awaiting` | `#8a5a00` on tint `#fff2d6` | "Awaiting verification" tag |
 | `--stated` | `--muted` on tint `#f1f0f2` | "Self-reported" / "Stated by you" tags and the stated tier |
 | `--error` | `#b3261e` | error text and border |
@@ -87,7 +87,7 @@ Radii: 4 px (inputs, buttons, tags, cards), 8 px (dialog), 50 % (step numbers on
 - Evidence record and opportunities: keep structure; opportunity items become list rows with a 1 px rule, title 16 px 600, meta 14 px, organisation logo at 32 px with a 1 px border, link text "Open on Yoma (yoma.world)" underlined.
 - YoCard tiers: "Recorded by Yoma" section has a 4 px left `--recorded` border and `--recorded` tint on the heading row only; "Stated by you, not checked" has a 4 px left `--line` border. Evidence rows and confirm lines are list items with rules, not white sub-cards. The account summary becomes a two-column definition list (`<dl>`), not stat tiles. Consent box: 1 px border, no tint.
 - Result screen: card image in a 1 px border; link and code in a `<dl>`; buttons stacked, one primary ("Share on WhatsApp"), others secondary; owner secret in a plain `<code>` block with a 1 px border.
-- Public card page (`render.js`): the markup and section order stay; the inline CSS adopts the token values (`--accent` `#41204b`, `--ok` becomes `--recorded` `#387f6a`, `--line` `#d9d5dc`, `--bg` `#f6f5f3`, `--ink` `#1f1a22`, `--stated` tint `#f1f0f2`), `h2` to 18 px 700 sentence case, section radius 4 px, pill buttons to 4 px radius with the WhatsApp button in `--accent` (WhatsApp is named in its label, so it needs no brand green), `.chip` to the tag pattern, bullets "●" in check results to a 14 px text list. SVG: header band `#41204b`, section labels in sentence case 700, tint rects `rx=8` using the recorded and stated tints, otherwise unchanged.
+- Public card page (`render.js`): the markup and section order stay; the inline CSS adopts the token values (`--accent` `#41204b`, `--ok` becomes `--recorded` `#2b6a57`, `--line` `#d9d5dc`, `--bg` `#f6f5f3`, `--ink` `#1f1a22`, `--stated` tint `#f1f0f2`), `h2` to 18 px 700 sentence case, section radius 4 px, pill buttons to 4 px radius with the WhatsApp button in `--accent` (WhatsApp is named in its label, so it needs no brand green), `.chip` to the tag pattern, bullets "●" in check results to a 14 px text list. SVG: header band `#41204b`, section labels in sentence case 700, tint rects `rx=8` using the recorded and stated tints, otherwise unchanged.
 
 ### Copy rules
 

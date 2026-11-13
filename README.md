@@ -4,11 +4,15 @@ An independent student concept for [Yoma](https://yoma.world). YoCV turns a youn
 
 Week 6 state: claim generation runs through a real model call when one is configured, every suggestion is checked against the user's own words before it is shown, suggested skills are matched to Yoma's public skill taxonomy, and the CV page lists live learning opportunities from Yoma's public API. The app says on screen whether it is in live or sample mode.
 
+This repository holds two prototypes that share one server, the grounding checks and the Yoma client. YoCard (`card.html`) is the Week 6 core feature after the pivot to informal work; YoCV (`index.html`) is the earlier CV prototype, kept and refined alongside it rather than replaced.
+
 ## Quick start
 
 Requires Node 20 or newer (built-in `fetch` and `node:test`; no npm packages are installed).
 
 ```sh
+git clone https://github.com/greenglow7/yocv-prototype.git
+cd yocv-prototype
 npm start
 ```
 
@@ -45,7 +49,7 @@ Every variable the code reads (`server/config.js` reads `.env` from the working 
 
 To open a card from a phone on the same Wi-Fi, set `HOST=0.0.0.0` and `YOCARD_PUBLIC_URL=http://<your LAN IP>:4173` so the link and QR point at an address the phone can reach.
 
-You can also open `index.html` straight from disk. The app then runs in **sample mode (offline)** with the rules in `core.js`, and the Yoma sections are hidden.
+You can also open `index.html` straight from disk. The app then runs in **sample mode (offline)** with the rules in `core.js`, and the Yoma sections are hidden (this path follows from the code and was not run in a browser during Week 6).
 
 Run the tests:
 
@@ -136,11 +140,11 @@ Built in:
 
 - Both pages set `lang="en"` and a viewport meta, start with a skip link to `#main`, announce toasts and busy text in an `aria-live="polite"` region, and expose the mode label as a `role="status"` live region; the error block is focusable and takes focus when a request fails.
 - `:focus-visible` outlines on controls; animations respect `prefers-reduced-motion`.
-- 44 px minimum targets on primary, secondary and header buttons; text floor of 11 px on phones; muted text at 4.5:1 contrast or better; no horizontal overflow at 360 px (checked at 375 px after the Week 6 fixes).
+- 44 px minimum targets on primary, secondary and header buttons; 14 px minimum text size on screen (print keeps smaller sizes); muted and tag text at 4.5:1 contrast or better; no horizontal overflow at 360 px (checked at 360 px and 375 px).
 - Connectivity: YoCV keeps working in the browser when the server is unreachable (sample mode, offline, labelled). YoCard shows a retryable "The YoCard server could not be reached" error and sets the mode label to offline. Every generation, draft and publish request has a 30 s client-side deadline that ends in a retryable "did not answer in time" error.
 - The public card page is server-rendered with system fonts, about 7 KB, and works without JavaScript (the Check now form posts to `/c/:id/check`; the inline script only enhances it).
 
-Not yet done: no VoiceOver or TalkBack pass; the claim-action buttons on the YoCV review step are 34 px, below the 44 px target; no translation (English only).
+Not yet done: no VoiceOver or TalkBack pass; the claim-action buttons on the YoCV review step are 36 px, below the 44 px target; no translation (English only).
 
 ## Known limitations
 

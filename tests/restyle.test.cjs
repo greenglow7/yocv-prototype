@@ -6,7 +6,7 @@ const path=require('node:path');
 const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8');
 const PAGES=['index.html','card.html','app.js','card.js'];
 const SHEETS=['styles.css','card.css'];
-const TOKENS=['--ink:#1f1a22','--muted:#5d5566','--line:#d9d5dc','--page:#f6f5f3','--panel:#ffffff','--accent:#41204b','--recorded:#387f6a','--recorded-tint:#e6f5f3','--awaiting:#8a5a00','--awaiting-tint:#fff2d6','--stated-tint:#f1f0f2','--error:#b3261e'];
+const TOKENS=['--ink:#1f1a22','--muted:#5d5566','--line:#d9d5dc','--page:#f6f5f3','--panel:#ffffff','--accent:#41204b','--recorded:#2b6a57','--recorded-tint:#e6f5f3','--awaiting:#8a5a00','--awaiting-tint:#fff2d6','--stated-tint:#f1f0f2','--error:#b3261e'];
 const stripSvg=s=>s.replace(/<svg[\s\S]*?<\/svg>/g,'').replace(/<path[^>]*>/g,'').replace(/d="[^"]*"/g,'');
 const stripPrint=css=>css.replace(/@media print\{[\s\S]*?\}\s*\}/g,'');
 

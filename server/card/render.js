@@ -110,11 +110,11 @@ function evidenceLabel(completion){
 // ---------- HTML ----------
 
 const CSS=[
-  ':root{--ink:#1f1a22;--muted:#5d5566;--line:#d9d5dc;--ok:#387f6a;--bad:#b3261e;--grey:#5d5566;--bg:#f6f5f3;--card:#fff;--accent:#41204b;--stated:#f1f0f2}',
+  ':root{--ink:#1f1a22;--muted:#5d5566;--line:#d9d5dc;--ok:#2b6a57;--bad:#b3261e;--grey:#5d5566;--bg:#f6f5f3;--card:#fff;--accent:#41204b;--stated:#f1f0f2}',
   '*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:'+FONT+';line-height:1.5;-webkit-text-size-adjust:100%}',
   'main{max-width:640px;margin:0 auto;padding:16px}',
   'header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;font-size:14px;color:var(--muted)}',
-  'header form{margin:0}button,.btn{font:inherit;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:4px;padding:8px 16px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-block}',
+  'header form{margin:0}button,.btn{font:inherit;min-height:44px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:4px;padding:8px 16px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-block}',
   'section{background:var(--card);border:1px solid var(--line);border-radius:4px;padding:16px;margin:12px 0}',
   'h1{font-size:24px;margin:0 0 4px}h2{font-size:18px;font-weight:700;margin:0 0 8px;color:var(--ink)}',
   '.identity{display:flex;gap:16px;align-items:center}.identity img{width:72px;height:72px;border-radius:50%;object-fit:cover;background:var(--line)}',
@@ -334,7 +334,7 @@ function cardSvg({record,publicUrl='',qrSvgFn,withdrawn=false}={}){
   // Confirmed strip
   let y=470;
   parts.push('<rect x="60" y="'+(y-40)+'" width="960" height="330" rx="8" fill="#e6f5f3"/>');
-  parts.push(svgText(90,y,STRINGS.confirmedTitle,{size:24,weight:700,fill:'#387f6a'}));
+  parts.push(svgText(90,y,STRINGS.confirmedTitle,{size:24,weight:700,fill:'#2b6a57'}));
   y+=50;
   const lines=[];
   const since=monthYear(user.dateYoIDOnboarded);

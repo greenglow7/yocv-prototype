@@ -233,7 +233,7 @@ function createApp({config,provider,yoma,roleSkills,core,rootDir=__dirname,maxIn
     const url=new URL(req.url||'/','http://localhost');
     const pathname=url.pathname;
     if(pathname==='/api/status'){
-      if(req.method!=='GET'&&req.method!=='HEAD')return sendError(res,405,'method_not_allowed',MESSAGES.methodNotAllowed,false,{allow:'GET'});
+      if(req.method!=='GET'&&req.method!=='HEAD')return sendError(res,405,'method_not_allowed',MESSAGES.methodNotAllowed,false,{allow:'GET, HEAD'});
       return status(res);
     }
     if(pathname==='/api/generate'){
@@ -241,7 +241,7 @@ function createApp({config,provider,yoma,roleSkills,core,rootDir=__dirname,maxIn
       return generate(req,res);
     }
     if(pathname==='/api/yoma/opportunities'){
-      if(req.method!=='GET'&&req.method!=='HEAD')return sendError(res,405,'method_not_allowed',MESSAGES.methodNotAllowed,false,{allow:'GET'});
+      if(req.method!=='GET'&&req.method!=='HEAD')return sendError(res,405,'method_not_allowed',MESSAGES.methodNotAllowed,false,{allow:'GET, HEAD'});
       return opportunities(res,url);
     }
     if(cardRouter){

@@ -1,6 +1,6 @@
 # Testing log — Week 6 (2026-11-12)
 
-Environment: macOS, Node v25.8.1, server in sample mode (no model key available), Yoma production API reachable. Automated suite: `npm test` → 253 tests, 251 pass, 0 fail, 2 skipped (the two credential-gated live model tests); 151 was the Phase 1 count before YoCard.
+Environment: macOS, Node v25.8.1, server in sample mode (no model key available), Yoma production API reachable. Automated suite: `npm test` → 256 tests, 254 pass, 0 fail, 2 skipped (the two credential-gated live model tests); 151 was the Phase 1 count before YoCard.
 
 Provider exercised live: **none**. The Azure OpenAI and OpenAI-compatible adapters are unit-tested with an injected `fetch` only. First action for the next sprint: run `npm test` with a real `.env`.
 
@@ -37,12 +37,15 @@ Provider exercised live: **none**. The Azure OpenAI and OpenAI-compatible adapte
 4. **Cache labelling.** An in-TTL cache hit is reported as `source: "cache"`, so the second view within an hour shows "From Yoma (cached)" even when the data is minutes old. Decide whether that is the honest label or whether only stale-on-failure should say "cached".
 5. **Non-English input.** No language detection; in live mode the prompt is English-only. Azure Translator could translate the self-reported text for the customer's language later.
 6. **Node 20 compatibility** rests on the Node docs; the dev machine runs Node 25. `npm test` uses `node --test tests/*.test.cjs` because Node 21+ no longer expands a bare directory argument.
-7. **Content filter and refusals** are surfaced as a generic "could not be processed" error; the user gets no hint about what to change.
-8. **Minor review notes** left as-is: unconsumed response body on Yoma non-2xx responses; `source: null` on the unavailable opportunities state; 405 `Allow` header omits HEAD.
+7. **Content filter and refusals** now show "The AI service declined to answer for this text. Rephrase your experience or continue in sample mode.", but the error code is still `provider_bad_output`; a distinct code would let the UI offer a rephrase action.
+8. **Minor review notes** left as-is: unconsumed response body on Yoma non-2xx responses; `source: null` on the unavailable opportunities state. (The 405 `Allow` header now lists HEAD.)
+9. **Browser scenarios are manual.** The browser-level checks in this log were run in a browser pane and recorded in prose; no headless script reproduces them from the repository.
+10. **Sample mode drafts from the first three sentences** (`core.js` and the local provider). The experience step now says so, but extra sentences are not recorded as `over_limit` the way live mode records them.
+11. **Accessibility not yet done:** no VoiceOver or TalkBack pass; the YoCV claim-action buttons are 36 px, below the 44 px target. Step-rail buttons now carry an `aria-label` with the step name, since the visible label is hidden under 640 px.
 
 # YoCard (Phase 2) — 2026-11-12
 
-Automated: `npm test` → 253 tests, 251 pass, 0 fail, 2 skipped (both live model tests; no key on this machine). Suites added: qr, card-sign, card-store, card-account, card-draft, card-render, card-routes.
+Automated: `npm test` → 256 tests, 254 pass, 0 fail, 2 skipped (both live model tests; no key on this machine). Suites added: qr, card-sign, card-store, card-account, card-draft, card-render, card-routes.
 
 | # | Scenario | Result |
 | --- | --- | --- |
@@ -63,6 +66,8 @@ Automated: `npm test` → 253 tests, 251 pass, 0 fail, 2 skipped (both live mode
 | 15 | Yoma unreachable or token rejected during the account read | Covered by two route tests in `tests/card-routes.test.cjs`: a token source whose `read()` throws `YomaUnavailable` → 502 `yoma_unavailable`, `retryable: true`; a `yoma_auth` error → 502 `yoma_auth`, `retryable: false`, message echoed. Both pass; no route change was needed. |
 | 16 | Non-English description through the template draft (sample mode, `runDraft` with `provider: null` against `server/card/draft.js`) | No crash, three confirms lines, no validator rejections. isiZulu "Ngenza izinwele eKhayelitsha, R150 kuya ku-R400. 8am kuya ku-6pm. Ngikhuluma isiZulu nesiNgisi." → languages `["isiZulu"]`, hours "8am kuya ku-6pm", but the price range splits: service 1 "Ngenza izinwele eKhayelitsha" with no price, service 2 named "Kuya ku-R400" with `priceFrom: 150`, `priceTo: null`, ZAR. Kiswahili "Nasuka nywele Kibera, KSh 300 hadi KSh 800. Jumatatu hadi Jumamosi. Ninazungumza Kiswahili na Kiingereza." → languages `["Kiswahili"]`, hours empty (the days land in notes), service 2 named "Hadi KSh 800" with `priceFrom: 300`, `priceTo: null`, KES. The worker can correct both in review. Live model behaviour untested. |
 | 17 | Public page and SVG for a sample persona | Pass. Published Thandi on PORT=4196 (template draft): the page carries "Fictional sample account: this card was built from a sample persona, not a real Yoma user. The completions reference real Yoma opportunities." after the "Read from …" header, the SVG subtitle reads "Sample card · fictional persona" (not "A work card read from a Yoma account"), and "verified by Yoma" appears in neither. Page 7,338 bytes. Card withdrawn afterwards. |
+| 18 | Rejected sentence in the self-declared block (375 px) | Pass. Message ending "I am a certified stylist from Alison Learning." → the review step lists the dropped line in plain words: "Notes: “Cornrows and relaxing. Come to your home. Certified stylist.” claims a certificate or qualification, which only the Yoma block can show." The whole Notes field is dropped (open issue 10). Disclosure checkboxes and Remove line buttons measure 44 px; no horizontal overflow. |
+| 19 | Withdraw from a later session (375 px) | Pass. Publish, Start over → the connect step lists "Card P4JJVN22V5" with Withdraw this card; confirm → toast "Card withdrawn…", the entry disappears, and the public link returns 410 "Card withdrawn". |
 
 Open issues for the next sprint:
 
@@ -71,9 +76,11 @@ Open issues for the next sprint:
 3. The under-18 gate relies on a self-declared date of birth; needs a UNICEF safeguarding decision before any real user.
 4. Content moderation of the self-declared block is only a banned-word and organisation-name check; add Azure Content Safety and decide how to handle non-English text.
 5. Lookalike-domain risk: trust is domain trust until the card is hosted under yoma.world.
-6. SVG footer text overflows the image width (reviewer note); shorten or wrap on the image.
+6. SVG footer overflow: fixed (the footer is centred at 18 px and a test checks it).
 7. Minor: `check` endpoints are unauthenticated and write `lastCheck` to disk; add a per-card rate limit.
 8. The template price parser only understands "-", "–" and "to" as range words, so "R150 kuya ku-R400" and "KSh 300 hadi KSh 800" split into two services (scenario 16); add per-language range words (kuya ku, hadi, à) or rely on the live model.
 9. The server's provider error message says "continue in sample mode" while the YoCard button says "Continue with template draft"; align the wording.
+10. **A rejected sentence drops its whole field.** The validator removes the entire self-declared field (for example all of Notes) when one sentence fails a check. The review step now lists the field, the dropped text and the reason in plain words; dropping only the offending sentence would keep the legitimate detail.
+11. **Withdraw after leaving the page.** The connect step now lists cards published in this browser session with a withdraw button (owner secret from `sessionStorage`); a worker who closed the tab still needs the raw API with the secret they saved.
 
-Final automated count after Phase 2: `npm test` → 253 tests, 251 pass, 0 fail, 2 skipped (the two live model tests in `tests/live.test.cjs`, skipped without a model key; the two live Yoma tests ran against api.yoma.world).
+Final automated count after Phase 2: `npm test` → 256 tests, 254 pass, 0 fail, 2 skipped (the two live model tests in `tests/live.test.cjs`, skipped without a model key; the two live Yoma tests ran against api.yoma.world).
