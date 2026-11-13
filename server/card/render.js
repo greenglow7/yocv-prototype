@@ -123,9 +123,9 @@ const CSS=[
   '.small{font-size:14px;color:var(--muted)}.small.sample{margin:8px 0 0;padding:8px 12px;border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:4px;background:var(--card)}.chip{display:inline-block;background:var(--stated);border:0;border-radius:4px;padding:2px 6px;margin:4px 4px 0 0;font-size:14px}',
   '.stated{background:var(--stated)}.stated h2{color:var(--grey)}.price{float:right;color:var(--muted)}',
   '.wa{display:block;text-align:center;background:var(--accent);border-color:var(--accent);margin-top:8px}',
-  '.safety{font-weight:600;text-align:center;margin:16px 0}',
+  '.safety{font-weight:600;margin:16px 0;padding:12px 16px;border-left:4px solid var(--accent);background:var(--card)}',
   '.ok{color:var(--ok)}.bad{color:var(--bad)}.grey{color:var(--grey)}.check li{font-size:14px}',
-  'footer{font-size:14px;color:var(--muted);text-align:center;padding:16px 0 32px}footer a{color:var(--accent)}',
+  'footer{font-size:14px;color:var(--muted);padding:16px 0 32px}footer a{color:var(--accent)}',
   '.notice{background:var(--card);border-left:4px solid var(--accent)}a{color:var(--accent)}.empty{color:var(--grey);font-style:italic}'
 ].join('');
 
@@ -163,10 +163,7 @@ function completionItem(c){
   const when=monthYear(c?.dateCompleted);
   const link=c?.live?safeUrl(c.live.yomaInfoURL):null;
   const head=link?'<a href="'+escapeHtml(link)+'" rel="noopener">'+title+'</a>':title;
-  const parts=[head,org];
-  if(when)parts.push('completed '+escapeHtml(when));
-  parts.push(org+' checked: '+escapeHtml(evidenceLabel(c)));
-  let item='<li>'+parts.join(' · ');
+  let item='<li>'+head+'<div class="small">'+org+(when?', completed '+escapeHtml(when):'')+'. '+org+' checked: '+escapeHtml(evidenceLabel(c))+'</div>';
   if(!c?.live)item+='<div class="small grey">'+escapeHtml(STRINGS.liveMissing)+'</div>';
   else if(Number.isFinite(c.live.participantCountCompleted)&&c.live.participantCountCompleted>0)item+='<div class="small">'+c.live.participantCountCompleted+' people have completed this on Yoma</div>';
   return item+'</li>';
@@ -263,7 +260,7 @@ function publicPage({record,status='ok',check=null,withdrawn=null,publicUrl='',n
   body+=checkSection(check,notice);
   body+='<section><div class="identity">'+(photo?'<img src="'+escapeHtml(photo)+'" alt="" loading="lazy">':'')+
     '<div><h1>'+escapeHtml(name)+'</h1>'+(trade?'<p class="trade">'+escapeHtml(trade)+(area?' · '+escapeHtml(area):'')+'</p>':(area?'<p class="trade">'+escapeHtml(area)+'</p>':''))+
-    '<p class="meta">'+escapeHtml(metaBits.join(' · '))+'</p></div></div></section>';
+    '<p class="meta">'+escapeHtml(metaBits.join('. '))+'</p></div></div></section>';
   body+=confirmedSection(record);
   body+=statedSection(record);
   if(wa)body+='<a class="btn wa" href="'+escapeHtml(wa)+'" rel="noopener">'+escapeHtml(STRINGS.whatsapp)+'</a>';

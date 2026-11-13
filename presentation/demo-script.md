@@ -16,7 +16,7 @@ Before presenting: run `npm start` (with `.env` filled in if a model key is avai
 
 ## 0:50–1:30 — Live generation and grounding
 
-**Do:** click **Write the draft**. On the review screen, open an experience claim and point to **Based on: "…"**. Point to the **Yoma skill** tag on the skill claim and click it to show the Lightcast taxonomy entry.
+**Do:** click **Write the draft**. On the review screen, open an experience claim and point to **Based on: "…"**. Point to the **Yoma skill** link on the skill claim and click it to show the Lightcast taxonomy entry.
 
 **Say:** "Every suggestion must cite a quote from Amina's own words. The server checks that quote exists, that no numbers were invented, and that nothing asserts a credential. Skills are not free text any more: each one is matched live against Yoma's skill taxonomy and carries Yoma's own skill id."
 

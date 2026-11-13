@@ -1,7 +1,7 @@
 /* YoCV and YoCard token sheet and shared components. card.css extends this and defines no tokens. */
 :root{--ink:#1f1a22;--muted:#5d5566;--line:#d9d5dc;--page:#f6f5f3;--panel:#ffffff;--accent:#41204b;--recorded:#387f6a;--recorded-tint:#e6f5f3;--awaiting:#8a5a00;--awaiting-tint:#fff2d6;--stated-tint:#f1f0f2;--error:#b3261e;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-size:16px;line-height:1.5;color:var(--ink);background:var(--page)}
 /* Resets */
-*{box-sizing:border-box}body{margin:0}h1,h2,h3,h4,p{margin:0}button,input,textarea{font:inherit}a{color:var(--accent)}svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.6}button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,summary:focus-visible{outline:3px solid var(--accent);outline-offset:2px}main:focus{outline:none}
+*{box-sizing:border-box}body{margin:0}h1,h2,h3,h4,p{margin:0}button,input,textarea{font:inherit}a{color:var(--accent)}button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,summary:focus-visible{outline:3px solid var(--accent);outline-offset:2px}main:focus{outline:none}
 /* Type scale */
 h1{font-size:32px;line-height:1.25;font-weight:700}h2{font-size:24px;line-height:1.25;font-weight:700}main h2{margin-top:24px}.top-actions .text-button{white-space:nowrap}h3{font-size:18px;line-height:1.25;font-weight:700}.step-line{font-size:14px;color:var(--muted);margin-bottom:8px}.lead{font-size:16px;color:var(--muted);margin-top:8px}small,.field-help,.tag,.claim-reason,.cv-contact,.cv-dates,.cv-footnote,.opp-meta,.app-footer{font-size:14px}
 /* Header */
