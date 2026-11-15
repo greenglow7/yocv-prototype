@@ -32,7 +32,7 @@ function errorHTML(){
 }
 function focusError(){document.querySelector('#card-error')?.focus();}
 function setError(message,meta=null){state.error=message;state.errorMeta=meta;}
-function go(step){state.step=step;state.maxStep=Math.max(step,state.maxStep);state.error='';state.errorMeta=null;render();window.scrollTo({top:0,behavior:'instant'});view.querySelector('h1')?.focus({preventScroll:true});}
+function go(step){state.step=step;state.maxStep=Math.max(step,state.maxStep);state.error='';state.errorMeta=null;render();window.scrollTo({top:0,behavior:'instant'});document.querySelector('#page-band h1')?.focus({preventScroll:true});}
 function renderSteps(){steps.innerHTML=stepNames.map((name,i)=>`<button class="step-button ${i===state.step?'active':i<state.step?'completed':''}" data-step="${i}" aria-label="Step ${i+1} of ${stepNames.length}: ${name}" ${i>state.maxStep||state.published?'disabled':''} ${i===state.step?'aria-current="step"':''}><span class="step-number">${i+1}</span><span>${name}</span></button>`).join('');}
 function stepLine(n){return `<p class="step-line">Step ${n} of 4</p>`;}
 function modePillText(){return status.offline?'Sample mode (offline)':isLive()?'Live AI · '+(status.model.model||status.model.provider):'Sample mode';}
@@ -90,7 +90,8 @@ function published(){
 /* Focus preservation across innerHTML replacement. */
 function focusSnapshot(){try{const a=document.activeElement;if(!a||!view.contains(a))return null;const key=a.tagName==='BUTTON'?['role','example','persona','trade','action'].find(k=>a.dataset[k]!==undefined):undefined;if(!a.id&&!key)return null;const sel=typeof a.selectionStart==='number'&&typeof a.selectionEnd==='number'?[a.selectionStart,a.selectionEnd]:null;return {id:a.id,key,val:key?a.dataset[key]:null,sel};}catch{return null;}}
 function focusRestore(f){if(!f)return;try{const esc=v=>window.CSS&&CSS.escape?CSS.escape(v):String(v).replace(/["\\]/g,'\\$&');const el=f.id?document.getElementById(f.id):view.querySelector(`button[data-${f.key}="${esc(f.val)}"]`);if(!el||el.disabled)return;el.focus({preventScroll:true});if(f.sel&&typeof el.setSelectionRange==='function')el.setSelectionRange(f.sel[0],f.sel[1]);}catch{}}
-function render(){const f=focusSnapshot();renderSteps();view.innerHTML=[connect,describe,review,publishStep][state.step]();view.setAttribute('aria-busy',String(state.busy));focusRestore(f);}
+function setBand(){const band=document.querySelector('#page-band');if(!band)return;band.innerHTML='';const line=view.querySelector('.step-line'),h=view.querySelector('h1');if(line)band.appendChild(line);if(h)band.appendChild(h);}
+function render(){const f=focusSnapshot();renderSteps();view.innerHTML=[connect,describe,review,publishStep][state.step]();setBand();view.setAttribute('aria-busy',String(state.busy));focusRestore(f);}
 
 /* Server access */
 function withDeadline(ms){const c=new AbortController();const t=setTimeout(()=>c.abort(),ms);return {signal:c.signal,clear:()=>clearTimeout(t)};}
