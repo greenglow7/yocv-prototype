@@ -118,6 +118,8 @@ test('YoCard components follow the same shapes',()=>{
  for(const r of radii)assert.ok(['8px','16px','9999px','50%','0'].includes(r),'radius '+r);
  assert.ok(/\.tier\{[^}]*border-radius:16px/.test(css));
  assert.ok(/\.tier\.confirmed\{border-left:6px solid var\(--green\)\}/.test(css));
+ assert.ok(/\.tier\.confirmed\{overflow:hidden\}/.test(css),"confirmed tier clips its tinted head to the 16px corners");
+ assert.ok(/\.secret-box code\{[^}]*font-size:14px/.test(css),"owner secret declares the 14px floor");
  assert.ok(/\.tier\.stated\{border-left:6px solid var\(--muted\)\}/.test(css));
  assert.ok(/\.trade\{[^}]*border-radius:16px/.test(css));
  assert.ok(!/border:1px solid var\(--line\)/.test(css.replace(/img\{[^}]*\}/g,'')),'no bordered boxes except logos');
