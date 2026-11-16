@@ -109,3 +109,14 @@ test('components follow the Yoma shapes',()=>{
  assert.ok(/#page-band/.test(print),'band hidden in print');
  assert.ok(/\.cv-paper\{border:0;border-radius:0;padding:0\}/.test(print),'flat CV in print');
 });
+
+test('YoCard components follow the same shapes',()=>{
+ const css=read('card.css');
+ const radii=new Set((css.match(/border-radius:([^;}]+)/g)||[]).map(r=>r.replace('border-radius:','').trim()));
+ for(const r of radii)assert.ok(['8px','16px','9999px','50%','0'].includes(r),'radius '+r);
+ assert.ok(/\.tier\{[^}]*border-radius:16px/.test(css));
+ assert.ok(/\.tier\.confirmed\{border-left:6px solid var\(--green\)\}/.test(css));
+ assert.ok(/\.tier\.stated\{border-left:6px solid var\(--muted\)\}/.test(css));
+ assert.ok(/\.trade\{[^}]*border-radius:16px/.test(css));
+ assert.ok(!/border:1px solid var\(--line\)/.test(css.replace(/img\{[^}]*\}/g,'')),'no bordered boxes except logos');
+});
