@@ -31,6 +31,7 @@ const MONTHS=['January','February','March','April','May','June','July','August',
 const E164=/^\+[1-9]\d{6,14}$/;
 const FONT='"Open Sans",system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif';
 const HEAD_FONT='"Nunito",system-ui,sans-serif';
+const SVG_FONT='system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif';
 const FONT_LINK='https://fonts.googleapis.com/css2?family=Nunito:wght@700;800&family=Open+Sans:wght@400;600;700&display=swap';
 
 function str(value){return value==null?'':String(value);}
@@ -126,10 +127,10 @@ const CSS=[
   '.small{font-size:14px;color:var(--muted)}.small.sample{margin:8px 0 0;padding:8px 16px;border:0;border-left:6px solid var(--accent);border-radius:0;background:var(--stated)}.chip{display:inline-block;background:var(--stated);border:0;border-radius:9999px;padding:4px 12px;margin:4px 4px 0 0;font-size:14px;font-weight:600}',
   '.stated{border-left:6px solid var(--grey)}.stated h2{color:var(--grey)}.price{float:right;color:var(--muted)}',
   '.wa{display:block;text-align:center;background:var(--accent);border-color:var(--accent);margin-top:8px}',
-  '.safety{font-weight:600;margin:16px 0;padding:16px 24px;border:0;border-radius:16px;background:var(--tint)}',
+  '.safety{font-weight:600;margin:16px 0;padding:16px 24px;border-radius:16px;background:var(--tint)}',
   '.ok{color:var(--ok)}.bad{color:var(--bad)}.grey{color:var(--grey)}.check li{font-size:14px}',
   'footer{font-size:14px;color:var(--muted);padding:16px 0 32px}footer a{color:var(--accent)}',
-  '.notice{background:var(--tint);border:0;border-radius:16px;padding:16px 24px}a{color:var(--accent)}.empty{color:var(--grey);font-style:italic}'
+  '.notice{background:var(--tint);border-radius:16px;padding:16px 24px}a{color:var(--accent)}.empty{color:var(--grey);font-style:italic}'
 ].join('');
 
 const SCRIPT=[
@@ -292,7 +293,7 @@ function clip(text,max){
   const s=str(text).replace(/\s+/g,' ').trim();
   return s.length<=max?s:s.slice(0,Math.max(0,max-1)).trimEnd()+'…';
 }
-function svgText(x,y,text,{size=28,weight=400,fill='#1f1a22',anchor='start',family=FONT}={}){
+function svgText(x,y,text,{size=28,weight=400,fill='#020304',anchor='start',family=SVG_FONT}={}){
   return '<text x="'+x+'" y="'+y+'" font-family="'+escapeHtml(family)+'" font-size="'+size+'" font-weight="'+weight+'" fill="'+fill+'" text-anchor="'+anchor+'">'+escapeHtml(text)+'</text>';
 }
 // Places the QR (its own <svg>) inside the card by wrapping it; the nested svg keeps its viewBox so any
@@ -317,11 +318,11 @@ function cardSvg({record,publicUrl='',qrSvgFn,withdrawn=false}={}){
     '<rect width="'+W+'" height="'+H+'" fill="#ffffff"/>',
     '<rect width="'+W+'" height="220" fill="#41204b"/>',
     svgText(60,96,'YoCard',{size:44,weight:700,fill:'#ffffff'}),
-    svgText(60,150,record?.accountSource==='sample'?STRINGS.sampleSvg:'A work card read from a Yoma account',{size:28,fill:'#d9d5dc'})];
+    svgText(60,150,record?.accountSource==='sample'?STRINGS.sampleSvg:'A work card read from a Yoma account',{size:28,fill:'#dce0e5'})];
   if(withdrawn){
     parts.push(svgText(60,420,'This card was withdrawn by its owner.',{size:44,weight:700}));
-    parts.push(svgText(60,480,'Open the link to see the current status.',{size:30,fill:'#5d5566'}));
-    parts.push(svgText(60,H-60,clip(shortUrl,60),{size:28,fill:'#5d5566'}));
+    parts.push(svgText(60,480,'Open the link to see the current status.',{size:30,fill:'#545859'}));
+    parts.push(svgText(60,H-60,clip(shortUrl,60),{size:28,fill:'#545859'}));
     parts.push('</svg>');
     return parts.join('');
   }
@@ -333,7 +334,7 @@ function cardSvg({record,publicUrl='',qrSvgFn,withdrawn=false}={}){
   }
   parts.push(svgText(textX,320,name,{size:56,weight:700}));
   const area=clip(str(record?.selfDeclared?.area).trim()||str(user.city).trim(),40);
-  parts.push(svgText(textX,372,trade+(area?' · '+area:''),{size:32,fill:'#5d5566'}));
+  parts.push(svgText(textX,372,trade+(area?' · '+area:''),{size:32,fill:'#545859'}));
 
   // Confirmed strip
   let y=470;
@@ -356,27 +357,27 @@ function cardSvg({record,publicUrl='',qrSvgFn,withdrawn=false}={}){
   y=830;
   parts.push('<rect x="60" y="'+(y-40)+'" width="960" height="250" rx="16" fill="#f3f6fa"/>');
   // The fixed string stays verbatim (as on the HTML page); only the name is clipped.
-  parts.push(svgText(90,y,STRINGS.statedBy(clip(first,18)),{size:24,weight:700,fill:'#5d5566'}));
+  parts.push(svgText(90,y,STRINGS.statedBy(clip(first,18)),{size:24,weight:700,fill:'#545859'}));
   y+=50;
   const services=list(record?.selfDeclared?.services).slice(0,3);
   if(services.length){
     for(const s of services){
       const price=priceText(s);
       parts.push(svgText(90,y,clip(s?.name,40),{size:28}));
-      if(price)parts.push(svgText(990,y,clip(price,24),{size:28,fill:'#5d5566',anchor:'end'}));
+      if(price)parts.push(svgText(990,y,clip(price,24),{size:28,fill:'#545859',anchor:'end'}));
       y+=46;
     }
-  }else parts.push(svgText(90,y,STRINGS.noServices,{size:28,fill:'#5d5566'}));
+  }else parts.push(svgText(90,y,STRINGS.noServices,{size:28,fill:'#545859'}));
 
   // QR, link, code
   const qr=typeof qrSvgFn==='function'?qrSvgFn(url,{cellSize:4,margin:2}):'';
   if(qr)parts.push(placeQr(qr,60,1070,220));
   parts.push(svgText(310,1120,clip(shortUrl,44),{size:30,weight:600}));
   parts.push(svgText(310,1172,'Code '+code,{size:34,weight:700,fill:'#41204b'}));
-  parts.push(svgText(310,1220,STRINGS.notProof,{size:26,fill:'#5d5566'}));
-  parts.push(svgText(310,1262,STRINGS.neverPay,{size:26,fill:'#5d5566'}));
+  parts.push(svgText(310,1220,STRINGS.notProof,{size:26,fill:'#545859'}));
+  parts.push(svgText(310,1262,STRINGS.neverPay,{size:26,fill:'#545859'}));
   // Centred and small enough to fit the 1080 px width whole; the fixed string is never clipped.
-  parts.push(svgText(540,H-28,STRINGS.footer,{size:18,fill:'#5d5566',anchor:'middle'}));
+  parts.push(svgText(540,H-28,STRINGS.footer,{size:18,fill:'#545859',anchor:'middle'}));
   parts.push('</svg>');
   return parts.join('');
 }
