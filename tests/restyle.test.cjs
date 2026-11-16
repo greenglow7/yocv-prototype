@@ -105,6 +105,8 @@ test('components follow the Yoma shapes',()=>{
  assert.ok(/\.form-section>summary\{[^}]*min-height:44px;padding:10px 0/.test(css),'form details summary target');
  assert.ok(/#view>\.form-section>h2\{margin-top:0\}/.test(css),'card heading flush with card padding');
  assert.ok(/\.cv-name\{[^}]*margin:0\}/.test(css),'CV name flush with paper padding');
+ assert.ok(/\.top-actions \.phone-hide\{white-space:pre\}/.test(css),'About label keeps its space inside the flex button');
+ assert.ok(/#toast\{[^}]*width:max-content;max-width:calc\(100vw - 32px\)/.test(css),'toast fills the phone width before wrapping');
  const print=css.match(/@media print\{[\s\S]*$/)[0];
  assert.ok(/#page-band/.test(print),'band hidden in print');
  assert.ok(/\.cv-paper\{border:0;border-radius:0;padding:0\}/.test(print),'flat CV in print');
