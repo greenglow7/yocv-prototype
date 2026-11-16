@@ -102,6 +102,7 @@ test('components follow the Yoma shapes',()=>{
  assert.ok(/\.error-message\{[^}]*background:var\(--error-tint\)/.test(css));
  assert.ok(/\.evidence-record summary\{[^}]*min-height:44px;padding:10px 0\}/.test(css),'summary target by padding');
  assert.ok(!/\.evidence-record summary\{[^}]*line-height:44px/.test(css),'summary keeps the 1.5 line-height when it wraps');
+ assert.ok(/\.form-section>summary\{[^}]*min-height:44px;padding:10px 0/.test(css),'form details summary target');
  const print=css.match(/@media print\{[\s\S]*$/)[0];
  assert.ok(/#page-band/.test(print),'band hidden in print');
  assert.ok(/\.cv-paper\{border:0;border-radius:0;padding:0\}/.test(print),'flat CV in print');
