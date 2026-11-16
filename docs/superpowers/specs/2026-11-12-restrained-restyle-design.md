@@ -1,5 +1,7 @@
 # Restrained restyle: YoCV and YoCard
 
+> Superseded on 2026-11-15 by [the Yoma family look](2026-11-15-yoma-family-look-design.md), which reverses the "not Yoma-branded" anti-goal below on the owner's decision; the honesty labels, flows and copy it fixed still stand.
+
 Date: 2026-11-12. Status: draft for approval (builder check applied).
 
 ## Intent

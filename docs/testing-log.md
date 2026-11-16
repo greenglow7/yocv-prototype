@@ -84,3 +84,32 @@ Open issues for the next sprint:
 11. **Withdraw after leaving the page.** The connect step now lists cards published in this browser session with a withdraw button (owner secret from `sessionStorage`); a worker who closed the tab still needs the raw API with the secret they saved.
 
 Final automated count after Phase 2: `npm test` → 256 tests, 254 pass, 0 fail, 2 skipped (the two live model tests in `tests/live.test.cjs`, skipped without a model key; the two live Yoma tests ran against api.yoma.world).
+
+# Yoma family look — 2026-11-15
+
+Environment: macOS, Node v25.8.1, server in sample mode on port 4174, browser pane with viewport emulation at 360, 375 and 1280 px. Design: `docs/superpowers/specs/2026-11-15-yoma-family-look-design.md`. Checks read computed styles and `scrollWidth` through the page's own DOM; screenshots were taken at each width.
+
+## YoCV
+
+| # | Scenario | Result |
+| --- | --- | --- |
+| 21 | 1280 px, steps 1 to 5 (Amina sample) | Pass. Band `#41204b` with white Nunito h1 (36 px) and "already done" in `#f9ab3e`; header 72 px white; step line reads "Step n of 5" inside the band; `document.fonts.check` true for Nunito 700 and Open Sans 400; every card white, 16 px radius, 24 px padding, no border or shadow; CV paper 32 px padding; pill buttons 44 px; `scrollWidth === innerWidth` on every step. |
+| 22 | 375 px, steps 1 to 5 | Pass. Header wraps to two rows (108 px) with the mode pill left-aligned on row two and the About button keeping its 44 px target; step strip shows five 44 x 44 circles; h1 28 px; cards and CV paper 16 px / 24 px padding and 343 px wide; export buttons 320 px; no overflow on any step. |
+| 23 | 360 px, steps 1 to 5 | Pass. Same layout as 375 px; cards 328 px wide; no overflow on any step. |
+| 24 | Keyboard focus on purple grounds | Pass. Tab from the band h1 lands on step button 1 with the 3 px purple ring; Enter on it runs `go()`, which focuses the band h1 and shows the browser's white focus ring on purple; the About dialog's Close button is 44 px on the purple dialog top and its ring is white. |
+| 25 | Google Fonts stylesheet absent (page rewritten without the `css2` link) | Pass. Zero font faces loaded, headings fall back to system-ui, header height, h1 height and button heights unchanged, no overflow. |
+| 26 | Review-step card headings | Fixed during verification. Carding `.form-section` left the "Your details" heading 48 px inside its card and the CV name 56 px inside the paper (the old `main h2` margin); both now sit at the card padding, pinned by two assertions in `tests/restyle.test.cjs`. |
+| 27 | Header label and toast on phones | Fixed during verification. The inline-flex About button swallowed the space before "this demo" (now `white-space:pre` on the hidden span), and the fixed toast shrank to half the screen and wrapped into a four-line blob (now `width:max-content; max-width:calc(100vw - 32px)`, two lines at 360 px). Both pre-dated this work. |
+| 28 | Targets under 44 px | Known. Accept / Edit / Leave out on the review step are 36 px pills (spec-sized); the Yoma skill link tag is 29 px. Recorded in the README. |
+
+## YoCard
+
+| # | Scenario | Result |
+| --- | --- | --- |
+| 20 | 1280 px, steps 1 to 4 (Thandi, template draft, publish) | Pass. Same header, band and step strip as YoCV; "Need a CV?" is a 44 px green outline pill; account summary, tiers, consent box and link box are white 16 px cards with 24 px padding; confirmed tier has a 6 px `#387f6a` left border and a `#e6f5f3` head, stated tier a 6 px `#545859` border; trade chips 16 px radius with the purple tint when selected; result buttons 44 px pills; secret code 14 px; no overflow on any step. |
+| 21 | Public card page at 1280 px | Pass. Body `#f3f6fa`, Nunito h1 28 px, Open Sans body, three white 16 px sections (stated section keeps its 6 px muted border), purple-tint safety notice, Check now as a 44 px green outline pill, smallest text 14 px, "Not operated by Yoma or UNICEF" present. Page 8,029 bytes plus the fonts stylesheet link; share image 11,306 bytes with the system font stack, 16 px corner radii and the current ink and muted values. |
+| 22 | 375 px: public page, then steps 1 to 4 | Pass. Public page sections 343 px wide with 24 px padding, Check now 44 px; app header wraps to two rows (108 px) with the mode pill on row two; four 44 x 44 step circles; the connect step lists the card published in this session with Withdraw; trade grid two columns; tiers, consent box and link box 343 px with 16 px padding; share image 311 px; link and secret wrap inside their boxes; no overflow on any step. |
+| 23 | 360 px: public page, then steps 1 to 4 | Pass. Public page widest element 360 px; app cards 328 px; `scrollWidth === innerWidth` on every step and after publishing. |
+| 24 | Reviewer nits taken after approval | The share image now defaults to the system stack instead of Open Sans (it cannot load web fonts) and uses `#020304` / `#545859` / `#dce0e5` for text; `.tier` clips in one rule instead of a duplicated `.tier.confirmed`; two dead `border:0` declarations dropped from the public page CSS. Left as designed: tier headings stay ink on the tint (spec table amended), and the "Confirmed from Yoma" h3 keeps the Nunito face. |
+
+Final automated count after the Yoma family look: `npm test` → 261 tests, 259 pass, 0 fail, 2 skipped (the two live model tests, no key on this machine).

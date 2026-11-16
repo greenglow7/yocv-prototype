@@ -51,7 +51,7 @@ YoCV and YoCard should look like features that belong inside the Yoma app, so th
 | `--accent-shade` | `#54365d` | primary hover (Yoma purple-shade) |
 | `--accent-tint` | `#e7d4ed` | selected choice, "AI-suggested" tag ground (Yoma purple-tint) |
 | `--green` | `#387f6a` | secondary button border and solid "done" step dots (Yoma green; 4.7:1 white on it) |
-| `--recorded` | `#2b6a57` | text of green tags and the confirmed tier heading (Yoma green darkened; `#387f6a` on the tint measured 4.24:1, under AA) |
+| `--recorded` | `#2b6a57` | text of green tags, secondary buttons and the public Check now button (Yoma green darkened; `#387f6a` on the tint measured 4.24:1, under AA); tier headings stay `--ink` on the tint |
 | `--recorded-tint` | `#e6f5f3` | green tag and tier ground (Yoma green-light) |
 | `--orange` | `#f9ab3e` | decorative only: the highlighted word in the band, the awaiting tier's left border (Yoma orange; never text on white) |
 | `--awaiting` | `#8a5a00` | text of amber tags (kept: Yoma's yellow `#d48414` is 3.0:1 on white) |

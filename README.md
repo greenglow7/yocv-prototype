@@ -140,11 +140,12 @@ Built in:
 
 - Both pages set `lang="en"` and a viewport meta, start with a skip link to `#main`, announce toasts and busy text in an `aria-live="polite"` region, and expose the mode label as a `role="status"` live region; the error block is focusable and takes focus when a request fails.
 - `:focus-visible` outlines on controls; animations respect `prefers-reduced-motion`.
-- 44 px minimum targets on primary, secondary and header buttons; 14 px minimum text size on screen (print keeps smaller sizes); muted and tag text at 4.5:1 contrast or better; no horizontal overflow at 360 px (checked at 360 px and 375 px).
+- 44 px minimum targets on primary, secondary, header, step and disclosure controls; 14 px minimum text size on screen (print keeps smaller sizes); every text and background pair at 4.76:1 contrast or better; no horizontal overflow at 360 px (checked at 360 px, 375 px and 1280 px on 15 November 2026).
+- Look: both apps and the public card page use Yoma's design language as measured on yoma.world on 15 November 2026 (purple `#41204b`, green `#387f6a`, orange `#f9ab3e`, page grey `#f3f6fa`, Nunito headings, Open Sans body, pill buttons, 16 px white cards without borders or shadows, a purple page band holding the step line and heading). The fonts come from Google Fonts through one stylesheet link; without it the pages render in the system font with the same layout. No Yoma logo is used and the "A Yoma concept" and "Not operated by Yoma or UNICEF" labels stay. Design and plan: `docs/superpowers/specs/2026-11-15-yoma-family-look-design.md`.
 - Connectivity: YoCV keeps working in the browser when the server is unreachable (sample mode, offline, labelled). YoCard shows a retryable "The YoCard server could not be reached" error and sets the mode label to offline. Every generation, draft and publish request has a 30 s client-side deadline that ends in a retryable "did not answer in time" error.
-- The public card page is server-rendered with system fonts, about 7 KB, and works without JavaScript (the Check now form posts to `/c/:id/check`; the inline script only enhances it).
+- The public card page is server-rendered, about 8 KB plus one Google Fonts stylesheet (system fonts without it), and works without JavaScript (the Check now form posts to `/c/:id/check`; the inline script only enhances it).
 
-Not yet done: no VoiceOver or TalkBack pass; the claim-action buttons on the YoCV review step are 36 px, below the 44 px target; no translation (English only).
+Not yet done: no VoiceOver or TalkBack pass; the claim-action buttons on the YoCV review step are 36 px and the Yoma skill link tag is 29 px, both below the 44 px target; no translation (English only).
 
 ## Known limitations
 
