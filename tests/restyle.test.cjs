@@ -83,3 +83,24 @@ test('the public card page and SVG use the accent and no uppercase labels',()=>{
  assert.ok(!/text-transform/.test(src));
  assert.ok(!src.includes('CONFIRMED FROM YOMA'));
 });
+
+test('components follow the Yoma shapes',()=>{
+ const css=read('styles.css');
+ const radii=new Set((css.match(/border-radius:([^;}]+)/g)||[]).map(r=>r.replace('border-radius:','').trim()));
+ for(const r of radii)assert.ok(['8px','16px','9999px','50%','0'].includes(r),'radius '+r);
+ assert.ok(/\.primary,\.secondary\{[^}]*border-radius:9999px/.test(css),'pill buttons');
+ assert.ok(/\.primary:hover\{background:var\(--accent-shade\)/.test(css));
+ assert.ok(/\.secondary\{[^}]*border:1px solid var\(--green\)/.test(css));
+ assert.ok(/input,textarea\{[^}]*border:1px solid var\(--muted\)/.test(css),'input border');
+ assert.ok(/\.tag\{[^}]*border-radius:9999px/.test(css),'tag pills');
+ assert.ok(/\.tag\.ai\{background:var\(--accent-tint\);color:var\(--accent\)\}/.test(css));
+ assert.ok(/\.claim-card\{[^}]*border-radius:16px/.test(css));
+ assert.ok(!/\.claim-card\{[^}]*border:1px/.test(css),'no card borders');
+ assert.ok(/\.cv-paper\{[^}]*border-radius:16px/.test(css));
+ assert.ok(/\.dialog-top\{[^}]*background:var\(--accent\)/.test(css),'dialog header band');
+ assert.ok(/\.notice\{[^}]*background:var\(--accent-tint\)/.test(css));
+ assert.ok(/\.error-message\{[^}]*background:var\(--error-tint\)/.test(css));
+ const print=css.match(/@media print\{[\s\S]*$/)[0];
+ assert.ok(/#page-band/.test(print),'band hidden in print');
+ assert.ok(/\.cv-paper\{border:0;border-radius:0;padding:0\}/.test(print),'flat CV in print');
+});
