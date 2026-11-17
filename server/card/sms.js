@@ -2,9 +2,10 @@
 /* The SMS handler (spec 7.3, 9.5). One entry point for the gateway webhook and the simulator. Every call
    normalises the sender (a + number needs no country; a local one is read with yovouch.smsCountry), tells the
    outbox it texted first, and passes every reply through outbox.send. Commands bound to the sender: YES <session
-   code> (binds a web vouch session, no reply), CODE, VOUCH <ref> <code> (or V), L and REMOVE <vouchId> <secret>.
+   code> (binds a web vouch session, no reply), CODE, REQUEST, VOUCH <ref> <code> (or V), L and REMOVE <vouchId> <secret>.
    The four-message vouch keeps a conversation per sender key in memory for 30 minutes; any other text with no
-   conversation gets no reply. REQUEST, STOP, REPLY and the one-question fallback arrive with later tasks.
+   conversation gets no reply. STOP, REPLY and the one-question fallback arrive with later tasks.
+   REQUEST (plan Task 14) from the card owner's number replies with the request text to forward, or requestCap.
    Worker variant (spec 7.4, plan Task 13): a VOUCH from a number in numbers/ whose card is not the target runs
    the worker path, with the worker menu, no name step and the voucher card's label in the read-back. */
 const {normalisePhone,keyedHash}=require('./vouchers.js');
@@ -73,6 +74,13 @@ function createSmsHandler(system){
     const c=spokenCode(entry.vouch.secret,counterAt(now()));
     const st=begin(senderKey,{cardId,lang});
     return [say(st,'smsCode',{spoken:formatSpoken(c),smsId:entry.smsId,code:c,shortcode:yv?.shortcode||'12345',callback:yv?.callbackNumber||''})];
+  }
+
+  // The sender's number names the card through numbers/, as CODE does. Nothing is sent to anyone else.
+  function request(senderKey){
+    const r=service.requestFromNumber(senderKey);
+    if(r.ok||r.code==='request_cap')return [r.ok?r.text:r.message];
+    return [t('smsNoCard','en',{url:system.publicUrl+'/card.html'})];
   }
 
   async function vouch(raw,senderKey,refText,codeText){
@@ -188,6 +196,7 @@ function createSmsHandler(system){
     let m;
     if((m=/^YES ([A-Z2-9]{6})$/.exec(cmd))){service.bindBySms(raw,m[1]);return [];}
     if(cmd==='CODE')return code(senderKey);
+    if(cmd==='REQUEST')return request(senderKey);
     if((m=/^(?:VOUCH|V) (\S+) (.+)$/.exec(cmd)))return vouch(raw,senderKey,m[1],m[2]);
     if((m=/^REMOVE (\S+) (\S+)$/.exec(cmd)))return remove(raw,senderKey,m[1],m[2]);
     const st=stateOf(senderKey);

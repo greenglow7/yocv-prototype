@@ -34,6 +34,12 @@
      POST /api/refer/:referToken/send      {statement} -> the draft referral, waiting for the worker's YES
      POST /o/:requestId/withdraw           {referToken}
      POST /api/vouch/:vouchId/accept       {cardId, cardToken, answer: yes | no}; a form post answers 303 to /my
+   Request path for past customers and workers (plan Task 14):
+     POST /api/request/create              {cardId, cardToken} -> {requestId, url, text}; 429 request_cap past 10 open
+     POST /my/:cardId/:cardToken/request   the worker page button; the page shows the text to forward
+     POST /my/:cardId/:cardToken/vouch     {request, adult}: a worker answers a request link (or the bare id)
+     GET  /a/:requestId                    the landing page with the 18-or-older form; consumes nothing
+     POST /a/:requestId                    {adult, lang, f}: opens the session, marks the request used, chips page
    Every response that carries a live code or the card token is private: no-store and no-referrer. A form
    post (application/x-www-form-urlencoded) gets HTML back; JSON gets JSON. */
 const fs=require('node:fs');
@@ -44,7 +50,7 @@ const {codeBatch,normaliseCardRef}=require('./vouchcode.js');
 const {LANGS,t,splitOptions}=require('./copy.js');
 const {STRINGS,fullDate}=require('./render.js');
 const {flowPage,workerPage,myVouchesPage,scanPage,typedPage,adultsOnlyPage,errorPage,chipsPage,withdrawPage,
-  disclosePage,bindPage,readbackPage,donePage,demoPhonePage,workerVouchPage,orgKeyPage,orgPage}=require('./pages.js');
+  disclosePage,bindPage,readbackPage,donePage,demoPhonePage,workerVouchPage,orgKeyPage,orgPage,requestLandingPage,requestMadePage}=require('./pages.js');
 const {tierItem}=require('./vouch-lines.js');
 const {withdrawnAtOf}=require('./vouches.js');
 const {signRecord}=require('./sign.js');
@@ -62,6 +68,9 @@ const API_SESSION=/^\/api\/vouch\/([0-9a-f]{24})\/(chips|words|bind|otp|confirm)
 const ACCEPT_PATH=/^\/api\/vouch\/([A-Z2-9]{10})\/accept$/;
 const ORG_PATH=/^\/o\/([A-Z2-9]{10})(\/withdraw)?$/;
 const REFER_SEND=/^\/api\/refer\/([0-9a-f]{24})\/send$/;
+const REQUEST_PATH=/^\/a\/([A-Z2-9]{10})$/;
+// A pasted request: the /a/<requestId> link as forwarded, or the bare id, in any case.
+const PASTED_REQUEST=/^(?:\S*\/a\/)?([A-Za-z2-9]{10})\/?$/;
 // The vouching worker's browser (spec 7.4 step 1): set by /my/<id>/<token>/vouch for 15 minutes, read only under /s.
 const WORKER_COOKIE=/(?:^|;\s*)yv_worker=([A-Z2-9]{10})\.([0-9a-f]{16})(?=;|$)/;
 const WORKER_COOKIE_AGE=900;
@@ -234,7 +243,69 @@ function createVouchRouter(system){
   function workerVouch(res,entry,cardToken,{status=200,error=null,lang='en'}={}){
     if(entry.withdrawnAt)return myPage(res,entry,cardToken);
     const cookie='yv_worker='+entry.cardId+'.'+cardToken+'; Path=/s; HttpOnly; SameSite=Lax; Max-Age='+WORKER_COOKIE_AGE+(secureCookie?'; Secure':'');
-    send(res,status,workerVouchPage({entry,cardToken,lang,formNonce:newNonce(),error,sampleMode}),'text/html; charset=utf-8',{'set-cookie':cookie});
+    send(res,status,workerVouchPage({entry,cardToken,lang,formNonce:newNonce(),requestNonce:newNonce(),error,sampleMode}),'text/html; charset=utf-8',{'set-cookie':cookie});
+  }
+  // POST /my/:id/:token/vouch {request, adult} (plan Task 14): this card vouches by the other worker's request link.
+  async function workerRequest(req,res,entry,cardToken){
+    const form=isForm(req),payload=await readBody(req,res);
+    if(payload===undefined)return;
+    const p=isPlainObject(payload)?payload:{},lang=langOf(p.lang);
+    if(entry.withdrawnAt)return myPage(res,entry,cardToken);
+    if(form&&p.adult==='no')return sendPage(res,200,adultsOnlyPage({lang,sampleMode}));
+    const adult=form?p.adult==='yes':p.adult===true;
+    if(!adult){
+      const msg=splitOptions(t('adultQ',lang)).stem;
+      return form?workerVouch(res,entry,cardToken,{status:400,error:msg,lang}):sendError(res,400,'adult_needed',msg);
+    }
+    const m=PASTED_REQUEST.exec(field(p.request).trim()),requestId=m?m[1].toUpperCase():'';
+    const r=await service.open({proof:{method:'request',requestId},voucher:{kind:'worker',cardId:entry.cardId,cardToken},channel:'web',lang,
+      formNonce:NONCE.test(field(p.f))?field(p.f):undefined});
+    if(!form)return r.ok?openedJSON(res,r):openFailed(res,r);
+    if(r.ok)return renderChips(res,r);
+    workerVouch(res,entry,cardToken,{status:r.status,error:r.message,lang});
+  }
+  // POST /my/:id/:token/request: the worker page button. A form gets the text to forward; JSON gets the API shape.
+  async function myRequest(req,res,entry,cardToken){
+    const form=isForm(req),payload=await readBody(req,res);
+    if(payload===undefined)return;
+    const lang=LANGS.includes(entry.vouch.lang)?entry.vouch.lang:'en',myPath='/my/'+entry.cardId+'/'+cardToken;
+    const r=service.createRequest(entry.cardId,cardToken);
+    if(!form)return r.ok?sendPrivateJSON(res,200,{requestId:r.requestId,url:r.url,text:r.text}):sendError(res,r.status,r.code,r.message);
+    if(!r.ok)return sendPage(res,r.status,errorPage({message:r.message,lang,sampleMode,link:{href:myPath,text:t('backToCode',lang)}}));
+    sendPage(res,200,requestMadePage({text:r.text,myPath,lang,sampleMode}));
+  }
+  async function apiRequestCreate(req,res){
+    const payload=await readBody(req,res);
+    if(payload===undefined)return;
+    const p=isPlainObject(payload)?payload:{};
+    const r=service.createRequest(field(p.cardId),field(p.cardToken));
+    if(!r.ok)return sendError(res,r.status,r.code,r.message);
+    sendPrivateJSON(res,200,{requestId:r.requestId,url:r.url,text:r.text});
+  }
+  // GET /a/:requestId: checks the request and renders the 18-or-older form; consumes nothing.
+  function requestGet(res,requestId,url){
+    const lang=langOf(url.searchParams.get('lang')),rq=system.requestStore.get(requestId);
+    const entry=rq?.kind==='vouch'?store.get(rq.cardId):null;
+    if(!entry?.record)return sendPage(res,404,notFound());
+    const refused=code=>sendPage(res,STATUS[code],errorPage({message:messageFor(code,firstOf(entry),lang),lang,sampleMode}));
+    if(entry.withdrawnAt)return refused('card_withdrawn');
+    if(rq.usedAt)return refused('request_used');
+    if(!(Date.parse(rq.expiresAt)>now()))return refused('request_expired');
+    sendPage(res,200,requestLandingPage({card:entry,requestId,lang,formNonce:newNonce(),sampleMode}));
+  }
+  // POST /a/:requestId: "No" consumes nothing; "Yes" opens the customer session and marks the request used.
+  async function requestPost(req,res,requestId){
+    const form=isForm(req),payload=await readBody(req,res);
+    if(payload===undefined)return;
+    const p=isPlainObject(payload)?payload:{},lang=langOf(p.lang);
+    if(form&&p.adult==='no')return sendPage(res,200,adultsOnlyPage({lang,sampleMode}));
+    const rq=system.requestStore.get(requestId),entry=rq?.kind==='vouch'?store.get(rq.cardId):null;
+    if(form&&p.adult!=='yes'&&entry?.record&&!rq.usedAt)return sendPage(res,400,requestLandingPage({card:entry,requestId,lang,formNonce:newNonce(),error:splitOptions(t('adultQ',lang)).stem,sampleMode}));
+    if(!form&&p.adult!==true)return sendError(res,400,'adult_needed',splitOptions(t('adultQ',lang)).stem);
+    const r=await service.open({proof:{method:'request',requestId},voucher:{kind:'customer'},channel:'web',lang,formNonce:NONCE.test(field(p.f))?field(p.f):undefined});
+    if(!form)return r.ok?openedJSON(res,r):openFailed(res,r);
+    if(r.ok)return renderChips(res,r);
+    sendPage(res,r.status,r.code==='not_found'?notFound():errorPage({message:r.message,lang,sampleMode}));
   }
   async function withdrawGiven(req,res,entry,cardToken){
     const form=isForm(req),payload=await readBody(req,res);
@@ -354,7 +425,7 @@ function createVouchRouter(system){
 
   // POST /api/vouch/open (spec 4.3). The channel is always web here: the SMS and call windows are only for
   // the gateway handlers, so a browser cannot widen its own window. A worker voucher brings its card token; an
-  // organisation brings its key and the referral request. The request proof for customers arrives with Task 14.
+  // organisation brings its key and the referral request. A request proof opens a customer or worker request (Task 14).
   async function apiOpen(req,res){
     const payload=await readBody(req,res);
     if(payload===undefined)return;
@@ -372,7 +443,15 @@ function createVouchRouter(system){
       if(!r.ok)return sendError(res,r.status,r.code,r.message);
       return sendPrivateJSON(res,200,{vouchToken:r.referToken,worker:r.worker,proof:r.proof,expiresInMs:r.expiresInMs});
     }
-    if(!isPlainObject(proof)||(proof.method!=='qr'&&proof.method!=='code'))return sendError(res,400,'invalid_input','proof.method must be "qr" or "code".');
+    // A request proof (plan Task 14): the request names the card; a cardId sent with it must be that card.
+    if(isPlainObject(proof)&&proof.method==='request'){
+      if(payload.channel!==undefined&&payload.channel!=='web')return sendError(res,400,'invalid_input','channel must be "web".');
+      const r=await service.open({...(typeof payload.cardId==='string'?{cardId:payload.cardId}:{}),proof:{method:'request',requestId:field(proof.requestId)},
+        voucher:v.kind==='worker'?{kind:'worker',cardId:field(v.cardId),cardToken:field(v.cardToken)}:{kind:'customer'},channel:'web',lang:langOf(payload.lang),
+        formNonce:NONCE.test(field(payload.formNonce))?payload.formNonce:undefined});
+      return r.ok?openedJSON(res,r):openFailed(res,r);
+    }
+    if(!isPlainObject(proof)||(proof.method!=='qr'&&proof.method!=='code'))return sendError(res,400,'invalid_input','proof.method must be "qr", "code" or "request".');
     if(payload.channel!==undefined&&payload.channel!=='web')return sendError(res,400,'invalid_input','channel must be "web".');
     const cardId=typeof payload.cardId==='string'?payload.cardId:null;
     if(!cardId&&proof.method==='qr')return sendError(res,400,'invalid_input','cardId is needed with a QR proof.');
@@ -671,6 +750,13 @@ function createVouchRouter(system){
     const acc=ACCEPT_PATH.exec(pathname);
     if(acc)return method==='POST'?wrap(apiAccept(req,res,acc[1])):notAllowed();
     if(pathname==='/api/refer/open')return method==='POST'?wrap(orgOpenPost(req,res,null)):notAllowed();
+    if(pathname==='/api/request/create')return method==='POST'?wrap(apiRequestCreate(req,res)):notAllowed();
+    if(pathname.startsWith('/a/')){
+      const m=REQUEST_PATH.exec(pathname);
+      if(!m||!validId(m[1]))return wrap(sendPage(res,404,notFound()));
+      if(method==='GET'||method==='HEAD')return wrap(requestGet(res,m[1],url));
+      return method==='POST'?wrap(requestPost(req,res,m[1])):notAllowed();
+    }
     const rs=REFER_SEND.exec(pathname);
     if(rs)return method==='POST'?wrap(orgSendPost(req,res,rs[1])):notAllowed();
     if(pathname.startsWith('/o/')){
@@ -717,7 +803,8 @@ function createVouchRouter(system){
       if(!entry)return wrap(sendPage(res,404,notFound()));
       const suffix=m[3]||'';
       if(!suffix)return method==='GET'||method==='HEAD'?wrap(myPage(res,entry,m[2],url)):notAllowed();
-      if(suffix==='/vouch')return method==='GET'||method==='HEAD'?wrap(workerVouch(res,entry,m[2])):notAllowed();
+      if(suffix==='/vouch')return method==='GET'||method==='HEAD'?wrap(workerVouch(res,entry,m[2])):method==='POST'?wrap(workerRequest(req,res,entry,m[2])):notAllowed();
+      if(suffix==='/request')return method==='POST'?wrap(myRequest(req,res,entry,m[2])):notAllowed();
       if(suffix==='/withdraw-given')return method==='POST'?wrap(withdrawGiven(req,res,entry,m[2])):notAllowed();
       if(suffix==='/referral')return method==='POST'?wrap(referralRequest(req,res,entry,m[2])):notAllowed();
       if(suffix==='/lang')return method==='POST'?wrap(setLang(req,res,entry,m[2])):notAllowed();

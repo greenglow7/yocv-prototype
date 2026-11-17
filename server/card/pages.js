@@ -88,7 +88,8 @@ function workerExtras({path,cardId,token,L,given=[],pending=[],orgs=[]}){
     '<br><button name="vouchId" value="'+E(g.vouchId)+'" class="alt">'+H(L('withdrawNow'))+'</button></p>').join('')+'</form>':'';
   const refer=orgs.length?'<form method="post" action="'+E(path)+'/referral" class="np"><h2>'+H(L('requestReferral'))+'</h2><label>'+H(L('pastePost'))+
     '<textarea name="post" rows="3" maxlength="2000" required></textarea></label>'+orgs.map(o=>'<p><button name="evidenceId" value="'+E(o.evidenceId)+'">'+H(L('askOrg',{org:o.org}))+'</button></p>').join('')+'</form>':'';
-  return {top:waitingYes,bottom:gave+'<p class="np"><a class="btn alt" href="'+E(path)+'/vouch">'+H(L('vouchForWorker'))+'</a></p>'+refer};
+  const ask='<form method="post" action="'+E(path)+'/request" class="np"><button class="alt">'+H(L('requestVouch'))+'</button></form>';
+  return {top:waitingYes,bottom:gave+ask+'<p class="np"><a class="btn alt" href="'+E(path)+'/vouch">'+H(L('vouchForWorker'))+'</a></p>'+refer};
 }
 
 function workerPage({entry,record,batch,locked,lang='en',publicUrl,myUrl,nowMs,sampleMode,yv={},vouches=[],arrived=false,waiting=0,liveCount=0,given=[],pending=[],orgs=[],notice=null}){
@@ -190,15 +191,33 @@ function typedPage({card=null,lang='en',formNonce,error,sampleMode}){
 
 // GET /my/:cardId/:cardToken/vouch (spec 7.4 steps 1 and 2): the typed form posts to /s with the vouching card in
 // hidden vc and vt. A camera scan from this browser carries the yv_worker cookie the route sets instead.
-function workerVouchPage({entry,cardToken,lang='en',formNonce,error,sampleMode}){
+function workerVouchPage({entry,cardToken,lang='en',formNonce,requestNonce,error,sampleMode}){
   const L=(k,v)=>t(k,lang,v),path='/my/'+entry.cardId+'/'+cardToken;
   const field=(name,label,extra)=>'<label>'+H(label)+'<input name="'+name+'" autocomplete="off" required'+extra+'></label>';
   const body='<section><h1>'+H(L('vouchForWorker'))+'</h1><p>'+H(L('scanTheirCode'))+'</p>'+errorLine(error)+
     '<form method="post" action="/s">'+hidden('vc',entry.cardId)+hidden('vt',cardToken)+hidden('f',formNonce)+
     field('ref',L('cardRefLabel'),' maxlength="12"')+field('code',L('digitsLabel'),' inputmode="numeric" maxlength="9"')+
     group('adult',L('adultQ'),['yes','no'],{required:true})+langSelect(lang)+'<button>'+H(L('vouchForWorker'))+'</button></form>'+
+    // A request link the other worker forwarded (plan Task 14): an /a/<requestId> link or the bare id.
+    '<form method="post" action="'+E(path)+'/vouch">'+hidden('f',requestNonce)+field('request',L('pasteRequestLink'),' maxlength="200"')+
+    group('adult',L('adultQ'),['yes','no'],{required:true})+'<button>'+H(L('vouchForWorker'))+'</button></form>'+
     '<p class="small"><a href="'+E(path)+'">'+H(L('backToCode'))+'</a></p></section>';
   return flowPage({title:L('vouchForWorker'),body,lang,sampleMode,css:FORM_CSS});
+}
+
+// GET /a/:requestId (spec 7.8, plan Task 14): the past customer's landing page. Consumes nothing; the 18-or-older
+// POST opens the session and marks the request used.
+function requestLandingPage({card,requestId,lang='en',formNonce,error,sampleMode}){
+  const body='<section><h1>'+H(titleFor(card,lang))+'</h1><p>'+H(t('requestLanding',lang,{first:first(card)}))+'</p>'+errorLine(error)+
+    '<form method="post" action="/a/'+E(requestId)+'">'+hidden('f',formNonce)+adultTail(card,lang)+'</form></section>';
+  return flowPage({title:titleFor(card,lang),body,lang,sampleMode,css:FORM_CSS});
+}
+// POST /my/:cardId/:cardToken/request: the text the worker forwards. YoVouch sends nothing.
+function requestMadePage({text,myPath,lang='en',sampleMode}){
+  const L=(k,v)=>t(k,lang,v);
+  const body='<section><h1>'+H(L('requestVouch'))+'</h1><p class="notice">'+H(text)+'</p>'+
+    '<p class="small"><a href="'+E(myPath)+'">'+H(L('backToCode'))+'</a></p></section>';
+  return flowPage({title:L('requestVouch'),body,lang,sampleMode});
 }
 
 function adultsOnlyPage({lang='en',sampleMode}){
@@ -375,5 +394,5 @@ function replyPage({reply,firstName,clips=[],lang='en',sampleMode}){
   return flowPage({title,body,lang:english?'en':(reply?.lang||lang),sampleMode});
 }
 
-module.exports={TIME_ZONES,replyPage,workerVouchPage,orgKeyPage,orgPage,localTime,flowPage,workerPage,myVouchesPage,scanPage,typedPage,adultsOnlyPage,errorPage,chipsPage,withdrawPage,
+module.exports={TIME_ZONES,replyPage,workerVouchPage,requestLandingPage,requestMadePage,orgKeyPage,orgPage,localTime,flowPage,workerPage,myVouchesPage,scanPage,typedPage,adultsOnlyPage,errorPage,chipsPage,withdrawPage,
   disclosePage,bindPage,readbackPage,donePage,demoPhonePage};

@@ -26,8 +26,9 @@ const DEMO_TTL_MS=10*MINUTE,DEMO_WRONG=3,DEMO_PER_HOUR=3;
 const REPLY_WINDOW_MS=15*MINUTE;
 const MAX_FIRST_NAME=30;
 const DAY_MS=86400000,REFERRAL_DAYS=30,MAX_STATEMENT=160,REFER_TTL_MS=30*MINUTE;
+const REQUEST_DAYS=14,MAX_OPEN_REQUESTS=10;
 const STATUS={code_expired:400,code_wrong:400,code_used:409,card_locked:429,card_withdrawn:410,not_found:404,self_vouch:403,
-  voucher_cap_day:429,voucher_cap_cards:429,voucher_recent:409,not_eligible:403,request_used:409,request_expired:410};
+  voucher_cap_day:429,voucher_cap_cards:429,voucher_recent:409,not_eligible:403,request_used:409,request_expired:410,request_cap:429};
 
 // The work chips for a TRADES id; free-text trades and unknown ids get the default list.
 function chipsFor(tradeId){
@@ -49,6 +50,7 @@ function messageFor(code,first,lang){
   if(code==='not_eligible')return t('notEligible',lang);
   if(code==='request_used')return t('requestUsed',lang);
   if(code==='request_expired')return t('requestExpired',lang,vars);
+  if(code==='request_cap')return t('requestCap',lang);
   return STRINGS.notFound;
 }
 
@@ -94,7 +96,10 @@ function createVouchService(system){
   async function open(input={}){
     const channel=['web','sms','ivr'].includes(input.channel)?input.channel:'web';
     const lang=LANGS.includes(input.lang)?input.lang:'en';
-    const cardId=input.cardId!=null?String(input.cardId):codes.resolveCard(input.cardRef??null);
+    // A request proof names its card through the request (plan Task 14); a cardId given with it must match.
+    const rqId=input.proof?.method==='request'?String(input.proof.requestId??''):null;
+    const rq=rqId&&validId(rqId)?system.requestStore.get(rqId):null;
+    const cardId=input.cardId!=null?String(input.cardId):rqId!==null?rq?.cardId||null:codes.resolveCard(input.cardRef??null);
     const entry=cardId?store.get(cardId):null;
     if(!entry?.record)return refuse('not_found',{channel,lang});
     if(entry.withdrawnAt)return refuse('card_withdrawn',{entry,channel,lang});
@@ -103,6 +108,7 @@ function createVouchService(system){
     const prior=again?sessions.get(again):null;
     if(prior&&prior.cardId===entry.cardId)return opened(again,prior,entry);
     const proof=input.proof||{};
+    if(proof.method==='request')return openRequest(entry,rq,input,{channel,lang});
     if(proof.method!=='qr'&&proof.method!=='code')return refuse('code_wrong',{entry,channel,lang});
     const voucherKey=typeof input.voucherKey==='string'&&/^[0-9a-f]{64}$/.test(input.voucherKey)?input.voucherKey:null;
     let voucher={kind:'customer'};
@@ -127,6 +133,27 @@ function createVouchService(system){
     // The SMS sender is the voucher: the number is taken from the sender, phoneConfirmedBy 'sms_origin' (spec 7.3).
     if(voucherKey)session.smsOrigin={key:voucherKey,last3:/^\d{3}$/.test(String(input.phoneLast3??''))?String(input.phoneLast3):null};
     events.log('vouch_opened',{channel,method:proof.method,...cardFields(entry)});
+    return opened(vouchToken,session,entry);
+  }
+
+  // A request vouch (spec 7.8, plan Task 14): a past customer opens the worker's forwarded link, or a worker pastes it
+  // on their own page. Web only. The first open marks the request used; a double tap re-opens the same session
+  // through the form nonce, before this runs. Then the customer path runs unchanged, with its binding and caps.
+  function openRequest(entry,rq,input,{channel,lang}){
+    if(channel!=='web'||!rq||rq.kind!=='vouch'||rq.cardId!==entry.cardId)return refuse('not_found',{entry,channel,lang});
+    if(rq.usedAt)return refuse('request_used',{entry,channel,lang});
+    if(!(Date.parse(rq.expiresAt)>system.now()))return refuse('request_expired',{entry,channel,lang});
+    let voucher={kind:'customer'};
+    if(input.voucher?.kind==='worker'){
+      const w=workerVoucher(entry,input.voucher,{channel,voucherKey:null,lang});
+      if(!w.voucher)return refuse(w.code,{entry,channel,lang,message:w.message});
+      voucher=w.voucher;
+    }
+    if(!system.requestStore.markUsed(rq.requestId))return refuse('request_used',{entry,channel,lang});
+    const proof={method:'request',requestId:rq.requestId,step:null,provedAt:iso(system.now()),channel:'web',onWorkerPhone:false};
+    const {vouchToken,session}=sessions.open({cardId:entry.cardId,proof,voucher,onWorkerPhone:false,channel:'web',lang,adult:true,formNonce:input.formNonce});
+    events.log('request_opened',{requestId:rq.requestId,...cardFields(entry),kind:'vouch'});
+    events.log('vouch_opened',{channel:'web',method:'request',...cardFields(entry)});
     return opened(vouchToken,session,entry);
   }
 
@@ -288,9 +315,10 @@ function createVouchService(system){
     const p=session.proof||{};
     const transcription=session.words?(session.words.source==='clip'&&session.words.fromModel?'model':'typed'):'none';
     const w=session.voucher?.kind==='worker'?session.voucher:null;
+    const rq=p.method==='request'?{requestId:p.requestId}:{};
     // A worker line shows the vouching worker's first name and card, never a number; the SMS path asks no showCard.
     if(w)return {vouchId:null,cardId:session.cardId,kind:'worker',
-      proof:{method:p.method,step:p.step,provedAt:p.provedAt,channel:p.channel||session.channel,onWorkerPhone:false},
+      proof:{method:p.method,...rq,step:p.step,provedAt:p.provedAt,channel:p.channel||session.channel,onWorkerPhone:false},
       voucher:{label:w.firstName+"'s card",firstName:w.firstName,phoneLast3:null,phoneConfirmedBy:method,cardId:w.cardId,
         showCard:method==='card'&&d.showCard===true,orgName:null,orgId:null,adultSelfDeclared:true},
       eligibility:{rule:w.eligibility?.rule??null,at:w.eligibility?.at??null},
@@ -298,7 +326,7 @@ function createVouchService(system){
       jobPostId:null,flags:[],visits:1,confirmedAt:iso(nowMs()),expiresAt:null,
       generation:{mode:transcription==='model'?'live':'sample',transcription}};
     return {vouchId:null,cardId:session.cardId,kind:'customer',
-      proof:{method:p.method,step:p.step,provedAt:p.provedAt,channel:p.channel||session.channel,onWorkerPhone:session.onWorkerPhone===true},
+      proof:{method:p.method,...rq,step:p.step,provedAt:p.provedAt,channel:p.channel||session.channel,onWorkerPhone:session.onWorkerPhone===true},
       voucher:{label:named?STRINGS.voucherShown(d.firstName,last3):STRINGS.aCustomer,firstName:named?d.firstName:null,phoneLast3:named?last3:null,
         phoneConfirmedBy:method,cardId:null,showCard:false,orgName:null,orgId:null,adultSelfDeclared:true},
       fields,line:buildLine('customer',fields),lang:session.lang,wordsShownAt:null,clip:null,restsOn:null,statement:null,acceptedAt:null,
@@ -378,7 +406,8 @@ function createVouchService(system){
     const {vouchId,withdrawSecret}=system.vouchStore.create({record,held,channel:session.channel,clip,
       private:{voucherKey:voucher.key,editedFields:session.editedFields||[],rawTranscript:session.transcript?.text??null,rejected:session.rejected||[]}});
     counted();
-    events.log('vouch_confirmed',{vouchId,...cardFields(entry),channel:session.channel,method:record.proof.method,kind:'customer',onWorkerPhone:record.proof.onWorkerPhone});
+    events.log('vouch_confirmed',{vouchId,...cardFields(entry),channel:session.channel,method:record.proof.method,kind:'customer',onWorkerPhone:record.proof.onWorkerPhone,
+      ...(record.proof.requestId?{requestId:record.proof.requestId}:{})});
     const withdrawUrl=system.publicUrl+'/v/'+vouchId+'/withdraw?w='+withdrawSecret;
     const bySms=session.onWorkerPhone&&voucher.method==='sms_bind';
     if(bySms)system.outbox.send(session.bind.replyTo,t('withdrawSms',lang,{first,link:withdrawUrl}));
@@ -402,7 +431,8 @@ function createVouchService(system){
     const held=session.words||clip?{words:session.words?.text??null,wordsSource:session.words?.source??null,clip:null}:null;
     const {vouchId,withdrawSecret}=system.vouchStore.create({record,held,channel:session.channel,clip,
       private:{voucherKey:voucher.key,editedFields:session.editedFields||[],rawTranscript:session.transcript?.text??null,rejected:session.rejected||[]}});
-    events.log('vouch_confirmed',{vouchId,...cardFields(entry),channel:session.channel,method:record.proof.method,kind:'worker',voucherCardId:w.cardId});
+    events.log('vouch_confirmed',{vouchId,...cardFields(entry),channel:session.channel,method:record.proof.method,kind:'worker',voucherCardId:w.cardId,
+      ...(record.proof.requestId?{requestId:record.proof.requestId}:{})});
     const lang=LANGS.includes(entry.vouch?.lang)?entry.vouch.lang:'en';
     if(entry.ownerPhoneHash)system.outbox.sendToKey(entry.ownerPhoneHash,t('vouchedForYou',lang,{name:w.firstName}));
     end();
@@ -481,6 +511,27 @@ function createReferrals(system){
     events.log('request_created',{requestId,...cardFields(entry),kind:'referral'});
     const url=system.publicUrl+'/o/'+requestId;
     return {ok:true,requestId,url,expiresAt,text:t('forwardOrg',lang,{org,link:url})};
+  }
+
+  // A request link for a past customer or worker (spec 7.8, plan Task 14): 14 days, single use, at most 10 open per
+  // card (referral requests do not count). YoVouch sends nothing: the worker forwards the text.
+  function newRequest(entry){
+    const lang=langOf(entry);
+    if(entry.withdrawnAt)return fail(410,'card_withdrawn',t('cardWithdrawn',lang));
+    if(system.requestStore.listOpen(entry.cardId,'vouch').length>=MAX_OPEN_REQUESTS)return {...fail(429,'request_cap',t('requestCap',lang)),error:'request_cap'};
+    const {requestId,expiresAt}=system.requestStore.create({kind:'vouch',cardId:entry.cardId,ttlMs:REQUEST_DAYS*DAY_MS});
+    events.log('request_created',{requestId,...cardFields(entry),kind:'vouch'});
+    const url=system.publicUrl+'/a/'+requestId;
+    return {ok:true,requestId,url,expiresAt,text:t('requestForward',lang,{first:firstOf(entry),link:url})};
+  }
+  function createRequest(cardId,cardToken){
+    const entry=cardByToken(cardId,cardToken);
+    return entry?newRequest(entry):fail(404,'not_found',STRINGS.notFound);
+  }
+  // REQUEST by SMS: the sender's keyed hash names the card through numbers/ (the owner's confirmed number).
+  function requestFromNumber(senderKey){
+    const cardId=typeof senderKey==='string'?store.indexGet('numbers',senderKey):null,entry=cardId?store.get(cardId):null;
+    return entry?.record&&entry.vouch?.secret?newRequest(entry):fail(404,'not_found',STRINGS.notFound);
   }
 
   // The open referral request with its card, completion and post, or the refusal.
@@ -581,8 +632,8 @@ function createReferrals(system){
     return {ok:true,vouchId};
   }
 
-  return {createReferralRequest,orgOpen,orgViewFor,orgSend,acceptReferral,withdrawReferral};
+  return {createRequest,requestFromNumber,createReferralRequest,orgOpen,orgViewFor,orgSend,acceptReferral,withdrawReferral};
 }
 const splitOptionsStem=s=>{const i=String(s).search(/[?:]/);return i<0?String(s):String(s).slice(0,i+1);};
 
-module.exports={referralOrgs,statementOk,createVouchService,chipsFor,messageFor,gatewayConfigured,STATUS,EXPIRES_IN_MS,BIND_TTL_MS,REPLY_WINDOW_MS};
+module.exports={referralOrgs,statementOk,createVouchService,chipsFor,messageFor,gatewayConfigured,STATUS,EXPIRES_IN_MS,BIND_TTL_MS,REPLY_WINDOW_MS,REQUEST_DAYS,MAX_OPEN_REQUESTS};

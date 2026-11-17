@@ -1,7 +1,7 @@
 'use strict';
 /* YoVouch requests (spec 5.1, 9.6, 9.7): <dir>/requests/<requestId>.json, single use. A referral request
-   (kind 'referral', plan Task 13) carries jobPostId, evidenceId and orgName and expires with the post; the
-   request path (kind 'vouch', Task 14) adds its own. markUsed reduces the file to
+   (kind 'referral', plan Task 13) carries jobPostId, evidenceId and orgName and expires with the post; a vouch
+   request (kind 'vouch', Task 14) carries no other field and lasts 14 days, at most 10 open per card. markUsed reduces the file to
    {requestId, cardId, kind, usedAt, expiresAt}, so a second open reads requestUsed. The sweep deletes a request
    at expiry and every request of a card withdrawn over 24 hours. */
 const crypto=require('node:crypto');
