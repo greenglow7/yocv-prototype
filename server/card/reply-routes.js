@@ -243,12 +243,12 @@ function createReplyService(system){
     return {forwardedAt:r.forwardedAt};
   }
   // The reply page's clips: only lines still live with a released clip (a withdrawal holds at read time).
-  // The worker's own clip follows, labelled "Said by <first>".
+  // The worker's own clip follows, labelled "Said by <first>", until scripts/measure.js --delete-clips expires it.
   function pageClips(reply,nowMs,firstName=''){
     const self='self:'+reply.replyId;
     return [...list(reply.clipIds).filter(id=>id!==self).map(id=>system.vouchStore.get(id)).filter(f=>f?.record&&system.vouchStore.isLive(f,nowMs)&&f.record.clip?.url&&!f.record.clip.expired)
       .map(f=>({href:'/v/'+f.record.vouchId+'/clip',text:STRINGS.playClip(f.record.clip.seconds,Math.round(Number(f.record.clip.bytes||0)/1024))})),
-      ...(list(reply.clipIds).includes(self)&&reply.selfClip?[{href:'/r/'+reply.replyId+'/clip',text:t('saidBy','en',{first:str(firstName)})}]:[])];
+      ...(list(reply.clipIds).includes(self)&&reply.selfClip?.url?[{href:'/r/'+reply.replyId+'/clip',text:t('saidBy','en',{first:str(firstName)})}]:[])];
   }
   // The reply page's line 2: when it rests on a vouch or referral that is no longer live (withdrawn, withdrawn
   // quietly past withdrawAfter, or hidden), the line turns neutral at read time (spec 5.6, Review Focus 4).

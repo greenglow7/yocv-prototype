@@ -92,3 +92,17 @@ The organisation-name check on the self-declared block is not a Yoma call. It us
 ## Honest limits of this build
 
 Sample personas are fictional; their completions reference real Yoma opportunities so the live cross-check is real, but no real youth data was read. Check now on a sample card re-reads the same persona and says `simulated: true`. The model draft path uses the same adapters as YoCV and was not exercised against a real key in this build; the template draft is what the demo shows unless a key is configured. The QR encoder was verified against an independent decoder and the browser's BarcodeDetector.
+
+# YoVouch open questions only Yoma can answer
+
+These come from spec section 16. Each one blocks a label or a channel from becoming real. Until it is answered, the prototype keeps the demo label or the simulator for it.
+
+1. **Organisation keys and identity.** Would organisations that verify completions (Atingi, Alison, UNICEF country offices) hold a YoVouch key and refer named workers to named posts? Under what policy, and who at the organisation presses confirm? Until Yoma issues keys, every referral keeps `Demo organisation key. A real key needs Yoma.`
+2. **WhatsApp Business API.** Can YoVouch run under a Yoma WhatsApp Business account? Is a business-initiated message after a worker's forward, inside the 24-hour service window, acceptable under Yoma's messaging policy?
+3. **Zero-rating.** Airtel Nigeria zero-rates Yoma. Would hosting on `yoma.world` bring the card, scan, code and clip pages under that zero-rating? What about South Africa's PBO zero-rating, and Kenya?
+4. **Phone binding.** Should the customer's `YES <session code>` text go to a Yoma shortcode and be matched by Yoma's own service? Then the label could read "Number confirmed by Yoma (not an ID check)". Or should it stay YoVouch's?
+5. **Shortcode and call-back number.** A reverse-billed SMS shortcode and a toll-free call-back number in each market are required, not optional. Without them the customer pays for every SMS, including the one `YES` text every web vouch needs, and the no-data path is not free. Who obtains them, and who pays per message? The `VOUCH` reply alone is three concatenated segments, so one SMS vouch costs six or seven segments on the server side.
+6. **Hosting and signing.** Would Yoma host the signing key, so "signed by YoCard" becomes "signed by Yoma's YoVouch service"? Does Yoma want referrals in the wallet as credentials later (L6)?
+7. **Who vouchers are.** Should vouchers be Yoma users with a Yo-ID, which would allow age checks? Or stay anyone with a number and a self-declared age?
+8. **Data protection.** Under POPIA, the NDPR and the Kenyan DPA, is a keyed hash of a customer's number plus three digits, kept for twelve months, acceptable to Yoma's data protection officer? What retention does Yoma require for clips? The pilot runs before this answer exists, so its consent text is signed off by the consultant's institution instead (`docs/pilot-consent.md`), and every clip is deleted at the end of the pilot.
+9. **A stable organisation id.** Completions carry `organizationName` and `organizationLogoURL` but no `organizationId` (`server/card/account.js` `enrich()` and `buildRecord` in `server/card/routes.js`). Referrals are anchored on the name string. Would Yoma expose a stable organisation id on `/opportunity/{id}/info`, or a referral endpoint, so a renamed organisation does not break its referrals?
