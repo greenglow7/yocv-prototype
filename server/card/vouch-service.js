@@ -11,6 +11,7 @@ const {ALPHABET}=require('./store.js');
 const {normalisePhone,keyedHash}=require('./vouchers.js');
 const {capFor,recentFor,isSelfVouch,capMessage}=require('./vouches.js');
 const {parseChips,checkWords,buildLine}=require('./vouch-lines.js');
+const {flagsAtConfirm,cardCreatedMs}=require('./flags.js');
 
 const CHIPS=JSON.parse(fs.readFileSync(path.join(__dirname,'..','..','data','vouch-chips.json'),'utf8'));
 const EXPIRES_IN_MS=30*60*1000;
@@ -288,6 +289,7 @@ function createVouchService(system){
       return {ok:true,vouchId:existingVouchId,line:file.record.line,withdrawUrl:null,visitAdded:true};
     }
     const record=draftRecord(session,voucher);
+    record.flags=flagsAtConfirm(system.vouchStore,record,cardCreatedMs(entry),nowMs());
     const held=session.words||session.clip?{words:session.words?.text??null,wordsSource:session.words?.source??null,
       clip:session.disclose?.attachClip?session.clip??null:null}:null;
     const {vouchId,withdrawSecret}=system.vouchStore.create({record,held,channel:session.channel,

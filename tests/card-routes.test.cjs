@@ -608,6 +608,7 @@ test('list page and JSON',async()=>{
  const {base,id,add,key,clock}=await vouchedCard();
  const ids=[];
  for(let i=0;i<22;i++)ids.push(add({confirmedAt:new Date(clock.t-i*60000).toISOString(),line:'Braids '+String.fromCharCode(65+i)+', November 2026, once. Would hire again: yes.'}).vouchId);
+ clock.t+=8*86400000; // past the 7-day burst hold (plan Task 8), so all 22 recent lines show
  const old=add({confirmedAt:'2024-09-01T10:00:00Z',proof:{method:'qr',provedAt:'2024-09-01T10:00:00Z',channel:'web',onWorkerPhone:false},line:'Cut, September 2024, once. Would hire again: yes.'}).vouchId;
  const res=await fetch(base+'/c/'+id+'/vouches');
  assert.equal(res.status,200);
@@ -648,6 +649,7 @@ test('a list page of long multi-byte lines holds fewer than 20 and stays within 
  const {base,id,add,clock}=await vouchedCard();
  const W='ẹ'.repeat(120);
  for(let i=0;i<25;i++)add({confirmedAt:new Date(clock.t-i*60000).toISOString(),line:'Braids, November 2026, once. Would hire again: yes. "'+W+'"'});
+ clock.t+=8*86400000; // past the 7-day burst hold (plan Task 8)
  let seen=0;
  for(let p=1;seen<25&&p<10;p++){
   const html=await vb.page(base,'/c/'+id+'/vouches?page='+p);

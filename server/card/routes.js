@@ -29,6 +29,7 @@ const {createVouchRouter}=require('./vouch-routes.js');
 const {runSweep}=require('./sweep.js');
 const {publicPage,vouchListPage,notFoundPage,withdrawnPage,cardSvg,maskPhone,firstNameOf,STRINGS}=require('./render.js');
 const {tierItem}=require('./vouch-lines.js');
+const {computeFlags,burstHeld,workerEdges,cardCreatedMs}=require('./flags.js');
 const {qrSvg}=require('../qr.js');
 const {ProviderError}=require('../providers/errors.js');
 const {noBannedClaims}=require('../validate.js');
@@ -231,13 +232,23 @@ function createCardRouter({config,accountSource,provider,store,key,yoma,publicUr
   function cardUrl(cardId){return base+'/c/'+cardId;}
 
   // ---- the vouched tier (spec 5.8, 10.1) ----
-  // Live files only, checked at read time (a quiet withdrawal past withdrawAfter is gone before any sweep):
-  // organisation referrals first, then confirmedAt newest first.
-  function liveFiles(cardId,nowMs){
+  // Live files only, checked at read time (a quiet withdrawal past withdrawAfter is gone before any sweep),
+  // less the burst-held lines (spec 5.4): organisation referrals first, then confirmedAt newest first.
+  function shownFiles(cardId,nowMs){
     const at=f=>Date.parse(f.record.confirmedAt)||0,ref=f=>f.record.kind==='organisation'?0:1;
-    return system.vouchStore.listForCard(cardId).filter(f=>system.vouchStore.isLive(f,nowMs)).sort((a,b)=>ref(a)-ref(b)||at(b)-at(a));
+    const all=system.vouchStore.listForCard(cardId);
+    const hold=burstHeld(all,cardCreatedMs(store.get(cardId)),nowMs);
+    const live=all.filter(f=>system.vouchStore.isLive(f,nowMs));
+    const files=live.filter(f=>!hold.has(f.record.vouchId)).sort((a,b)=>ref(a)-ref(b)||at(b)-at(a));
+    return {files,burstHeld:files.length<live.length};
   }
-  function visibleItems(cardId,firstName,nowMs){return liveFiles(cardId,nowMs).map(f=>tierItem(system.vouchStore.publicPart(f),firstName,{nowMs}));}
+  const liveFiles=(cardId,nowMs)=>shownFiles(cardId,nowMs).files;
+  // The current flags (spec 5.5), not the ones stored at confirm.
+  function tierView(cardId,firstName,nowMs){
+    const {files,burstHeld:held}=shownFiles(cardId,nowMs),flags=computeFlags(workerEdges(system.vouchStore,nowMs),nowMs);
+    return {items:files.map(f=>tierItem(system.vouchStore.publicPart(f),firstName,{nowMs,flags:flags.get(f.record.vouchId)||[]})),burstHeld:held};
+  }
+  function visibleItems(cardId,firstName,nowMs){return tierView(cardId,firstName,nowMs).items;}
   // Check now: one signal per rendered id of this card; ids of other cards are ignored.
   function vouchSignals(cardId,vouchIds,nowMs){
     const out=[];
@@ -431,7 +442,7 @@ function createCardRouter({config,accountSource,provider,store,key,yoma,publicUr
     const record={...entry.record,cardId};
     const withdrawn=entry.withdrawnAt?{withdrawnAt:entry.withdrawnAt}:null;
     const first=firstNameOf(record),fonts=!saveData(req);
-    const page=extra=>publicPage({record,status:'ok',publicUrl:base,vouches:visibleItems(cardId,first,now()),fonts,...extra});
+    const page=extra=>{const v=tierView(cardId,first,now());return publicPage({record,status:'ok',publicUrl:base,vouches:v.items,burstHeld:v.burstHeld,fonts,...extra});};
     if(suffix==='/check'){
       if(req.method!=='POST')return sendError(res,405,'method_not_allowed',MESSAGES.methodNotAllowed,false);
       const body=await checkBody(req,res);
@@ -466,7 +477,8 @@ function createCardRouter({config,accountSource,provider,store,key,yoma,publicUr
       const files=liveFiles(cardId,nowMs),isOld=f=>(Date.parse(f.record.confirmedAt)||0)<cut.getTime();
       const ordered=[...files.filter(f=>!isOld(f)),...files.filter(isOld)];
       const q=url.searchParams.get('page')||'',n=/^[1-9]\d{0,5}$/.test(q)?Number(q):1;
-      const item=f=>tierItem(system.vouchStore.publicPart(f),first,{nowMs});
+      const flags=computeFlags(workerEdges(system.vouchStore,nowMs),nowMs);
+      const item=f=>tierItem(system.vouchStore.publicPart(f),first,{nowMs,flags:flags.get(f.record.vouchId)||[]});
       const render=(from,to,p)=>{const slice=ordered.slice(from,to);
         return vouchListPage({record,items:slice.filter(f=>!isOld(f)).map(item),older:slice.filter(isOld).map(item),page:p,hasNext:to<ordered.length,publicUrl:base});};
       // Pages of 20 lines; a page of long multi-byte lines holds fewer, so every page stays within 10240 bytes.
