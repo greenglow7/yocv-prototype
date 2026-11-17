@@ -34,7 +34,17 @@ function loadConfig({env=process.env,cwd=process.cwd()}={}){
     // YoCard: a bearer token switches the account source from sample personas to a real Yoma account;
     // the public URL is what card links, the QR and share text use (default http://HOST:PORT).
     yomaAccessToken:get('YOMA_ACCESS_TOKEN'),
-    publicUrl:/^https?:\/\//i.test(publicUrlRaw)?stripSlashes(publicUrlRaw):null
+    publicUrl:/^https?:\/\//i.test(publicUrlRaw)?stripSlashes(publicUrlRaw):null,
+    // YoVouch: the simulated gateways, the production gateway secret, the shortcode and call-back number
+    // printed on the worker's page, and the shortcode's market for local-format senders with no card context.
+    yovouch:{
+      sim:get('YOVOUCH_SIM')==='1',
+      gatewaySecret:get('YOVOUCH_GATEWAY_SECRET'),
+      shortcode:get('YOVOUCH_SHORTCODE')||'12345',
+      callbackNumber:get('YOVOUCH_CALLBACK_NUMBER')||'0800 000 000',
+      smsCountry:get('YOVOUCH_SMS_COUNTRY')||'South Africa',
+      orgKeys:{}
+    }
   };
   if(azureEndpoint&&azureKey&&azureDeployment){
     const azure={endpoint:stripSlashes(azureEndpoint),apiKey:azureKey,deployment:azureDeployment,apiVersion:get('AZURE_OPENAI_API_VERSION')||DEFAULTS.azureApiVersion};

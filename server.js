@@ -129,15 +129,15 @@ function validateGenerateInput(payload,roleKeys){
   return {input:{role,experience:trimmed,context:ctx,dates:dt},mode:mode??null};
 }
 
-// `card` = {accountSource, store, key} mounts the YoCard routes (main() builds them from config; tests
-// inject fakes). Without it the card routes are absent and only the Phase 1 routes answer.
+// `card` = {accountSource, store, key, outbox?, transcriber?, random?} mounts the YoCard and YoVouch routes
+// (main() builds them from config; tests inject fakes). Without it the card routes are absent and only the Phase 1 routes answer.
 function createApp({config,provider,yoma,roleSkills,core,rootDir=__dirname,maxInFlight=4,card=null,publicUrl=null,now=Date.now}={}){
   if(!config)throw new Error('createApp needs a config');
   if(!roleSkills||typeof roleSkills!=='object')throw new Error('createApp needs roleSkills');
   const roleKeys=Object.keys(roleSkills);
   const liveConfigured=config.provider!=='local';
   const cardBase=String(publicUrl||config.publicUrl||('http://'+config.host+':'+config.port)).replace(/\/+$/,'');
-  const cardRouter=card?createCardRouter({config,accountSource:card.accountSource,provider,store:card.store,key:card.key,yoma,publicUrl:cardBase,now,readJSONBody,maxInFlight}):null;
+  const cardRouter=card?createCardRouter({config,accountSource:card.accountSource,provider,store:card.store,key:card.key,yoma,publicUrl:cardBase,now,random:card.random,readJSONBody,maxInFlight,outbox:card.outbox??null,transcriber:card.transcriber}):null;
   let localProvider=provider&&provider.name==='local'?provider:null;
   const getLocalProvider=()=>{
     if(!localProvider)localProvider=createLocalProvider(core);
@@ -260,6 +260,7 @@ function createApp({config,provider,yoma,roleSkills,core,rootDir=__dirname,maxIn
       sendError(res,500,'internal_error',MESSAGES.internal,true);
     });
   });
+  server.card=cardRouter; // tests reach the YoVouch system as server.card.vouch
   return server;
 }
 

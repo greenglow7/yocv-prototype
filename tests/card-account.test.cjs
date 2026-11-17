@@ -62,10 +62,10 @@ test('ageAt returns null for missing or unparseable dates',()=>{
 
 // --- personas.json ---
 
-test('personas.json holds the five spec personas with real opportunity ids and confirmed phones',()=>{
+test('personas.json holds the six personas with real opportunity ids and confirmed phones',()=>{
  assert.ok(Array.isArray(personas),'personas.json must be an array');
  const ids=personas.map(p=>p.id);
- assert.deepEqual(ids,['thandi','brian','amara','sipho','lerato']);
+ assert.deepEqual(ids,['thandi','brian','amara','sipho','lerato','bongani']);
  const byId=Object.fromEntries(personas.map(p=>[p.id,p]));
  assert.deepEqual(byId.thandi.completions.map(c=>c.opportunityId),[HAIR,CARE,FINLIT]);
  assert.deepEqual(byId.brian.completions.map(c=>c.opportunityId),['019e6fa0-1b36-7cba-a344-44f23ab7619d','019e6fb9-bfc4-7dd7-ac9d-c09a384c5160',FINLIT]);
@@ -93,6 +93,7 @@ test('personas.json holds the five spec personas with real opportunity ids and c
  assert.equal(ageAt(byId.amara.dateOfBirth,NOW),22);
  assert.equal(ageAt(byId.sipho.dateOfBirth,NOW),19);
  assert.equal(ageAt(byId.lerato.dateOfBirth,NOW),17);
+ assert.equal(ageAt(byId.bongani.dateOfBirth,NOW),27);
  assert.ok(byId.thandi.skills.some(s=>s.name==='Cosmetics'));
  assert.ok(byId.brian.skills.some(s=>s.name==='First Aid'));
  assert.ok(byId.amara.skills.some(s=>s.name==='Sewing'));
@@ -105,7 +106,7 @@ test('createAccountSource defaults to the sample kind and lists every persona wi
  const source=createAccountSource({config,yoma:fakeYoma(),now});
  assert.equal(source.kind,'sample');
  const listed=source.listPersonas();
- assert.deepEqual(listed.map(p=>p.id),['thandi','brian','amara','sipho','lerato']);
+ assert.deepEqual(listed.map(p=>p.id),['thandi','brian','amara','sipho','lerato','bongani']);
  const lerato=listed.find(p=>p.id==='lerato');
  assert.equal(lerato.age,17);
  assert.deepEqual(Object.keys(listed[0]).sort(),['age','city','displayName','id','trade']);

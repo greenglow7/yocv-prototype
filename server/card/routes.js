@@ -7,17 +7,21 @@
      POST /api/card/publish                validate, build the public record, sign, store
      POST /api/card/:id/check              re-read the account, compare, JSON signals
      POST /api/card/:id/withdraw           owner secret, marks the card withdrawn
+     POST /api/card/:id/rotate-token       owner secret, a new card token (and the YoVouch block for an older card)
      GET  /c/:id | /c/:id.svg | /c/:id.json  public page, image, signed record
      POST /c/:id/check                     the no-JavaScript check form, renders the page with the result
      GET  /.well-known/jwks.json           the signing key
    Draft sessions live in memory for 30 minutes keyed by a 24-hex draftToken; they hold the full snapshot
-   (with the real phone number and date of birth) so the browser only ever sees the masked copy. */
+   (with the real phone number and date of birth) so the browser only ever sees the masked copy.
+   The YoVouch routes (/my/, /api/vouch/, /qr-browser.js) live in vouch-routes.js and are tried last. */
 
 const crypto=require('node:crypto');
 const {ageAt}=require('./account.js');
 const {runDraft,validateSelfDeclared,validateConfirms,MAX_DESCRIPTION}=require('./draft.js');
 const {signRecord,jwks}=require('./sign.js');
-const {validId}=require('./store.js');
+const {validId,secretsMatch,hashSecret}=require('./store.js');
+const {buildVouchSystem,issueVouchFields,indexCard,phoneHashOf,newCardToken,myUrl}=require('./vouch-system.js');
+const {createVouchRouter}=require('./vouch-routes.js');
 const {publicPage,notFoundPage,withdrawnPage,cardSvg,maskPhone}=require('./render.js');
 const {qrSvg}=require('../qr.js');
 const {ProviderError}=require('../providers/errors.js');
@@ -31,8 +35,9 @@ const CODE_LENGTH=6;
 const MAX_TRADE=40;
 const MAX_IN_FLIGHT=4;
 const E164=/^\+[1-9]\d{6,14}$/;
+const NO_REFERRER={'referrer-policy':'no-referrer'}; // with send()'s no-store: a response that carries a card token
 const CARD_PATH=/^\/c\/([A-Z2-9]{10})(\.svg|\.json|\/check)?$/;
-const API_CARD_PATH=/^\/api\/card\/([A-Z2-9]{10})\/(check|withdraw)$/;
+const API_CARD_PATH=/^\/api\/card\/([A-Z2-9]{10})\/(check|withdraw|rotate-token)$/;
 
 // Trade grid from spec §3.7: id -> label shown on the card.
 const TRADES=[
@@ -97,6 +102,11 @@ function tradeLabel(trade){
   if(!raw||raw.length>MAX_TRADE||!/\p{L}/u.test(raw)||!noBannedClaims(raw).ok)return null;
   return raw;
 }
+// The TRADES id for a trade given as an id or a label, or null for free text (spec 5.2).
+function tradeIdOf(trade){
+  const raw=str(trade).trim(),lower=raw.toLowerCase();
+  return TRADE_LABELS.has(raw)?raw:(TRADES.find(t=>t.label.toLowerCase()===lower)?.id??null);
+}
 
 // The public record (spec §3.5). Built from the snapshot and the worker's choices; never carries the
 // date of birth, the email flag, or the phone number unless WhatsApp is enabled.
@@ -135,6 +145,7 @@ function buildRecord({snapshot,trade,selfDeclared,confirms,disclose={},code,gene
     code:str(code),
     publishedAt:new Date(now()).toISOString(),
     trade:tradeLabel(trade)||str(trade).trim(),
+    tradeId:tradeIdOf(trade),
     selfDeclared:{
       headline:str(selfDeclared?.headline),
       services:list(selfDeclared?.services).map(s=>({name:str(s?.name),priceFrom:s?.priceFrom??null,priceTo:s?.priceTo??null,currency:str(s?.currency)})),
@@ -172,9 +183,11 @@ function maskSnapshot(snapshot,now){
   return {...snapshot,user:{...rest,phoneNumber:maskPhone(phoneNumber),phoneMaskedOnly:true,age:ageAt(dateOfBirth,now)}};
 }
 
-function createCardRouter({config,accountSource,provider,store,key,yoma,publicUrl,now=Date.now,random=crypto.randomBytes,readJSONBody=defaultReadJSONBody,maxInFlight=MAX_IN_FLIGHT}={}){
+function createCardRouter({config,accountSource,provider,store,key,yoma,publicUrl,now=Date.now,random=crypto.randomBytes,readJSONBody=defaultReadJSONBody,maxInFlight=MAX_IN_FLIGHT,outbox=null,transcriber=undefined}={}){
   if(!accountSource||!store||!key)throw new Error('createCardRouter needs accountSource, store and key');
   const base=str(publicUrl||('http://'+(config?.host||'127.0.0.1')+':'+(config?.port||4173))).replace(/\/+$/,'');
+  const system=buildVouchSystem({config,store,key,accountSource,provider,publicUrl:base,now,random,outbox,transcriber});
+  const vouchRouter=createVouchRouter(system);
   const sessions=new Map();
   let inFlight=0;
   const liveModel=Boolean(provider)&&typeof provider.complete==='function';
@@ -312,9 +325,13 @@ function createCardRouter({config,accountSource,provider,store,key,yoma,publicUr
     if(confirms.rejected.length)return sendError(res,400,'invalid_input',MESSAGES.confirms,false,{rejected:confirms.rejected});
     const code=newCode();
     const record=buildRecord({snapshot,trade,selfDeclared:self.value,confirms:confirms.lines,disclose:{completions:wantCompletions,skills:wantSkills,photo:disclose.photo===true,whatsapp:disclose.whatsapp===true},code,generation:session.generation,now,personaId:session.selector?.persona??null});
-    const {cardId,ownerSecret}=store.create(record);
+    // YoVouch (spec 4.3, 9.6): the card token (only its hash is stored), the smsId, the code secret and the
+    // keyed hash of the owner's phone; the number index only for a phone Yoma confirmed.
+    const {cardToken,smsId,fields}=issueVouchFields(system,{user:snapshot.user});
+    const {cardId,ownerSecret}=store.create(record,fields);
+    indexCard(system,cardId,store.get(cardId),{phoneConfirmed:snapshot.user?.phoneNumberConfirmed});
     sessions.delete(payload.draftToken);
-    sendJSON(res,200,{cardId,url:cardUrl(cardId),svgUrl:cardUrl(cardId)+'.svg',code,ownerSecret});
+    sendJSON(res,200,{cardId,url:cardUrl(cardId),svgUrl:cardUrl(cardId)+'.svg',code,ownerSecret,cardToken,smsId,myUrl:myUrl(system,cardId,cardToken)},NO_REFERRER);
   }
 
   // ---- check ----
@@ -412,7 +429,37 @@ function createCardRouter({config,accountSource,provider,store,key,yoma,publicUr
     if(!entry)return sendError(res,404,'not_found',MESSAGES.noCard,false);
     const secret=isPlainObject(payload)?payload.ownerSecret:null;
     if(typeof secret!=='string'||!store.withdraw(cardId,secret))return sendError(res,403,'forbidden',MESSAGES.forbidden,false);
+    // The number index stops pointing at a withdrawn card at once (spec 9.6); an entry a newer card owns stays.
+    for(const hash of [entry.ownerPhoneHash,entry.linkedPhoneHash])if(hash&&store.indexGet('numbers',hash)===cardId)store.indexDelete('numbers',hash);
     sendJSON(res,200,{cardId,withdrawnAt:store.get(cardId)?.withdrawnAt??new Date(now()).toISOString()});
+  }
+
+  // A new card token; the old one stops working. A card published before YoVouch gets its vouch block, smsId
+  // and index entries here, with the phone hash from a fresh read when the account still matches (spec 9.6).
+  async function apiRotateToken(req,res,cardId){
+    const payload=await readBody(req,res);
+    if(payload===undefined)return;
+    const entry=store.get(cardId);
+    if(!entry||!entry.record)return sendError(res,404,'not_found',MESSAGES.noCard,false);
+    if(!secretsMatch(entry.ownerSecretHash,isPlainObject(payload)?payload.ownerSecret:null))return sendError(res,403,'forbidden',MESSAGES.forbidden,false);
+    if(entry.withdrawnAt)return sendError(res,410,'withdrawn',MESSAGES.withdrawn,false);
+    if(entry.vouch?.secret&&entry.smsId){
+      const cardToken=newCardToken(system);
+      store.update(cardId,e=>{e.cardTokenHash=hashSecret(cardToken);});
+      return sendJSON(res,200,{cardToken,smsId:entry.smsId,myUrl:myUrl(system,cardId,cardToken)},NO_REFERRER);
+    }
+    const record=entry.record;
+    let fresh=null;
+    try{fresh=await accountSource.read(record.accountSource==='sample'?{persona:record.personaId}:{});}catch{fresh=null;}
+    const same=Boolean(fresh?.user)&&record.user?.id!=null&&str(fresh.user.id)===str(record.user.id);
+    const {cardToken,smsId,fields}=issueVouchFields(system,{user:null});
+    fields.ownerPhoneHash=same?phoneHashOf(system,fresh.user):null;
+    const next=store.update(cardId,e=>{
+      Object.assign(e,fields);
+      if(e.record.tradeId===undefined)e.record.tradeId=tradeIdOf(e.record.trade);
+    });
+    indexCard(system,cardId,next,{phoneConfirmed:same&&fresh.user.phoneNumberConfirmed===true});
+    sendJSON(res,200,{cardToken,smsId,myUrl:myUrl(system,cardId,cardToken)},NO_REFERRER);
   }
 
   function handle(req,res,url){
@@ -435,17 +482,17 @@ function createCardRouter({config,accountSource,provider,store,key,yoma,publicUr
     if(api){
       const [,cardId,action]=api;
       if(!validId(cardId))return wrap(sendError(res,404,'not_found',MESSAGES.noCard,false));
-      return wrap(post(()=>action==='check'?apiCheck(req,res,cardId):apiWithdraw(req,res,cardId)));
+      return wrap(post(()=>action==='check'?apiCheck(req,res,cardId):action==='withdraw'?apiWithdraw(req,res,cardId):apiRotateToken(req,res,cardId)));
     }
     if(pathname.startsWith('/c/')){
       const m=CARD_PATH.exec(pathname);
       if(!m||!validId(m[1]))return wrap(sendHtml(res,404,notFoundPage()));
       return wrap(publicCard(req,res,m[1],m[2]||''));
     }
-    return false;
+    return vouchRouter.handle(req,res,url);
   }
 
-  return {handle,sessions,buildRecord,TRADES};
+  return {handle,sessions,buildRecord,TRADES,vouch:system};
 }
 
-module.exports={createCardRouter,buildRecord,tradeLabel,maskSnapshot,TRADES,SESSION_TTL_MS,MESSAGES};
+module.exports={createCardRouter,buildRecord,tradeLabel,tradeIdOf,maskSnapshot,TRADES,SESSION_TTL_MS,MESSAGES};

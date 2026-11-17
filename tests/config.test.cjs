@@ -102,3 +102,11 @@ test('loadConfig falls back to the default port when PORT is not a number',()=>{
  const cfg=config.loadConfig({env:{PORT:'abc'},cwd:tmpDir()});
  assert.equal(cfg.port,4173);
 });
+test('loadConfig gives the YoVouch defaults and reads YOVOUCH_SIM',()=>{
+ const cfg=config.loadConfig({env:{},cwd:tmpDir()});
+ assert.deepEqual(cfg.yovouch,{sim:false,gatewaySecret:'',shortcode:'12345',callbackNumber:'0800 000 000',smsCountry:'South Africa',orgKeys:{}});
+ assert.equal(config.loadConfig({env:{YOVOUCH_SIM:'1'},cwd:tmpDir()}).yovouch.sim,true);
+ assert.equal(config.loadConfig({env:{YOVOUCH_SIM:'true'},cwd:tmpDir()}).yovouch.sim,false);
+ const set=config.loadConfig({env:{YOVOUCH_GATEWAY_SECRET:'s3',YOVOUCH_SHORTCODE:'40400',YOVOUCH_CALLBACK_NUMBER:'0800 123 456',YOVOUCH_SMS_COUNTRY:'Kenya'},cwd:tmpDir()});
+ assert.deepEqual(set.yovouch,{sim:false,gatewaySecret:'s3',shortcode:'40400',callbackNumber:'0800 123 456',smsCountry:'Kenya',orgKeys:{}});
+});

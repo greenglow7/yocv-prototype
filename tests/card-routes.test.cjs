@@ -256,6 +256,11 @@ test('POST /api/card/publish stores a signed record and the public routes serve 
  assert.equal(json.svgUrl,PUBLIC_URL+'/c/'+json.cardId+'.svg');
  assert.match(json.code,/^[A-Z0-9]{6}$/);
  assert.match(json.ownerSecret,/^[0-9a-f]{32}$/);
+ assert.match(json.cardToken,/^[0-9a-f]{16}$/);
+ assert.equal(res.headers.get('referrer-policy'),'no-referrer');
+ assert.match(res.headers.get('cache-control'),/no-store/);
+ assert.match(json.smsId,/^\d{5}$/);
+ assert.equal(json.myUrl,PUBLIC_URL+'/my/'+json.cardId+'/'+json.cardToken);
  assert.deepEqual(store.list(),[json.cardId]);
  const entry=store.get(json.cardId);
  assert.equal(entry.record.user.dateOfBirth,undefined);
@@ -487,6 +492,12 @@ test('the static allowlist serves the worker page files and still blocks data/ca
  }
 });
 
+test('card.js shows the card code, card number and the private /my link after publishing',()=>{
+ const js=fs.readFileSync(path.join(rootDir,'card.js'),'utf8');
+ assert.ok(js.includes('Your card: code '));
+ assert.ok(js.includes('Keep this link private.'));
+});
+
 test('buildRecord strips date of birth, email and the phone unless WhatsApp is on',()=>{
  assert.equal(typeof buildRecord,'function');
  const snapshot={
@@ -507,6 +518,9 @@ test('buildRecord strips date of birth, email and the phone unless WhatsApp is o
  assert.deepEqual(off.disclosed.completions.map(c=>c.evidenceId),['c1']);
  assert.deepEqual(off.disclosed.skills,[]);
  assert.equal(off.trade,'Hairdresser');
+ assert.equal(off.tradeId,'hair');
+ assert.equal(buildRecord({...base,trade:'Tutor',disclose:{}}).tradeId,null);
+ assert.equal(buildRecord({...base,trade:'General labourer',disclose:{}}).tradeId,'labourer');
  assert.equal(off.code,'K7PQ2M');
  assert.equal(off.accountSource,'sample');
  assert.equal(off.snapshotReadAt,'2026-11-12T10:00:00.000Z');

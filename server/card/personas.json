@@ -214,8 +214,8 @@
     "id": "sipho",
     "displayName": "Sipho Dlamini",
     "firstName": "Sipho",
-    "trade": "cleaner",
-    "tradeLabel": "Cleaner and general labourer",
+    "trade": "labourer",
+    "tradeLabel": "General labourer",
     "country": "South Africa",
     "city": "Durban",
     "dateOfBirth": "2007-08-09T00:00:00+00:00",
@@ -248,6 +248,41 @@
     "photoURL": null,
     "userId": "5f8a2c6d-9e4b-4d7a-b3f1-8c2d5a0e7b19",
     "completions": [],
+    "skills": []
+  },
+  {
+    "id": "bongani",
+    "displayName": "Bongani Dlamini",
+    "firstName": "Bongani",
+    "trade": "labourer",
+    "tradeLabel": "General labourer",
+    "country": "South Africa",
+    "city": "Umlazi, Durban",
+    "dateOfBirth": "1999-04-11T00:00:00+00:00",
+    "phoneNumber": "+27715550164",
+    "phoneNumberConfirmed": true,
+    "emailConfirmed": false,
+    "yoIDOnboarded": true,
+    "dateYoIDOnboarded": "2025-09-02T08:00:00+00:00",
+    "dateCreated": "2025-08-30T08:00:00+00:00",
+    "photoURL": null,
+    "userId": "3c8e1a5d-7f2b-4d9e-a6c3-5b1f0e8d2a74",
+    "completions": [
+      {
+        "myOpportunityId": "8f2d6b1a-3c5e-4a7f-9b0d-1e4c7a2f5b38",
+        "opportunityId": "019e6fb9-bfc4-7dd7-ac9d-c09a384c5160",
+        "title": "Basic First Aid Training",
+        "organizationName": "Alison Learning",
+        "organizationLogoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/5d2bd805-affa-479b-b7e2-eca5adf9b244.png",
+        "dateCompleted": "2026-06-10T09:30:00+00:00",
+        "opportunityType": "Learning",
+        "verificationMethod": "Automatic",
+        "evidenceTypes": [],
+        "skills": [
+          {"id": "d4e73cdf-35fe-4f16-bab6-52f6249ae0c9", "name": "First Aid", "infoURL": "https://lightcast.io/open-skills/skills/KS1200X6V3937RSF8VVM"}
+        ]
+      }
+    ],
     "skills": []
   }
 ]
