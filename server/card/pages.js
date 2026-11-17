@@ -147,4 +147,15 @@ function chipsPage({session,card,chips,lang='en',sampleMode}){
   return flowPage({title:titleFor(card,lang),body,lang,sampleMode,css:FORM_CSS});
 }
 
-module.exports={TIME_ZONES,localTime,flowPage,workerPage,scanPage,typedPage,adultsOnlyPage,errorPage,chipsPage};
+// GET /v/:vouchId/withdraw (spec 5.6, 7.8): one question, two buttons. The secret rides in a hidden field; only
+// the POST acts. No reason is asked and the worker is not messaged.
+function withdrawPage({first:name,vouchId,secret,lang='en',error,sampleMode}){
+  const L=(k,v)=>t(k,lang,v);
+  const body='<section><h1>'+H(L('withdrawQ',{first:name||''}))+'</h1>'+errorLine(error)+
+    '<form method="post" action="/v/'+E(vouchId)+'/withdraw">'+hidden('w',secret)+
+    '<p><button name="mode" value="now">'+H(L('withdrawNow'))+'</button></p>'+
+    '<p><button name="mode" value="quiet" class="alt">'+H(L('withdrawQuiet'))+'</button></p></form></section>';
+  return flowPage({title:L('withdrawNow'),body,lang,sampleMode});
+}
+
+module.exports={TIME_ZONES,localTime,flowPage,workerPage,scanPage,typedPage,adultsOnlyPage,errorPage,chipsPage,withdrawPage};

@@ -9,6 +9,9 @@
      GET  /s/:cardId | GET /s              typed path: the six digits (and first the card code or card number)
      POST /s/:cardId | POST /s             the 18-or-older answer: consumes the step, opens the session, chips page
      POST /api/vouch/open                  the JSON form of the same step (spec 4.3)
+     GET  /v/:vouchId.json                 {record, jwt, jwksUrl, held}, signed with sub: vouchId; 410 unless live
+     GET  /v/:vouchId/clip                 410 unless live (clip storage arrives with Task 11)
+     GET  /v/:vouchId/withdraw?w=          the withdraw question; POST (w, mode now|quiet) withdraws
    Every response that carries a live code or the card token is private: no-store and no-referrer. A form
    post (application/x-www-form-urlencoded) gets HTML back; JSON gets JSON. */
 const fs=require('node:fs');
@@ -17,12 +20,15 @@ const {validId,secretsMatch}=require('./store.js');
 const {codeBatch,normaliseCardRef}=require('./vouchcode.js');
 const {LANGS,t,splitOptions}=require('./copy.js');
 const {STRINGS}=require('./render.js');
-const {flowPage,workerPage,scanPage,typedPage,adultsOnlyPage,errorPage,chipsPage}=require('./pages.js');
+const {flowPage,workerPage,scanPage,typedPage,adultsOnlyPage,errorPage,chipsPage,withdrawPage}=require('./pages.js');
+const {signRecord}=require('./sign.js');
+const {cardFields}=require('./events.js');
 const {chipsFor,messageFor,STATUS}=require('./vouch-service.js');
 const {myUrl}=require('./vouch-system.js');
 
 const MY_PATH=/^\/my\/([A-Z2-9]{10})\/([0-9a-f]{16})(\/[a-z-]+(?:\.json)?)?$/;
 const SCAN_PATH=/^\/s(?:\/([A-Z2-9]{10}))?$/;
+const VOUCH_PATH=/^\/v\/([A-Z2-9]{10})(\.json|\/clip|\/withdraw)?$/;
 const NONCE=/^[0-9a-f]{16}$/;
 const MAX_FORM_BYTES=64*1024;
 const PRIVATE={'cache-control':'no-store','referrer-policy':'no-referrer','x-content-type-options':'nosniff'};
@@ -69,7 +75,7 @@ function qrBrowser(){
 }
 
 function createVouchRouter(system){
-  const {store,codes,now,sessions,service}=system;
+  const {store,codes,now,sessions,service,vouchStore,events,key}=system;
   const readJSONBody=req=>require('../../server.js').readJSONBody(req);
   // Raw bodies (audio uploads, Task 11) go through server.js too, loaded lazily for the same reason.
   const readRawBody=(req,maxBytes)=>require('../../server.js').readRawBody(req,maxBytes);
@@ -203,6 +209,53 @@ function createVouchRouter(system){
     return r.ok?openedJSON(res,r):openFailed(res,r);
   }
 
+  // ---- Vouch JSON, clip and withdrawal (spec 5.6, 9.5, plan Task 5) ----
+  // A withdrawal holds at read time: a withdrawn or hidden vouch, a passed quiet withdrawal, an unaccepted
+  // referral and any vouch on a withdrawn card are all 410 before the sweep runs.
+  function vouchJson(res,vouchId){
+    const file=vouchStore.get(vouchId);
+    if(!file)return sendError(res,404,'not_found','No vouch with this id.');
+    if(!vouchStore.isLive(file,now()))return sendError(res,410,'withdrawn','This vouch was withdrawn.');
+    const record=vouchStore.publicPart(file);
+    const jwt=signRecord(key,record,{sub:vouchId,now:()=>Date.parse(record.wordsShownAt||record.confirmedAt)});
+    sendPrivateJSON(res,200,{record,jwt,jwksUrl:system.publicUrl+'/.well-known/jwks.json',held:file.held&&!record.wordsShownAt?['words','clip']:[]});
+  }
+  function vouchClip(res,vouchId){
+    const file=vouchStore.get(vouchId);
+    if(!file)return sendError(res,404,'not_found','No vouch with this id.');
+    if(!vouchStore.isLive(file,now()))return sendError(res,410,'withdrawn','This vouch was withdrawn.');
+    sendError(res,404,'not_found','No clip for this vouch.');
+  }
+  const workerFirst=file=>firstOf(store.get(file.record.cardId));
+  const secretField=v=>/^[0-9A-Za-z]{6,16}$/.test(field(v))?field(v):'';
+  function doneMessage(file,lang){return t(file.private?.withdrawnAt?'withdrawnNow':'withdrawnLater',lang);}
+  function withdrawGet(res,vouchId,url){
+    const file=vouchStore.get(vouchId);
+    if(!file?.record)return sendPage(res,404,notFound());
+    const lang=langOf(file.record.lang);
+    if(file.private?.withdrawnAt||file.private?.withdrawAfter)return sendPage(res,200,errorPage({message:doneMessage(file,lang),lang,sampleMode}));
+    sendPage(res,200,withdrawPage({first:workerFirst(file),vouchId,secret:secretField(url.searchParams.get('w')),lang,sampleMode}));
+  }
+  async function withdrawPost(req,res,vouchId){
+    const form=isForm(req),payload=await readBody(req,res);
+    if(payload===undefined)return;
+    const p=isPlainObject(payload)?payload:{},file=vouchStore.get(vouchId);
+    if(!file?.record)return form?sendPage(res,404,notFound()):sendError(res,404,'not_found','No vouch with this id.');
+    const lang=langOf(file.record.lang),mode=field(p.mode);
+    if(mode!=='now'&&mode!=='quiet'){
+      if(form)return sendPage(res,400,withdrawPage({first:workerFirst(file),vouchId,secret:secretField(p.w),lang,sampleMode}));
+      return sendError(res,400,'invalid_input','mode must be "now" or "quiet".');
+    }
+    const r=vouchStore.withdraw(vouchId,field(p.w),mode);
+    if(!r.ok){
+      if(form)return sendPage(res,403,withdrawPage({first:workerFirst(file),vouchId,secret:'',lang,sampleMode}));
+      return sendError(res,403,'forbidden','That withdraw secret does not match this vouch.');
+    }
+    events.log('vouch_withdrawn',{vouchId,...cardFields(store.get(file.record.cardId)||{cardId:file.record.cardId}),mode,by:'voucher'});
+    if(form)return sendPage(res,200,errorPage({message:doneMessage(r.file,lang),lang,sampleMode}));
+    sendPrivateJSON(res,200,{vouchId,mode:r.file.private.withdrawnAt?'now':'quiet'});
+  }
+
   function handle(req,res,url){
     const pathname=url.pathname,method=req.method;
     const wrap=p=>Promise.resolve(p).then(()=>true);
@@ -219,6 +272,16 @@ function createVouchRouter(system){
       if(method==='GET'||method==='HEAD')return wrap(scanGet(res,cardId,url));
       return method==='POST'?wrap(scanPost(req,res,cardId)):notAllowed();
     }
+    if(pathname.startsWith('/v/')){
+      const m=VOUCH_PATH.exec(pathname),suffix=m?.[2]||'';
+      if(!m||!validId(m[1])||!suffix)return wrap(sendPage(res,404,notFound()));
+      if(suffix==='/withdraw'){
+        if(method==='GET'||method==='HEAD')return wrap(withdrawGet(res,m[1],url));
+        return method==='POST'?wrap(withdrawPost(req,res,m[1])):notAllowed();
+      }
+      if(method!=='GET'&&method!=='HEAD')return notAllowed();
+      return wrap(suffix==='.json'?vouchJson(res,m[1]):vouchClip(res,m[1]));
+    }
     if(pathname.startsWith('/my/')){
       const m=MY_PATH.exec(pathname),entry=m?cardFor(m[1],m[2]):null;
       if(!entry)return wrap(sendPage(res,404,notFound()));
@@ -233,4 +296,4 @@ function createVouchRouter(system){
   return {handle};
 }
 
-module.exports={createVouchRouter,sendPage,sendPrivateJSON,readForm,MY_PATH};
+module.exports={createVouchRouter,sendPage,sendPrivateJSON,readForm,MY_PATH,VOUCH_PATH};

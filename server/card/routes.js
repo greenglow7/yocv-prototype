@@ -13,7 +13,8 @@
      GET  /.well-known/jwks.json           the signing key
    Draft sessions live in memory for 30 minutes keyed by a 24-hex draftToken; they hold the full snapshot
    (with the real phone number and date of birth) so the browser only ever sees the masked copy.
-   The YoVouch routes (/my/, /s/, /api/vouch/, /qr-browser.js) live in vouch-routes.js and are tried last. */
+   The YoVouch routes (/my/, /s/, /v/, /api/vouch/, /qr-browser.js) live in vouch-routes.js and are tried last;
+   the retention sweep (sweep.js) runs every hour. */
 
 const crypto=require('node:crypto');
 const {ageAt}=require('./account.js');
@@ -22,6 +23,7 @@ const {signRecord,jwks}=require('./sign.js');
 const {validId,secretsMatch,hashSecret}=require('./store.js');
 const {buildVouchSystem,issueVouchFields,indexCard,phoneHashOf,newCardToken,myUrl}=require('./vouch-system.js');
 const {createVouchRouter}=require('./vouch-routes.js');
+const {runSweep}=require('./sweep.js');
 const {publicPage,notFoundPage,withdrawnPage,cardSvg,maskPhone}=require('./render.js');
 const {qrSvg}=require('../qr.js');
 const {ProviderError}=require('../providers/errors.js');
@@ -34,6 +36,7 @@ const CODE_ALPHABET='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CODE_LENGTH=6;
 const MAX_TRADE=40;
 const MAX_IN_FLIGHT=4;
+const SWEEP_EVERY_MS=60*60*1000;
 const E164=/^\+[1-9]\d{6,14}$/;
 const NO_REFERRER={'referrer-policy':'no-referrer'}; // with send()'s no-store: a response that carries a card token
 const CARD_PATH=/^\/c\/([A-Z2-9]{10})(\.svg|\.json|\/check)?$/;
@@ -188,6 +191,8 @@ function createCardRouter({config,accountSource,provider,store,key,yoma,publicUr
   const base=str(publicUrl||('http://'+(config?.host||'127.0.0.1')+':'+(config?.port||4173))).replace(/\/+$/,'');
   const system=buildVouchSystem({config,store,key,accountSource,provider,publicUrl:base,now,random,outbox,transcriber});
   const vouchRouter=createVouchRouter(system);
+  // Retention (spec 9.7): hourly, never holding the process open. Tests call runSweep directly.
+  setInterval(()=>{try{runSweep(system);}catch(err){console.error('[yovouch] sweep failed:',err?.message||err);}},SWEEP_EVERY_MS).unref();
   const sessions=new Map();
   let inFlight=0;
   const liveModel=Boolean(provider)&&typeof provider.complete==='function';

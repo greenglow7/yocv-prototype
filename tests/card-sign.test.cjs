@@ -108,3 +108,11 @@ test('jwks exposes the public key as an EC P-256 signing key with the kid',()=>{
  const imported=crypto.createPublicKey({key:{kty:jwk.kty,crv:jwk.crv,x:jwk.x,y:jwk.y},format:'jwk'});
  assert.ok(sign.verifyJwt({publicKey:imported,kid:key.kid},sign.signRecord(key,record)));
 });
+
+test('signRecord sub option',()=>{
+ const key=sign.loadOrCreateKey(tempDir());
+ const p=sign.verifyJwt(key,sign.signRecord(key,{vouchId:'Q7M2PX4KLW',cardId:'ABCDEFGHJK'},{sub:'Q7M2PX4KLW'}));
+ assert.equal(p.sub,'Q7M2PX4KLW'); assert.equal(p.record.cardId,'ABCDEFGHJK');
+ assert.equal(sign.verifyJwt(key,sign.signRecord(key,{cardId:'ABCDEFGHJK'})).sub,'ABCDEFGHJK');
+ assert.equal(sign.verifyJwt(key,sign.signRecord(key,{cardId:'ABCDEFGHJK'},{now:()=>1700000000000})).iat,1700000000);
+});

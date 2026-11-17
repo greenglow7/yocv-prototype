@@ -36,10 +36,11 @@ function loadOrCreateKey(dir){
   return {privateKey,publicKey,kid};
 }
 
-function signRecord(key,record,{now=Date.now}={}){
+// sub defaults to the card id; a vouch is signed with sub: vouchId (spec 9.1). The payload key stays record.
+function signRecord(key,record,{now=Date.now,sub=record?.cardId??null}={}){
   if(!key?.privateKey)throw new Error('signRecord needs a key with a privateKey');
   const header=b64url(JSON.stringify({alg:'ES256',typ:'JWT',kid:key.kid}));
-  const payload=b64url(JSON.stringify({iss:ISSUER,sub:record?.cardId??null,iat:Math.floor(now()/1000),record}));
+  const payload=b64url(JSON.stringify({iss:ISSUER,sub,iat:Math.floor(now()/1000),record}));
   const data=header+'.'+payload;
   const signature=crypto.sign('sha256',Buffer.from(data),{key:key.privateKey,dsaEncoding:'ieee-p1363'});
   return data+'.'+signature.toString('base64url');

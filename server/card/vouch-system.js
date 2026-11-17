@@ -5,7 +5,7 @@
 const crypto=require('node:crypto');
 const {createCodeService,newSecret}=require('./vouchcode.js');
 const {normalisePhone,keyedHash,createVoucherFiles}=require('./vouchers.js');
-const {loadOrCreateHashKey}=require('./vouches.js');
+const {loadOrCreateHashKey,createVouchStore}=require('./vouches.js');
 const {hashSecret}=require('./store.js');
 const {createEventLog,cardFields}=require('./events.js');
 const {createVouchSessions}=require('./vouch-sessions.js');
@@ -24,7 +24,8 @@ function buildVouchSystem({config,store,key,accountSource,provider,publicUrl,now
   void outbox;void transcriber; // wired in by the tasks that send messages and transcribe clips
   const events=createEventLog(store.dir,{now});
   const sessions=createVouchSessions({now,random});
-  const system={yv,store,key,accountSource,provider,liveModel,publicUrl:String(publicUrl||'').replace(/\/+$/,''),now,random,hashKey,voucherFiles,codes,events,sessions};
+  const vouchStore=createVouchStore(store.dir,{now,random,cardStore:store});
+  const system={yv,store,key,accountSource,provider,liveModel,publicUrl:String(publicUrl||'').replace(/\/+$/,''),now,random,hashKey,voucherFiles,codes,events,sessions,vouchStore};
   system.service=createVouchService(system);
   return system;
 }
