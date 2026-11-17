@@ -2,10 +2,29 @@
   "name": "yocv-prototype",
   "version": "0.1.0",
   "private": true,
-  "description": "Standalone YoCV claim-review and CV-generation prototype",
+  "description": "YoCV, YoCard and YoVouch: a student prototype for Yoma. A reviewed first CV, a signed work card for informal work, and rotating-code vouches with a six-line reply to job posts. Node built-ins only.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/greenglow7/yocv-prototype.git"
+  },
+  "homepage": "https://github.com/greenglow7/yocv-prototype#readme",
+  "bugs": {
+    "url": "https://github.com/greenglow7/yocv-prototype/issues"
+  },
+  "keywords": [
+    "yoma",
+    "cv",
+    "informal-work",
+    "vouch",
+    "prototype",
+    "nodejs"
+  ],
   "scripts": {
     "start": "node server.js",
-    "test": "node --test tests/*.test.cjs"
+    "test": "node --test tests/*.test.cjs",
+    "seed:demo": "node scripts/seed-demo.js",
+    "measure": "node scripts/measure.js"
   },
   "engines": {
     "node": ">=20"
