@@ -26,6 +26,7 @@
      POST /api/sim/sms and GET /demo/phone the simulated gateway, only when YOVOUCH_SIM=1 and no gateway secret
      GET|POST /demo/ivr                    the simulated call-back (plan Task 17), same condition: {from} starts a call,
                                            {s, k[, words]} presses a key, multipart adds the optional clip
+     GET  /demo/beat3                      the prepared beat 3 extraction from demo.json (plan Task 18), same condition
    WhatsApp (plan Task 16):
      POST /my/:cardId/:cardToken/link      issues the one-time link code: vouch.linkCode {hash, expiresAt}, 10 minutes
      POST /api/wa/webhook                  gateway, only when YOVOUCH_GATEWAY_SECRET is set (constant-time header check)
@@ -57,7 +58,7 @@ const {normalisePhone,keyedHash}=require('./vouchers.js');
 const {LANGS,t,splitOptions}=require('./copy.js');
 const {STRINGS,fullDate}=require('./render.js');
 const {flowPage,workerPage,myVouchesPage,scanPage,typedPage,adultsOnlyPage,errorPage,chipsPage,withdrawPage,
-  disclosePage,bindPage,readbackPage,donePage,demoPhonePage,ivrPage,workerVouchPage,orgKeyPage,orgPage,requestLandingPage,requestMadePage,linkCodePage}=require('./pages.js');
+  disclosePage,bindPage,readbackPage,donePage,demoPhonePage,ivrPage,workerVouchPage,orgKeyPage,orgPage,requestLandingPage,requestMadePage,linkCodePage,beat3Page}=require('./pages.js');
 const {tierItem}=require('./vouch-lines.js');
 const {withdrawnAtOf}=require('./vouches.js');
 const {signRecord}=require('./sign.js');
@@ -773,6 +774,13 @@ function createVouchRouter(system){
   // ---- Gateways (spec 9.5): the production webhook and the simulator drive the same SMS handler ----
   const gatewaySecret=String(system.yv?.gatewaySecret||'');
   const simOn=Boolean(system.yv?.sim)&&!gatewaySecret;
+  // GET /demo/beat3 (plan Task 18): the prepared extraction scripts/seed-demo.js wrote to demo.json; 404 before a seed.
+  function beat3(res){
+    let demo=null;
+    try{demo=JSON.parse(fs.readFileSync(path.join(system.store.dir,'demo.json'),'utf8'));}catch{demo=null;}
+    if(!isPlainObject(demo?.beat3))return sendPage(res,404,errorPage({message:'No prepared demo. Run node scripts/seed-demo.js first.',sampleMode}));
+    return sendPage(res,200,beat3Page({beat3:demo.beat3,sampleMode}));
+  }
   async function smsWebhook(req,res){
     if(!gatewaySecretOk(String(req.headers['x-yovouch-gateway-secret']||''),gatewaySecret))return sendError(res,403,'forbidden','Unknown gateway.');
     const payload=await readBody(req,res);
@@ -996,6 +1004,7 @@ function createVouchRouter(system){
     if(pathname==='/api/wa/webhook'&&gatewaySecret)return method==='POST'?wrap(waWebhook(req,res)):notAllowed();
     if(pathname==='/api/sim/wa'&&simOn)return method==='POST'?wrap(simWa(req,res)):notAllowed();
     if(pathname==='/demo/ivr'&&simOn)return method==='GET'||method==='HEAD'?wrap(sendPage(res,200,ivrPage({sampleMode}))):method==='POST'?wrap(ivrPost(req,res)):notAllowed();
+    if(pathname==='/demo/beat3'&&simOn)return method==='GET'||method==='HEAD'?wrap(beat3(res)):notAllowed();
     if(pathname==='/demo/phone'&&simOn)return method==='GET'||method==='HEAD'?wrap(sendPage(res,200,demoPhonePage({sampleMode}))):notAllowed();
     const sp=SESSION_PAGE.exec(pathname);
     if(sp){

@@ -410,6 +410,16 @@ function ivrPage({prompt=null,s=null,keyed='',from='',lang='en',clip=false,words
   return flowPage({title:call,body,lang,sampleMode,css:FORM_CSS+IVR_CSS});
 }
 
+// GET /demo/beat3 (YOVOUCH_SIM=1 only, plan Task 18): the prepared extraction from demo.json, labelled beat3Label.
+// The transcript, each field the model added that the checks refused with its reason, and the lines that came back.
+function beat3Page({beat3,sampleMode}){
+  const b=beat3||{},out=b.output||{},label=t('beat3Label');
+  const rows=(Array.isArray(b.rejected)?b.rejected:[]).map(r=>'<li>'+H(r.field)+': <q>'+H(out[r.field]?.text)+'</q> · '+H(r.reason)+'</li>').join('');
+  const body='<section><h1>'+H(label)+'</h1><p>Transcript: <q>'+H(b.transcript)+'</q></p>'+
+    '<h2>Refused</h2><ul>'+rows+'</ul><h2>Lines it produced</h2><ol>'+(Array.isArray(b.lines)?b.lines:[]).map(l=>'<li>'+H(l)+'</li>').join('')+'</ol></section>';
+  return flowPage({title:label,body,sampleMode});
+}
+
 // GET /r/:replyId (spec 6.4, 9.5), shown only once the worker confirms: the six confirmed lines, the attached clips that are still live and
 // the footer honesty strings. Until an English translation is confirmed by the speaker, the page shows the
 // own-language lines and "Not translated".
@@ -428,5 +438,5 @@ function replyPage({reply,firstName,clips=[],lang='en',sampleMode}){
   return flowPage({title,body,lang:english?'en':(reply?.lang||lang),sampleMode});
 }
 
-module.exports={TIME_ZONES,replyPage,linkCodePage,workerVouchPage,requestLandingPage,requestMadePage,orgKeyPage,orgPage,localTime,flowPage,workerPage,myVouchesPage,scanPage,typedPage,adultsOnlyPage,errorPage,chipsPage,withdrawPage,
+module.exports={TIME_ZONES,replyPage,beat3Page,linkCodePage,workerVouchPage,requestLandingPage,requestMadePage,orgKeyPage,orgPage,localTime,flowPage,workerPage,myVouchesPage,scanPage,typedPage,adultsOnlyPage,errorPage,chipsPage,withdrawPage,
   disclosePage,bindPage,readbackPage,donePage,demoPhonePage,ivrPage};
