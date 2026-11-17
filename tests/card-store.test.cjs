@@ -137,3 +137,58 @@ test('createCardStore creates the directory when it does not exist',()=>{
  const {cardId}=store.create(record);
  assert.ok(fs.existsSync(path.join(dir,cardId+'.json')));
 });
+
+test('create spreads extra into the entry and writes codes.json; update persists',()=>{
+ const dir=tempDir();
+ const store=storeMod.createCardStore(dir);
+ const {cardId}=store.create({...record,code:'K7PQ2M'},{smsId:'48213',cardId:'ZZZZZZZZZZ'});
+ const entry=store.get(cardId);
+ assert.equal(entry.smsId,'48213'); assert.equal(entry.cardId,cardId);
+ assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir,'codes.json'),'utf8')),{K7PQ2M:cardId});
+ assert.equal(store.indexGet('codes','K7PQ2M'),cardId);
+ const updated=store.update(cardId,e=>{e.vouch={usedSteps:[1]};});
+ assert.deepEqual(updated.vouch,{usedSteps:[1]});
+ assert.deepEqual(store.get(cardId).vouch,{usedSteps:[1]});
+ assert.equal(store.update('ZZZZZZZZZZ',()=>{}),null);
+ assert.equal(store.update('../x',()=>{}),null);
+});
+
+test('indexGet rejects bad names and keys without touching the filesystem',()=>{
+ const dir=tempDir();
+ const store=storeMod.createCardStore(dir);
+ for(const [name,key] of [['numbers','../x'],['numbers','A'.repeat(64)],['codes','__proto__'],['smsids','1234'],['other','x'],['codes','../codes']])
+  assert.equal(store.indexGet(name,key),null,name+' '+key);
+ assert.deepEqual(fs.readdirSync(dir),[]);
+ assert.throws(()=>store.indexSet('numbers','../x','ABCDEFGHJK'));
+ assert.throws(()=>store.indexSet('smsids','48213','../x'));
+});
+
+test('indexDeleteCard removes the codes, smsids and numbers entries for that card only',()=>{
+ const dir=tempDir();
+ const store=storeMod.createCardStore(dir);
+ const a=store.create({...record,code:'AAAAAA'}).cardId,b=store.create({...record,code:'BBBBBB'}).cardId;
+ const ka='a'.repeat(64),kb='b'.repeat(64);
+ store.indexSet('smsids','11111',a); store.indexSet('smsids','22222',b);
+ store.indexSet('numbers',ka,a); store.indexSet('numbers',kb,b);
+ assert.equal(store.indexGet('numbers',ka),a);
+ store.indexDeleteCard(a);
+ assert.equal(store.indexGet('codes','AAAAAA'),null); assert.equal(store.indexGet('smsids','11111'),null); assert.equal(store.indexGet('numbers',ka),null);
+ assert.equal(store.indexGet('codes','BBBBBB'),b); assert.equal(store.indexGet('smsids','22222'),b); assert.equal(store.indexGet('numbers',kb),b);
+ store.indexDelete('smsids','22222'); store.indexDelete('numbers',kb);
+ assert.equal(store.indexGet('smsids','22222'),null); assert.equal(store.indexGet('numbers',kb),null);
+ assert.deepEqual(store.list().sort(),[a,b].sort());
+});
+
+test('list ignores codes.json and smsids.json',()=>{
+ const dir=tempDir();
+ const store=storeMod.createCardStore(dir);
+ const a=store.create({...record,code:'K7PQ2M'}).cardId;
+ store.indexSet('smsids','48213',a);
+ assert.ok(fs.existsSync(path.join(dir,'codes.json'))&&fs.existsSync(path.join(dir,'smsids.json')));
+ assert.deepEqual(store.list(),[a]);
+});
+
+test('secretsMatch is exported',()=>{
+ assert.equal(storeMod.secretsMatch(storeMod.hashSecret('abc'),'abc'),true);
+ assert.equal(storeMod.secretsMatch(storeMod.hashSecret('abc'),'abd'),false);
+});
