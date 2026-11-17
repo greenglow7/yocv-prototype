@@ -212,7 +212,7 @@ function createSmsHandler(system){
   }
 
   async function handle({from,text,channel='sms'}={}){
-    void channel; // the WhatsApp handler (Task 16) reuses this entry point
+    void channel; // WhatsApp has its own handler in wa.js (plan Task 16)
     const raw=String(from??''),e164=normalisePhone(raw,yv?.smsCountry);
     if(!e164)return {replies:[]};
     outbox.inbound(e164);

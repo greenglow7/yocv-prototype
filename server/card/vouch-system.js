@@ -12,6 +12,7 @@ const {createVouchSessions}=require('./vouch-sessions.js');
 const {createVouchService}=require('./vouch-service.js');
 const {createOutbox}=require('./outbox.js');
 const {createSmsHandler}=require('./sms.js');
+const {createWaHandler}=require('./wa.js');
 const {createPostStore,createReplyStore}=require('./reply.js');
 const {createTranscriber}=require('./transcribe.js');
 const {createOrgStore}=require('./orgs.js');
@@ -38,6 +39,8 @@ function buildVouchSystem({config,store,key,accountSource,provider,publicUrl,now
   system.requestStore=createRequestStore(store.dir,{now,random});
   system.service=createVouchService(system);
   system.sms=createSmsHandler(system);
+  // The WhatsApp handler (plan Task 16) reads system.replyService at call time; createCardRouter sets it.
+  system.wa=createWaHandler(system);
   system.postStore=createPostStore(store.dir,{now,random});
   system.replyStore=createReplyStore(store.dir,{now,random});
   // The injected transcriber (tests), else one from config.transcribe; with none, the template transcriber.

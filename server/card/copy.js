@@ -236,13 +236,16 @@ const COPY={
   referralNoOrg:'Only an organisation on a completion on your card can refer you.', // plan addition (Task 13)
   referralDeclined:'Declined. Nothing was put on your card.', // plan addition (Task 13, the worker's NO)
   referralSent:'Sent to {first}. It goes on the card only once {first} says yes.', // plan addition (Task 13, organisation page)
-  referralWithdrawnOrg:'The referral was withdrawn. It is no longer on the card.' // plan addition (Task 13, organisation page)
+  referralWithdrawnOrg:'The referral was withdrawn. It is no longer on the card.', // plan addition (Task 13, organisation page)
+  waLinked:'Linked to your card. Forward a job post here.', // plan addition (Task 16, link code matched)
+  waSelfClip:'Send one voice note of up to 15 seconds about yourself.', // plan addition (Task 16, menu 3)
+  waEditRefused:'That change was not kept. Only lines 1, 4 and 5 can change, in your own words, with no certificate and no organisation name.' // plan addition (Task 16, menu 2)
 };
 const PLAN_ADDITIONS=['codeWrongWeb','codeLockedWeb','sessionEnded','sampleNumber','recentNo','visitAdded','demoWithdrawHere','docAskItem','docToldItem',
   'smsVouchMenuWorker','smsQ2','smsQ3','smsQ4','smsQ4Worker','smsCompletionOne','smsCompletions','referralWithdrawnMsg','orgKeyWrong','pasteRequestLink',
   'beat3Label','srcCustomerDemo','srcWorkerRequest','demoCodeWrong','demoNumberBad','demoOneNumber',
   'allYourVouches','backToCode','prevPage','nextPage','line2','line3One','line4','line5One','line6One','line6None','replyMenuNoOrg',
-  'referralNoOrg','referralDeclined','referralSent','referralWithdrawnOrg'];
+  'referralNoOrg','referralDeclined','referralSent','referralWithdrawnOrg','waLinked','waSelfClip','waEditRefused'];
 
 let TRANSLATIONS={};
 try{TRANSLATIONS=JSON.parse(fs.readFileSync(path.join(__dirname,'..','..','data','yovouch-copy.json'),'utf8'))||{};}catch{TRANSLATIONS={};}

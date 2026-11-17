@@ -89,7 +89,8 @@ function workerExtras({path,cardId,token,L,given=[],pending=[],orgs=[]}){
   const refer=orgs.length?'<form method="post" action="'+E(path)+'/referral" class="np"><h2>'+H(L('requestReferral'))+'</h2><label>'+H(L('pastePost'))+
     '<textarea name="post" rows="3" maxlength="2000" required></textarea></label>'+orgs.map(o=>'<p><button name="evidenceId" value="'+E(o.evidenceId)+'">'+H(L('askOrg',{org:o.org}))+'</button></p>').join('')+'</form>':'';
   const ask='<form method="post" action="'+E(path)+'/request" class="np"><button class="alt">'+H(L('requestVouch'))+'</button></form>';
-  return {top:waitingYes,bottom:gave+ask+'<p class="np"><a class="btn alt" href="'+E(path)+'/vouch">'+H(L('vouchForWorker'))+'</a></p>'+refer};
+  const wa='<form method="post" action="'+E(path)+'/link" class="np"><button class="alt">'+H(L('linkWhatsapp'))+'</button></form>';
+  return {top:waitingYes,bottom:gave+ask+'<p class="np"><a class="btn alt" href="'+E(path)+'/vouch">'+H(L('vouchForWorker'))+'</a></p>'+refer+wa};
 }
 
 function workerPage({entry,record,batch,locked,lang='en',publicUrl,myUrl,nowMs,sampleMode,yv={},vouches=[],arrived=false,waiting=0,liveCount=0,given=[],pending=[],orgs=[],notice=null}){
@@ -218,6 +219,14 @@ function requestMadePage({text,myPath,lang='en',sampleMode}){
   const body='<section><h1>'+H(L('requestVouch'))+'</h1><p class="notice">'+H(text)+'</p>'+
     '<p class="small"><a href="'+E(myPath)+'">'+H(L('backToCode'))+'</a></p></section>';
   return flowPage({title:L('requestVouch'),body,lang,sampleMode});
+}
+
+// POST /my/:cardId/:cardToken/link (plan Task 16): the one-time WhatsApp link code. It carries a live code, so it is private.
+function linkCodePage({message,myPath,lang='en',sampleMode}){
+  const L=(k,v)=>t(k,lang,v);
+  const body='<section><h1>'+H(L('linkWhatsapp'))+'</h1><p class="notice">'+H(message)+'</p>'+
+    '<p class="small"><a href="'+E(myPath)+'">'+H(L('backToCode'))+'</a></p></section>';
+  return flowPage({title:L('linkWhatsapp'),body,lang,sampleMode});
 }
 
 function adultsOnlyPage({lang='en',sampleMode}){
@@ -399,5 +408,5 @@ function replyPage({reply,firstName,clips=[],lang='en',sampleMode}){
   return flowPage({title,body,lang:english?'en':(reply?.lang||lang),sampleMode});
 }
 
-module.exports={TIME_ZONES,replyPage,workerVouchPage,requestLandingPage,requestMadePage,orgKeyPage,orgPage,localTime,flowPage,workerPage,myVouchesPage,scanPage,typedPage,adultsOnlyPage,errorPage,chipsPage,withdrawPage,
+module.exports={TIME_ZONES,replyPage,linkCodePage,workerVouchPage,requestLandingPage,requestMadePage,orgKeyPage,orgPage,localTime,flowPage,workerPage,myVouchesPage,scanPage,typedPage,adultsOnlyPage,errorPage,chipsPage,withdrawPage,
   disclosePage,bindPage,readbackPage,donePage,demoPhonePage};

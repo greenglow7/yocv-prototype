@@ -5,7 +5,7 @@
    validated against ^[A-Z2-9]{10}$ before any path is built, so a request can never read outside
    the card directory (and never the .keys.json next to the cards).
    YoVouch indexes (spec 9.6): codes.json maps a card code to its cardId, smsids.json an smsId to its cardId,
-   and numbers/<keyed phone hash>.json holds {cardId}. Every index key is checked against its pattern first. */
+   and numbers/<keyed phone hash>.json holds {cardId} ({cardId, linked:true} for a WhatsApp-linked number). Every index key is checked against its pattern first. */
 
 const crypto=require('node:crypto');
 const fs=require('node:fs');
@@ -56,9 +56,10 @@ function createCardStore(dir,{random=crypto.randomBytes,now=Date.now}={}){
     const m=name==='numbers'?readJSON(numberFile(key)):readMap(name),id=name==='numbers'?m?.cardId:(Object.hasOwn(m,key)?m[key]:null);
     return validId(id)?id:null;
   }
-  function indexSet(name,key,cardId){
+  // A numbers entry for a WhatsApp-linked number (plan Task 16) is {cardId, linked:true}.
+  function indexSet(name,key,cardId,{linked=false}={}){
     if(!indexKey(name,key)||!validId(cardId))throw new TypeError('bad index entry: '+name);
-    if(name==='numbers'){fs.mkdirSync(path.join(dir,'numbers'),{recursive:true});writeJSON(numberFile(key),{cardId});return;}
+    if(name==='numbers'){fs.mkdirSync(path.join(dir,'numbers'),{recursive:true});writeJSON(numberFile(key),linked?{cardId,linked:true}:{cardId});return;}
     const m=readMap(name);m[key]=cardId;writeJSON(mapFile(name),m,2);
   }
   function indexDelete(name,key){

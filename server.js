@@ -35,6 +35,8 @@ const STATIC={
   '/card.html':'card.html',
   '/card.js':'card.js',
   '/card.css':'card.css',
+  '/thread.html':'thread.html',
+  '/thread.js':'thread.js',
   '/data/sample-credential.json':'data/sample-credential.json'
 };
 const CONTENT_TYPES={

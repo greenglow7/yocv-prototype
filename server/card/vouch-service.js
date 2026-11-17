@@ -497,9 +497,18 @@ function createReferrals(system){
   // The chat the worker opened: the linked WhatsApp number, else the owner's number. Nothing when none is open.
   const tellWorker=(entry,text)=>{const key=entry.linkedPhoneHash||entry.ownerPhoneHash;return key?system.outbox.sendToKey(key,text):false;};
 
-  function createReferralRequest(cardId,cardToken,{jobPostId,evidenceId}={}){
+  function createReferralRequest(cardId,cardToken,opts={}){
     const entry=cardByToken(cardId,cardToken);
-    if(!entry)return fail(404,'not_found',STRINGS.notFound);
+    return entry?referralRequestFor(entry,opts):fail(404,'not_found',STRINGS.notFound);
+  }
+  // The WhatsApp chat (plan Task 16) names the card by its linked number, so it passes no card token.
+  const linkedCard=cardId=>{const entry=validId(cardId)?store.get(cardId):null;return entry?.record&&entry.vouch?.secret?entry:null;};
+  function createReferralRequestForCard(cardId,opts={}){
+    const entry=linkedCard(cardId);
+    return entry?referralRequestFor(entry,opts):fail(404,'not_found',STRINGS.notFound);
+  }
+  function referralRequestFor(entry,{jobPostId,evidenceId}={}){
+    const cardId=entry.cardId;
     if(entry.withdrawnAt)return fail(410,'card_withdrawn',t('cardWithdrawn'));
     const lang=langOf(entry),post=validId(jobPostId)?system.postStore.get(jobPostId):null;
     if(!post)return fail(404,'not_found',t('cannotRead',lang));
@@ -601,8 +610,9 @@ function createReferrals(system){
   }
 
   // The worker's YES signs the referral and puts it on the card; NO deletes the draft (spec 7.5 step 6).
-  function acceptReferral(vouchId,cardId,cardToken,answer){
-    const entry=cardByToken(cardId,cardToken);
+  function acceptReferral(vouchId,cardId,cardToken,answer){return acceptFor(cardByToken(cardId,cardToken),vouchId,answer);}
+  function acceptReferralForCard(vouchId,cardId,answer){return acceptFor(linkedCard(cardId),vouchId,answer);}
+  function acceptFor(entry,vouchId,answer){
     if(!entry||entry.withdrawnAt)return fail(404,'not_found',STRINGS.notFound);
     const lang=langOf(entry),file=system.vouchStore.get(vouchId);
     if(!file?.record||file.record.kind!=='organisation'||file.record.cardId!==entry.cardId||withdrawnAtOf(file,nowMs()))return fail(404,'not_found',STRINGS.notFound);
@@ -632,7 +642,7 @@ function createReferrals(system){
     return {ok:true,vouchId};
   }
 
-  return {createRequest,requestFromNumber,createReferralRequest,orgOpen,orgViewFor,orgSend,acceptReferral,withdrawReferral};
+  return {createRequest,requestFromNumber,createReferralRequest,createReferralRequestForCard,orgOpen,orgViewFor,orgSend,acceptReferral,acceptReferralForCard,withdrawReferral};
 }
 const splitOptionsStem=s=>{const i=String(s).search(/[?:]/);return i<0?String(s):String(s).slice(0,i+1);};
 

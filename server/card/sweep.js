@@ -11,7 +11,8 @@
    - voucher-file entries older than 12 months are dropped, and a file left empty is deleted;
    - a job post is deleted 60 days after createdAt (Task 9);
    - a card withdrawn over 24 hours ago loses its replies and replies/clips/<replyId>.* (Task 10);
-   - a request is deleted past its expiresAt, and every request of a card withdrawn over 24 hours ago (Task 13). */
+   - a request is deleted past its expiresAt, and every request of a card withdrawn over 24 hours ago (Task 13);
+   - a WhatsApp link code is cleared past its expiresAt (Task 16). */
 const fs=require('node:fs');
 const path=require('node:path');
 const {withdrawnAtOf}=require('./vouches.js');
@@ -109,6 +110,17 @@ function sweepRequests(system,nowMs,out){
   }
 }
 
+function sweepLinkCodes(system,nowMs,out){
+  for(const cardId of system.store.list()){
+    const lc=system.store.get(cardId)?.vouch?.linkCode;
+    if(!lc)continue;
+    const at=ms(lc.expiresAt);
+    if(at!==null&&at>nowMs)continue;
+    system.store.update(cardId,e=>{e.vouch.linkCode=null;});
+    out.deleted++;
+  }
+}
+
 function runSweep(system){
   const nowMs=system.now();
   const out={reduced:0,deleted:0,clipsExpired:0,cardsCleared:0};
@@ -118,6 +130,7 @@ function runSweep(system){
   sweepPosts(system,nowMs,out);
   sweepReplies(system,nowMs,out);
   sweepRequests(system,nowMs,out);
+  sweepLinkCodes(system,nowMs,out);
   return out;
 }
 

@@ -24,6 +24,10 @@
      GET  /my/:cardId/:cardToken/status.json and POST .../hide|show|show-words {vouchId}
      POST /api/sms/webhook                 gateway, only when YOVOUCH_GATEWAY_SECRET is set (constant-time header check)
      POST /api/sim/sms and GET /demo/phone the simulated gateway, only when YOVOUCH_SIM=1 and no gateway secret
+   WhatsApp (plan Task 16):
+     POST /my/:cardId/:cardToken/link      issues the one-time link code: vouch.linkCode {hash, expiresAt}, 10 minutes
+     POST /api/wa/webhook                  gateway, only when YOVOUCH_GATEWAY_SECRET is set (constant-time header check)
+     POST /api/sim/wa {from, text}         the simulated chat behind thread.html, only when YOVOUCH_SIM=1 and no gateway secret
    Worker to worker and organisation referral (plan Task 13):
      GET  /my/:cardId/:cardToken/vouch     Vouch for another worker: the typed form (hidden vc, vt) and the yv_worker
                                            cookie, so a camera scan from this browser opens /s as that worker
@@ -45,12 +49,12 @@
 const fs=require('node:fs');
 const path=require('node:path');
 const crypto=require('node:crypto');
-const {validId,secretsMatch}=require('./store.js');
+const {validId,secretsMatch,hashSecret,ALPHABET}=require('./store.js');
 const {codeBatch,normaliseCardRef}=require('./vouchcode.js');
 const {LANGS,t,splitOptions}=require('./copy.js');
 const {STRINGS,fullDate}=require('./render.js');
 const {flowPage,workerPage,myVouchesPage,scanPage,typedPage,adultsOnlyPage,errorPage,chipsPage,withdrawPage,
-  disclosePage,bindPage,readbackPage,donePage,demoPhonePage,workerVouchPage,orgKeyPage,orgPage,requestLandingPage,requestMadePage}=require('./pages.js');
+  disclosePage,bindPage,readbackPage,donePage,demoPhonePage,workerVouchPage,orgKeyPage,orgPage,requestLandingPage,requestMadePage,linkCodePage}=require('./pages.js');
 const {tierItem}=require('./vouch-lines.js');
 const {withdrawnAtOf}=require('./vouches.js');
 const {signRecord}=require('./sign.js');
@@ -77,6 +81,7 @@ const WORKER_COOKIE_AGE=900;
 const ARRIVED_MS=10*60*1000;
 const MAX_FORM_BYTES=64*1024;
 const MAX_CLIP_SECONDS=16;
+const LINK_TTL_MS=10*60*1000;
 const PRIVATE={'cache-control':'no-store','referrer-policy':'no-referrer','x-content-type-options':'nosniff'};
 
 function send(res,status,body,type,extra={}){
@@ -330,6 +335,21 @@ function createVouchRouter(system){
     if(!r.ok)return fail(r.status,r.code,r.message);
     if(form)return sendPage(res,200,donePage({messages:[r.text],lang,sampleMode}));
     sendPrivateJSON(res,200,{requestId:r.requestId,url:r.url,text:r.text,jobPostId:parsed.jobPostId});
+  }
+
+  // POST /my/:id/:token/link (spec 7.6 step 1): a 6-character code in the card code alphabet, stored as its hash
+  // for 10 minutes. A new code replaces the last one; the sweep clears it past expiresAt.
+  async function linkWhatsapp(req,res,entry,cardToken){
+    const form=isForm(req),payload=await readBody(req,res);
+    if(payload===undefined)return;
+    if(entry.withdrawnAt)return myPage(res,entry,cardToken);
+    const bytes=system.random(6);let code='';
+    for(let i=0;i<6;i++)code+=ALPHABET[bytes[i]%ALPHABET.length];
+    const expiresAt=new Date(now()+LINK_TTL_MS).toISOString(),lang=langOf(entry.vouch.lang);
+    store.update(entry.cardId,e=>{e.vouch.linkCode={hash:hashSecret(code),expiresAt};});
+    const message=t('linkCode',lang,{code});
+    if(form)return sendPage(res,200,linkCodePage({message,myPath:'/my/'+entry.cardId+'/'+cardToken,lang,sampleMode}));
+    sendPrivateJSON(res,200,{linkCode:code,expiresAt,message});
   }
 
   async function setLang(req,res,entry,cardToken){
@@ -733,6 +753,21 @@ function createVouchRouter(system){
     sendPrivateJSON(res,200,r);
   }
 
+  // The WhatsApp chat (plan Task 16): the same handler behind the gateway and the simulator.
+  async function waWebhook(req,res){
+    if(!gatewaySecretOk(String(req.headers['x-yovouch-gateway-secret']||''),gatewaySecret))return sendError(res,403,'forbidden','Unknown gateway.');
+    const payload=await readBody(req,res);
+    if(payload===undefined)return;
+    const p=isPlainObject(payload)?payload:{};
+    sendPrivateJSON(res,200,await system.wa.handle({from:field(p.from),text:field(p.text)}));
+  }
+  async function simWa(req,res){
+    const payload=await readBody(req,res);
+    if(payload===undefined)return;
+    const p=isPlainObject(payload)?payload:{};
+    sendPrivateJSON(res,200,await system.wa.handle({from:field(p.from),text:field(p.text)},{sim:true}));
+  }
+
   function handle(req,res,url){
     const pathname=url.pathname,method=req.method;
     const wrap=p=>Promise.resolve(p).then(()=>true);
@@ -776,6 +811,8 @@ function createVouchRouter(system){
     }
     if(pathname==='/api/sms/webhook'&&gatewaySecret)return method==='POST'?wrap(smsWebhook(req,res)):notAllowed();
     if(pathname==='/api/sim/sms'&&simOn)return method==='POST'?wrap(simSms(req,res)):notAllowed();
+    if(pathname==='/api/wa/webhook'&&gatewaySecret)return method==='POST'?wrap(waWebhook(req,res)):notAllowed();
+    if(pathname==='/api/sim/wa'&&simOn)return method==='POST'?wrap(simWa(req,res)):notAllowed();
     if(pathname==='/demo/phone'&&simOn)return method==='GET'||method==='HEAD'?wrap(sendPage(res,200,demoPhonePage({sampleMode}))):notAllowed();
     const sp=SESSION_PAGE.exec(pathname);
     if(sp){
@@ -807,6 +844,7 @@ function createVouchRouter(system){
       if(suffix==='/request')return method==='POST'?wrap(myRequest(req,res,entry,m[2])):notAllowed();
       if(suffix==='/withdraw-given')return method==='POST'?wrap(withdrawGiven(req,res,entry,m[2])):notAllowed();
       if(suffix==='/referral')return method==='POST'?wrap(referralRequest(req,res,entry,m[2])):notAllowed();
+      if(suffix==='/link')return method==='POST'?wrap(linkWhatsapp(req,res,entry,m[2])):notAllowed();
       if(suffix==='/lang')return method==='POST'?wrap(setLang(req,res,entry,m[2])):notAllowed();
       if(suffix==='/vouches')return method==='GET'||method==='HEAD'?wrap(myVouches(res,entry,m[2],url)):notAllowed();
       if(suffix==='/status.json')return method==='GET'||method==='HEAD'?wrap(myStatus(res,entry)):notAllowed();
