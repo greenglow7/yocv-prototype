@@ -221,11 +221,16 @@ const COPY={
   srcWorkerRequest:'(vouched by another worker, by request)', // plan addition
   demoCodeWrong:'That code did not match. Type the code shown on this page.', // plan addition (demo fallback, attempts 1 and 2)
   demoNumberBad:'Type the whole phone number.', // plan addition (demo fallback)
-  demoOneNumber:"This vouch already has a number. Start again from {first}'s code to use another." // plan addition (demo fallback)
+  demoOneNumber:"This vouch already has a number. Start again from {first}'s code to use another.", // plan addition (demo fallback)
+  allYourVouches:'All your vouches', // plan addition (the worker page links to the full list when not every line fits)
+  backToCode:'Back to your code', // plan addition (full list)
+  prevPage:'Previous page', // plan addition (full list pager)
+  nextPage:'Next page' // plan addition (full list pager)
 };
 const PLAN_ADDITIONS=['codeWrongWeb','codeLockedWeb','sessionEnded','sampleNumber','recentNo','visitAdded','demoWithdrawHere','docAskItem','docToldItem',
   'smsVouchMenuWorker','smsQ2','smsQ3','smsQ4','smsQ4Worker','smsCompletionOne','smsCompletions','referralWithdrawnMsg','orgKeyWrong','pasteRequestLink',
-  'beat3Label','srcCustomerDemo','srcWorkerRequest','demoCodeWrong','demoNumberBad','demoOneNumber'];
+  'beat3Label','srcCustomerDemo','srcWorkerRequest','demoCodeWrong','demoNumberBad','demoOneNumber',
+  'allYourVouches','backToCode','prevPage','nextPage'];
 
 let TRANSLATIONS={};
 try{TRANSLATIONS=JSON.parse(fs.readFileSync(path.join(__dirname,'..','..','data','yovouch-copy.json'),'utf8'))||{};}catch{TRANSLATIONS={};}

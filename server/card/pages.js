@@ -58,14 +58,18 @@ const WORKER_CSS='.code{font-size:28px;font-weight:700}#q svg{width:100%;max-wid
 // the signature, since the "Customer has no data" line prints both.
 // vouches (plan Task 6) are the worker's own lines, newest first: {vouchId, line, words, hidden, held}. Held words
 // show here, on the worker's private page only, so the worker can read them before tapping Show.
-function vouchList(vouches,path,L,waiting){
-  if(!vouches.length)return '';
-  // One form; each button carries its vouchId and a path relative to /my/<cardId>/<token>, so a line stays small.
-  const rel=path.split('/').pop()+'/';
+// Lines with words waiting come first, then the shown lines, then the hidden ones; each group stays newest first.
+const WORKER_BUDGET=13312,INLINE_MAX=10,LIST_PAGE=20;
+const vouchRank=v=>v.held&&!v.hidden?0:v.hidden?2:1;
+const orderVouches=vouches=>vouches.map((v,i)=>[v,i]).sort((a,b)=>vouchRank(a[0])-vouchRank(b[0])||a[1]-b[1]).map(([v])=>v);
+// One form; each button carries its vouchId and a formaction relative to the page URL, so a line stays small.
+// rel is that page's path to /my/<cardId>/<token>/ ('<token>/' on the code page, '' on the full list).
+function vouchList(vouches,path,L,waiting,{rel=path.split('/').pop()+'/',more=false,page=0,head=true}={}){
   const act=(v,to,label,cls='')=>'<button name="vouchId" value="'+E(v.vouchId)+'" formaction="'+E(rel+to)+'"'+cls+'>'+H(L(label))+'</button>';
-  return '<form method="post" action="'+E(path)+'/hide" class="np"><h2>'+H(L('yourVouches'))+'</h2>'+(waiting?'<p>'+H(L('wordsWaiting',{n:waiting}))+'</p>':'')+
+  return '<form method="post" action="'+E(path)+'/hide" class="np">'+(head?'<h2>'+H(L('yourVouches'))+'</h2>':'')+(page?hidden('page',page):'')+(waiting?'<p>'+H(L('wordsWaiting',{n:waiting}))+'</p>':'')+
     vouches.map(v=>'<p'+(v.hidden?' class="small"':'')+'>'+H(v.line)+(v.held&&v.words?' <i>"'+H(v.words)+'"</i>':'')+'<br>'+
       (v.hidden?act(v,'show','showAgain'):act(v,'hide','hide',' class="alt"'))+(v.held&&!v.hidden?' '+act(v,'show-words','showWords'):'')+'</p>').join('')+
+    (more?'<p><a href="'+E(path)+'/vouches">'+H(L('allYourVouches'))+'</a></p>':'')+
     '<p class="small">'+H(L('biscate'))+'</p></form>';
 }
 // Polls status.json every 10 s for two minutes and reloads when a new vouch arrives (spec 7.1 step 4).
@@ -97,10 +101,29 @@ function workerPage({entry,record,batch,locked,lang='en',publicUrl,myUrl,nowMs,s
     '<p><a id="a" href="'+E(scanHref)+'">'+H(L('vouchButton',{first}))+'</a></p></details>'+
     (locked?'<p class="bad">'+H(L('locked',{time:localTime(Date.parse(locked.until),country,{seconds:false})}))+'</p>':'')+
     '</section>'+
-    vouchList(vouches,path,L,waiting)+
+    '\u0000'+
     '<form method="post" action="'+E(path)+'/lang" class="langs np"><p>'+H(splitOptions(L('languageMenu')).stem)+'</p>'+langs+'</form>'+
     '<script src="/qr-browser.js" defer></script><script>'+WORKER_JS+STATUS_JS+'</script>';
-  return flowPage({title:'YoCard',body,lang,sampleMode,css:WORKER_CSS});
+  // The inline list keeps the page inside its budget: the most lines (up to INLINE_MAX) that fit, and a link to
+  // the full list at /my/<cardId>/<token>/vouches when any line is left out.
+  const ordered=orderVouches(vouches),at=body.lastIndexOf('\u0000'),render=n=>flowPage({title:'YoCard',lang,sampleMode,css:WORKER_CSS,
+    body:body.slice(0,at)+(ordered.length?vouchList(ordered.slice(0,n),path,L,waiting,{more:n<ordered.length}):'')+body.slice(at+1)});
+  let html;
+  for(let n=Math.min(ordered.length,INLINE_MAX);n>=0;n--){html=render(n);if(Buffer.byteLength(html)<=WORKER_BUDGET)break;}
+  return html;
+}
+
+// GET /my/:cardId/:cardToken/vouches?page=N: the worker's full own list, LIST_PAGE lines a page, same order and
+// buttons as the code page. Each form carries its page, so a Hide or Show comes back to the same page.
+function myVouchesPage({entry,lang='en',myUrl,vouches=[],waiting=0,page=1,sampleMode}){
+  const L=(key,vars)=>t(key,lang,vars),token=String(myUrl||'').split('/').pop(),path='/my/'+entry.cardId+'/'+token;
+  const ordered=orderVouches(vouches),pages=Math.max(1,Math.ceil(ordered.length/LIST_PAGE)),p=Math.min(Math.max(1,page|0),pages);
+  const link=(n,key)=>'<a href="'+E(path)+'/vouches?page='+n+'">'+H(L(key))+'</a>';
+  const nav=(p>1?link(p-1,'prevPage'):'')+(p>1&&p<pages?' · ':'')+(p<pages?link(p+1,'nextPage'):'');
+  const body='<section><h1>'+H(L('yourVouches'))+'</h1><p><a href="'+E(path)+'">'+H(L('backToCode'))+'</a></p></section>'+
+    (ordered.length?vouchList(ordered.slice((p-1)*LIST_PAGE,p*LIST_PAGE),path,L,waiting,{rel:'',page:p,head:false}):'<p class="small">'+H(L('invite'))+'</p>')+
+    (nav?'<p>'+nav+'</p>':'');
+  return flowPage({title:L('yourVouches'),body,lang,sampleMode});
 }
 
 // ---- Scan and vouch pages (spec 7.2, plan Task 4). Each stays under 4096 bytes. ----
@@ -272,5 +295,5 @@ function demoPhonePage({from='',replies=null,sampleMode}){
   return flowPage({title:t('simSms'),body,sampleMode,css:FORM_CSS});
 }
 
-module.exports={TIME_ZONES,localTime,flowPage,workerPage,scanPage,typedPage,adultsOnlyPage,errorPage,chipsPage,withdrawPage,
+module.exports={TIME_ZONES,localTime,flowPage,workerPage,myVouchesPage,scanPage,typedPage,adultsOnlyPage,errorPage,chipsPage,withdrawPage,
   disclosePage,bindPage,readbackPage,donePage,demoPhonePage};

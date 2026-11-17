@@ -420,3 +420,34 @@ test('changes after the read-back are kept in editedFields',async()=>{
  assert.deepEqual(file.private.editedFields,['hireAgain','words']);
  assert.equal(file.record.voucher.label,'a customer'); assert.equal(file.record.voucher.firstName,null);
 });
+test('the worker page stays inside 13312 bytes with 20 held lines and links to the full list',async()=>{
+ const b=await fresh({env:{sim:true}}),{base,id,token,vouch}=b;
+ const s=await openScan(b);
+ await textYes(b,await toBind(b,s,{words:'Neat and kind.'}));
+ const [,first]=(await form(base,`/api/vouch/${s}/confirm`,{consent:'yes'})).match(WITHDRAW_AT);
+ const rec=vouch.vouchStore.get(first).record,W='ẹ'.repeat(120),ids=[first];
+ for(let i=1;i<=24;i++){
+  const held=i<=19?{words:W,wordsSource:'typed',clip:null}:null;   // 20 held lines in all, then 5 newer lines without words
+  ids.push(vouch.vouchStore.create({record:{...rec,confirmedAt:new Date(b.clock.t+i*1000).toISOString()},held,private:{voucherKey:'c'.repeat(64)},channel:'web'}).vouchId);
+ }
+ const my=await page(base,`/my/${id}/${token}`);
+ assert.ok(Buffer.byteLength(my)<=13312,'worker page '+Buffer.byteLength(my));
+ assert.ok(my.includes(`<a href="/my/${id}/${token}/vouches">All your vouches</a>`));
+ assert.ok(my.includes('20 lines have words waiting for you.'));
+ const shown=[...my.matchAll(/formaction="[0-9a-f]{16}\/hide"/g)].length;
+ assert.ok(shown>=1&&shown<25,'inline lines '+shown);
+ assert.equal([...my.matchAll(/<i>"ẹ+"<\/i>/g)].length,shown);       // lines with words waiting come first
+ const res=await fetch(base+`/my/${id}/${token}/vouches`);
+ assertPrivateHeaders(res);
+ const p1=await res.text();
+ assert.equal([...p1.matchAll(/formaction="hide"/g)].length,20); assert.ok(p1.includes('name="page" value="1"'));
+ assert.ok(p1.includes(`/my/${id}/${token}/vouches?page=2">Next page<`)); assert.ok(p1.includes(`<a href="/my/${id}/${token}">Back to your code</a>`));
+ const p2=await page(base,`/my/${id}/${token}/vouches?page=2`);
+ assert.equal([...p2.matchAll(/formaction="hide"/g)].length,5); assert.ok(p2.includes('?page=1">Previous page<'));
+ const last=ids.at(-1);
+ assert.ok(p2.includes(`value="${last}" formaction="hide"`)||p1.includes(`value="${last}" formaction="hide"`));
+ const hid=await fetch(base+`/my/${id}/${token}/hide`,{method:'POST',redirect:'manual',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({vouchId:last,page:'2'}).toString()});
+ assert.equal(hid.status,303); assert.equal(hid.headers.get('location'),`/my/${id}/${token}/vouches?page=2`);
+ assert.ok((await page(base,`/my/${id}/${token}/vouches?page=2`)).includes(`value="${last}" formaction="show"`));
+ assert.equal((await fetch(base+`/my/${id}/${'0'.repeat(16)}/vouches`)).status,404);
+});

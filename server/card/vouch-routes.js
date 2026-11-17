@@ -31,7 +31,7 @@ const {validId,secretsMatch}=require('./store.js');
 const {codeBatch,normaliseCardRef}=require('./vouchcode.js');
 const {LANGS,t,splitOptions}=require('./copy.js');
 const {STRINGS}=require('./render.js');
-const {flowPage,workerPage,scanPage,typedPage,adultsOnlyPage,errorPage,chipsPage,withdrawPage,
+const {flowPage,workerPage,myVouchesPage,scanPage,typedPage,adultsOnlyPage,errorPage,chipsPage,withdrawPage,
   disclosePage,bindPage,readbackPage,donePage,demoPhonePage}=require('./pages.js');
 const {tierItem}=require('./vouch-lines.js');
 const {withdrawnAtOf}=require('./vouches.js');
@@ -131,15 +131,23 @@ function createVouchRouter(system){
     if(entry.withdrawnAt)return sendPage(res,410,flowPage({title:t('cardWithdrawn'),body:'<section class="notice"><h1>'+t('cardWithdrawn')+'</h1></section>',sampleMode}));
     const nowMs=now(),lang=LANGS.includes(entry.vouch.lang)?entry.vouch.lang:'en';
     const mine=ownVouches(entry,nowMs),live=mine.filter(f=>vouchStore.isLive(f,nowMs));
-    const newest=Math.max(...mine.map(f=>Date.parse(f.record.confirmedAt)||0),0);
-    const vouches=mine.slice().reverse().map(f=>({vouchId:f.record.vouchId,line:tierItem(f.record,firstOf(entry),{nowMs}).line,
-      words:f.held?.words||null,hidden:Boolean(f.private?.hiddenAt),held:Boolean(f.held)&&!f.record.wordsShownAt}));
+    const newest=Math.max(...mine.map(f=>Date.parse(f.record.confirmedAt)||0),0),vouches=listItems(entry,mine,nowMs);
     sendPage(res,200,workerPage({entry,record:entry.record,batch:codeBatch(entry.vouch.secret,nowMs),locked:codes.lockState(entry.cardId),lang,
       publicUrl:system.publicUrl,myUrl:myUrl(system,entry.cardId,cardToken),nowMs,sampleMode,yv:system.yv,
       vouches,arrived:newest>0&&nowMs-newest<=ARRIVED_MS,waiting:live.filter(waitingWords).length,liveCount:live.length}));
   }
 
   // ---- The worker's own vouch list (spec 9.5, plan Task 6) ----
+  // The list items for the pages, newest first; pages.js orders and windows them.
+  const listItems=(entry,mine,nowMs)=>mine.slice().reverse().map(f=>({vouchId:f.record.vouchId,line:tierItem(f.record,firstOf(entry),{nowMs}).line,
+    words:f.held?.words||null,hidden:Boolean(f.private?.hiddenAt),held:Boolean(f.held)&&!f.record.wordsShownAt}));
+  function myVouches(res,entry,cardToken,url){
+    if(entry.withdrawnAt)return myPage(res,entry,cardToken);
+    const nowMs=now(),lang=LANGS.includes(entry.vouch.lang)?entry.vouch.lang:'en',mine=ownVouches(entry,nowMs);
+    const page=/^[1-9]\d{0,5}$/.test(url.searchParams.get('page')||'')?Number(url.searchParams.get('page')):1;
+    sendPage(res,200,myVouchesPage({entry,lang,myUrl:myUrl(system,entry.cardId,cardToken),vouches:listItems(entry,mine,nowMs),
+      waiting:mine.filter(f=>vouchStore.isLive(f,nowMs)&&waitingWords(f)).length,page,sampleMode}));
+  }
   // Every line of the card not withdrawn, hidden ones included, oldest first; organisation referrals arrive with Task 13.
   function ownVouches(entry,nowMs){return vouchStore.listForCard(entry.cardId).filter(f=>f.record&&!withdrawnAtOf(f,nowMs)&&f.record.kind!=='organisation');}
   const waitingWords=f=>Boolean(f.held)&&!f.record.wordsShownAt;
@@ -153,7 +161,9 @@ function createVouchRouter(system){
     if(payload===undefined)return;
     const vouchId=field(isPlainObject(payload)?payload.vouchId:'');
     const ok=validId(vouchId)&&(action==='hide'?vouchStore.hide(vouchId,entry.cardId):action==='show'?vouchStore.show(vouchId,entry.cardId):Boolean(vouchStore.showWords(vouchId,entry.cardId)));
-    if(form)return ok?redirect(res,'/my/'+entry.cardId+'/'+cardToken):sendPage(res,404,notFound());
+    // A post from the full list carries its page and goes back to it; the code page's form carries none.
+    const page=field(isPlainObject(payload)?payload.page:''),back='/my/'+entry.cardId+'/'+cardToken+(/^[1-9]\d{0,5}$/.test(page)?'/vouches?page='+page:'');
+    if(form)return ok?redirect(res,back):sendPage(res,404,notFound());
     return ok?sendPrivateJSON(res,200,{vouchId,ok:true}):sendError(res,404,'not_found','No vouch with this id on this card.');
   }
 
@@ -499,6 +509,7 @@ function createVouchRouter(system){
       const suffix=m[3]||'';
       if(!suffix)return method==='GET'||method==='HEAD'?wrap(myPage(res,entry,m[2])):notAllowed();
       if(suffix==='/lang')return method==='POST'?wrap(setLang(req,res,entry,m[2])):notAllowed();
+      if(suffix==='/vouches')return method==='GET'||method==='HEAD'?wrap(myVouches(res,entry,m[2],url)):notAllowed();
       if(suffix==='/status.json')return method==='GET'||method==='HEAD'?wrap(myStatus(res,entry)):notAllowed();
       if(suffix==='/hide'||suffix==='/show'||suffix==='/show-words')return method==='POST'?wrap(myAction(req,res,entry,m[2],suffix.slice(1))):notAllowed();
       return wrap(sendPage(res,404,notFound()));
