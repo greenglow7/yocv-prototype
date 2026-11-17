@@ -168,6 +168,26 @@ test('the organisation withdraws; the worker is told only in an open chat',async
  assert.equal((await rawForm(base,`/o/${requestId}/withdraw`,{referToken:'0'.repeat(24)})).status,404);
 });
 
+test('a no-JS organisation withdraws with the token from the page after the send',async()=>{
+ const b=await boot(),{base,am}=b;
+ const {requestId}=await requestReferral(b);
+ const token=referTokenIn(await (await openOrg(b,requestId)).text());
+ const res=await rawForm(base,`/api/refer/${token}/send`,{statement:SENTENCE});
+ assert.equal(res.status,200); assertPrivateHeaders(res);
+ const html=await res.text();
+ assertHonestPage(html);
+ assert.ok(html.includes('Withdraw referral')&&!html.includes('<textarea'),'the sent note replaces the statement box');
+ const m=new RegExp(`<form method="post" action="/o/${requestId}/withdraw"><input type="hidden" name="referToken" value="([0-9a-f]{24})">`).exec(html);
+ assert.ok(m,html.slice(0,800));
+ const vouchId=b.vouch.vouchStore.listForCard(am.cardId).find(f=>f.record.kind==='organisation').record.vouchId;
+ assert.equal((await post(base,`/api/vouch/${vouchId}/accept`,{cardId:am.cardId,cardToken:am.cardToken,answer:'yes'})).ok,true);
+ assert.ok((await page(base,'/c/'+am.cardId)).includes(LABEL));
+ const w=await rawForm(base,`/o/${requestId}/withdraw`,{referToken:m[1]});
+ assert.equal(w.status,200); assertHonestPage(await w.text());
+ assert.ok(!(await page(base,'/c/'+am.cardId)).includes(LABEL));
+ assert.equal((await fetch(base+`/v/${vouchId}.json`)).status,410);
+});
+
 test('Amara\'s card is honest about the fictional organisation',async()=>{
  const b=await boot(),{base,am}=b;
  const before=await page(base,'/c/'+am.cardId);

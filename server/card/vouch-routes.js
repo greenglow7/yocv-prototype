@@ -616,16 +616,14 @@ function createVouchRouter(system){
   async function orgSendPost(req,res,referToken){
     const form=isForm(req),payload=await readBody(req,res);
     if(payload===undefined)return;
-    const p=isPlainObject(payload)?payload:{},r=service.orgSend(referToken,field(p.statement));
+    // The view is read before the send: the send marks the request used, after which orgViewFor gives null.
+    const p=isPlainObject(payload)?payload:{},view=service.orgViewFor(referToken),r=service.orgSend(referToken,field(p.statement));
     if(!r.ok){
-      const view=service.orgViewFor(referToken);
       if(form&&view&&r.code==='invalid_input')return sendPage(res,400,orgPage({view,referToken,error:r.message,sampleMode}));
       return form?sendPage(res,r.status,errorPage({message:r.message,sampleMode})):sendError(res,r.status,r.code,r.message);
     }
-    if(form){
-      const file=vouchStore.get(r.vouchId),entry=store.get(file.record.cardId);
-      return sendPage(res,200,errorPage({message:t('referralSent','en',{first:firstOf(entry)}),sampleMode}));
-    }
+    // The sent page keeps the withdrawReferral form with this refer token (spec 7.5: only the organisation withdraws).
+    if(form)return sendPage(res,200,orgPage({view,referToken,sent:true,sampleMode}));
     sendPrivateJSON(res,200,{vouchId:r.vouchId});
   }
   async function orgWithdrawPost(req,res,requestId){
