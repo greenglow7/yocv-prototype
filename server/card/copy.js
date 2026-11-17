@@ -28,6 +28,7 @@ const COPY={
   showAgain:'Show again',
   showWords:'Show words and clip',
   wordsWaiting:'{n} lines have words waiting for you.',
+  wordsWaitingOne:'1 line has words waiting for you.',
   biscate:'Workers with one customer vouch got far more requests (Biscate, World Bank 2021).',
   vouchForWorker:'Vouch for another worker',
   requestVouch:'Request a vouch from a past customer',

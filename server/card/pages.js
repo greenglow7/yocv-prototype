@@ -66,7 +66,7 @@ const orderVouches=vouches=>vouches.map((v,i)=>[v,i]).sort((a,b)=>vouchRank(a[0]
 // rel is that page's path to /my/<cardId>/<token>/ ('<token>/' on the code page, '' on the full list).
 function vouchList(vouches,path,L,waiting,{rel=path.split('/').pop()+'/',more=false,page=0,head=true}={}){
   const act=(v,to,label,cls='')=>'<button name="vouchId" value="'+E(v.vouchId)+'" formaction="'+E(rel+to)+'"'+cls+'>'+H(L(label))+'</button>';
-  return '<form method="post" action="'+E(path)+'/hide" class="np">'+(head?'<h2>'+H(L('yourVouches'))+'</h2>':'')+(page?hidden('page',page):'')+(waiting?'<p>'+H(L('wordsWaiting',{n:waiting}))+'</p>':'')+
+  return '<form method="post" action="'+E(path)+'/hide" class="np">'+(head?'<h2>'+H(L('yourVouches'))+'</h2>':'')+(page?hidden('page',page):'')+(waiting?'<p>'+H(waiting===1?L('wordsWaitingOne'):L('wordsWaiting',{n:waiting}))+'</p>':'')+
     vouches.map(v=>'<p'+(v.hidden?' class="small"':'')+'>'+H(v.line)+(v.held&&v.words?' <i>"'+H(v.words)+'"</i>':'')+'<br>'+
       (v.hidden?act(v,'show','showAgain'):act(v,'hide','hide',' class="alt"'))+(v.held&&!v.hidden?' '+act(v,'show-words','showWords'):'')+'</p>').join('')+
     (more?'<p><a href="'+E(path)+'/vouches">'+H(L('allYourVouches'))+'</a></p>':'')+

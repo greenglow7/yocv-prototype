@@ -938,7 +938,7 @@ Worker's page (L)
 - `A vouch is on your card.`
 - `Your vouches`
 - `Hide` / `Show again`
-- `Show words and clip` / `<N> lines have words waiting for you.` (worker's own page only; the count never reaches a public surface)
+- `Show words and clip` / `<N> lines have words waiting for you.`, or `1 line has words waiting for you.` for a single line (worker's own page only; the count never reaches a public surface)
 - `Workers with one customer vouch got far more requests (Biscate, World Bank 2021).` (vouch list tab only)
 - `Vouch for another worker`
 - `Request a vouch from a past customer`

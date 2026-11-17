@@ -89,3 +89,9 @@ test('the honesty helper passes a flow page and catches a bad one',()=>{
  assertPrivateHeaders({headers:new Headers({'cache-control':'private, no-store','referrer-policy':'no-referrer'})});
  assert.throws(()=>assertPrivateHeaders({headers:{'cache-control':'no-store'}}));
 });
+
+test('one held line reads in the singular on the worker page', () => {
+  const {t}=require('../server/card/copy.js');
+  assert.equal(t('wordsWaitingOne','en'),'1 line has words waiting for you.');
+  assert.equal(t('wordsWaiting','en',{n:2}),'2 lines have words waiting for you.');
+});

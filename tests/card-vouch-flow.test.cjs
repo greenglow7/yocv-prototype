@@ -107,7 +107,7 @@ test('Show words re-signs with the words',async()=>{
  assertPrivateHeaders(status);
  assert.deepEqual(await status.json(),{vouchCount:1,lastVouchAt:new Date(b.clock.t).toISOString(),wordsWaiting:1});
  const my=await page(base,`/my/${id}/${token}`);
- assert.ok(my.includes('Your vouches')&&my.includes('Show words and clip')&&my.includes('1 lines have words waiting for you.'));
+ assert.ok(my.includes('Your vouches')&&my.includes('Show words and clip')&&my.includes('1 line has words waiting for you.'));
  assert.ok(my.includes('A vouch is on your card.')&&my.includes('Workers with one customer vouch got far more requests (Biscate, World Bank 2021).'));
  assert.ok(my.includes('"She did my braids three times this year."'),'the worker reads the held words on their own page before Show (spec 5.7)');
  assertPrivateHeaders(await fetch(base+`/my/${id}/${token}`)); assert.ok(Buffer.byteLength(my)<=13312,'worker page '+Buffer.byteLength(my));
