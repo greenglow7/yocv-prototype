@@ -10,7 +10,7 @@
      A pasted post goes to replyService.parse; each asked document's 1 or 2 fills documentAnswer in turn; the typed
        answer goes to replyService.draft. Menu: 1 confirm (and YES or NO to the back-translation), 2 <n> <text>
        (or <n> <text>) edits a line, 3 waits for a self clip, 4 asks the first disclosed completion's organisation.
-     "Send me my words" gives the newest reply's transcript. YES or NO with no step answers a waiting referral.
+     "Send me my words" gives the newest reply's transcript. YES or NO at the menu or with no step answers a waiting referral.
    With sim every reply list ends with simWa, which is a label and never sent. The simulator response also carries
    step and lang, and jobPostId, replyId, rejected and forward when a step sets them, so thread.js can record, attach
    a self clip and forward. The webhook answers {replies} only. */
@@ -161,11 +161,12 @@ function createWaHandler(system){
     if(st.step==='docs')return cmd==='1'||cmd==='2'?docAnswer(st,cmd):draft(st,text);
     if(st.step==='answers')return draft(st,text);
     if(st.step==='back')return backTranslate(st,entry,cmd);
-    if(MENU_STEPS.has(st.step))return menuStep(st,entry,cmd,text);
-    if(cmd==='YES'||cmd==='NO'){
+    // YES or NO at the menu or with no step answers a waiting referral (menu 4 leaves the chat at its menu).
+    if((cmd==='YES'||cmd==='NO')&&(!st.step||MENU_STEPS.has(st.step))){
       const f=waitingReferral(st.cardId);
       if(f){const r=system.service.acceptReferralForCard(f.record.vouchId,st.cardId,cmd.toLowerCase());return [r.message];}
     }
+    if(MENU_STEPS.has(st.step))return menuStep(st,entry,cmd,text);
     return parsePost(st,text);
   }
 

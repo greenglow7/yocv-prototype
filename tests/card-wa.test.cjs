@@ -147,6 +147,26 @@ test('YES in the chat accepts a waiting referral',async()=>{
  assert.ok(b.vouch.vouchStore.get(sent.vouchId).record.acceptedAt);
 });
 
+test('menu 4, the organisation sends, then YES in the chat accepts the referral',async()=>{
+ const KEY='demo-alison-learning',THANDI='0735550147';
+ const b=await bootVouch({env:{sim:true,YOVOUCH_ORG_KEY_ALISON_LEARNING:KEY}});
+ await publishPersona(b.base,'thandi',{trade:'hair'});
+ const say=text=>post(b.base,'/api/sim/wa',{from:THANDI,text});
+ await say('hi'); await say('1'); await say(SALON_POST);
+ await say('I did braids for 10 years, I can start Monday.');
+ const r=await say('4');
+ assert.equal(r.step,'menu');
+ const requestId=/\/o\/([A-Z2-9]{10})/.exec(r.replies[0])[1];
+ const org=await form(b.base,'/o/'+requestId,{orgKey:KEY});
+ const token=/action="\/api\/refer\/([0-9a-f]{24})\/send"/.exec(org)[1];
+ const sent=await post(b.base,`/api/refer/${token}/send`,{statement:'She did braids for our clients for two years and was always on time.'});
+ assert.ok(b.vouch.outbox.sent('+27735550147').some(m=>m.startsWith('Alison Learning wrote: "She did braids')),'orgWrote reaches the open chat');
+ const y=await say('YES');
+ assert.equal(y.replies[0],'Done. It is on your card. Forward your reply again if you already sent it, so the employer sees the referral.');
+ assert.ok(b.vouch.vouchStore.get(sent.vouchId).record.acceptedAt);
+ assert.equal(y.step,'menu','the chat stays at its menu');
+});
+
 test('thread page is static and honest; the routes are gated',async()=>{
  await boot();
  const res=await fetch(B.base+'/thread.html'); assert.equal(res.status,200);
