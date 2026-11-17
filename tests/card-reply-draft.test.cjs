@@ -332,9 +332,49 @@ test('clips: released, unflagged, live vouch clips ride along by default, newest
   const picked = await post(base, '/api/reply/draft', {cardId, cardToken, jobPostId, text:'From Monday.', lang:'en', clipIds:[ids[3], gone, 'NOPEAAAAAA']});
   assert.deepEqual(vouch.replyStore.get(picked.replyId).clipIds, [ids[3]]);
   // The reply page links only clips that are still live.
+  await post(base, `/api/reply/${d.replyId}/confirm`, {cardId, cardToken, lines:d.lines, lang:'en'});
   vouch.vouchStore.withdrawAs(ids[0], 'now');
   const html = await (await fetch(base + '/r/' + d.replyId)).text();
   assert.equal(html.split('/clip"').length - 1, 2);
+});
+
+test('the reply page shows no line before the worker confirms, and an edit closes it again', async () => {
+  const {base, cardId, cardToken, jobPostId} = await sipho0();
+  const d = await post(base, '/api/reply/draft', {cardId, cardToken, jobPostId, text:'Two taxis, about an hour. From Monday. Paving.', lang:'en'});
+  const closed = async () => { const res = await fetch(base + '/r/' + d.replyId); assertPrivateHeaders(res);
+    const html = await res.text(); assert.equal(res.status, 404); assert.ok(html.includes('not confirmed yet'));
+    for (const l of ['Two taxis', 'From Monday', 'from Tuesday', 'Paving']) assert.ok(!html.includes(l), l); };
+  await closed();
+  const e = await post(base, `/api/reply/${d.replyId}/edit`, {cardId, cardToken, line:4, text:'4 from Tuesday'});
+  await closed();
+  await post(base, `/api/reply/${d.replyId}/confirm`, {cardId, cardToken, lines:e.lines, lang:'en'});
+  const open = await fetch(base + '/r/' + d.replyId);
+  assert.equal(open.status, 200); assert.ok((await open.text()).includes('Available: from Tuesday (stated by Sipho)'));
+  await post(base, `/api/reply/${d.replyId}/edit`, {cardId, cardToken, line:4, text:'4 from Wednesday'});
+  const reopened = await fetch(base + '/r/' + d.replyId);
+  assert.equal(reopened.status, 404); assert.ok(!(await reopened.text()).includes('Wednesday'));
+});
+
+test('Review Focus 4: reply line 2 turns neutral once its vouch is withdrawn, quietly withdrawn or hidden', async () => {
+  const {base, vouch, cardId, cardToken, clock} = await sipho0();
+  const pave = await post(base, '/api/reply/parse', {text:'Paving crew needed in Umlazi, call 0821234567'});
+  const neutral = 'Experience: not stated (stated by Sipho, not checked)';
+  for (const how of ['now', 'quiet', 'hide']) {
+    const id = vouch.vouchStore.create({record:vf('X', {card:{cardId}, work:'Paving', words:'laid our driveway', at:clock.t-HOUR}).record, channel:'web'}).vouchId;
+    const d = await post(base, '/api/reply/draft', {cardId, cardToken, jobPostId:pave.jobPostId, text:'From Monday.', lang:'en'});
+    assert.equal(vouch.replyStore.get(d.replyId).sources[1], 'vouch:' + id);
+    assert.ok(d.lines[1].includes('laid our driveway'), d.lines[1]);
+    await post(base, `/api/reply/${d.replyId}/confirm`, {cardId, cardToken, lines:d.lines, lang:'en'});
+    const before = await (await fetch(base + '/r/' + d.replyId)).text();
+    assert.ok(before.includes('laid our driveway') && before.includes('said by a customer'), how);
+    if (how === 'hide') vouch.vouchStore.hide(id, cardId);
+    else vouch.vouchStore.withdrawAs(id, how);
+    if (how === 'quiet') clock.t += 73 * HOUR;
+    const html = await (await fetch(base + '/r/' + d.replyId)).text();
+    assert.ok(!html.includes('laid our driveway') && !html.includes('said by a customer'), how);
+    assert.ok(html.includes(neutral), how);
+    assert.ok(html.includes('Available: From Monday (stated by Sipho)'), how);
+  }
 });
 
 test('the reply menu names an organisation only when the card has one', async () => {

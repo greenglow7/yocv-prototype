@@ -7,7 +7,8 @@
      POST /api/reply/:replyId/edit        {cardId, cardToken, line, text} -> {ok, lines} | {ok:false, reason}
      POST /api/reply/:replyId/confirm     {cardId, cardToken, lines, lang} -> {forward} | {forward:null, lines, notTranslated:true}
      POST /api/reply/:replyId/forwarded   {cardId, cardToken} -> {forwardedAt}, set once
-     GET  /r/:replyId                     the reply page: the lines, clip links, private headers, honest footer
+     GET  /r/:replyId                     the reply page: the lines, clip links, private headers, honest footer;
+                                          404 until the worker confirms, and line 2 turns neutral once its vouch is gone
    The routes are thin: they read the body, check the card token and call createReplyService, so the WhatsApp
    handler (Task 16) calls the same functions. A model call goes through system.withSlot, the router's in-flight
    guard, and a full guard answers 503 busy. A refusal stores no post and logs parser_refused with its reason.
@@ -151,7 +152,18 @@ function createReplyService(system){
     return list(reply.clipIds).map(id=>system.vouchStore.get(id)).filter(f=>f?.record&&system.vouchStore.isLive(f,nowMs)&&f.record.clip?.url&&!f.record.clip.expired)
       .map(f=>({href:'/v/'+f.record.vouchId+'/clip',text:STRINGS.playClip(f.record.clip.seconds,Math.round(Number(f.record.clip.bytes||0)/1024))}));
   }
-  return {parse,draft,edit,confirm,forwarded,pageClips,organisationsOf};
+  // The reply page's line 2: when it rests on a vouch or referral that is no longer live (withdrawn, withdrawn
+  // quietly past withdrawAfter, or hidden), the line turns neutral at read time (spec 5.6, Review Focus 4).
+  function pageReply(reply,firstName,nowMs){
+    const m=/^(?:vouch|referral):([A-Z2-9]{10})$/.exec(str(list(reply?.sources)[1]));
+    if(!m)return reply;
+    const f=system.vouchStore.get(m[1]);
+    if(f?.record&&system.vouchStore.isLive(f,nowMs))return reply;
+    const neutral=t('line2','en',{text:t('notStated'),source:t('srcStated','en',{first:str(firstName)})});
+    const swap=v=>Array.isArray(v)&&v.length>1?v.map((l,i)=>i===1?neutral:l):v;
+    return {...reply,lines:swap(reply.lines),linesInSourceLang:swap(reply.linesInSourceLang)};
+  }
+  return {parse,draft,edit,confirm,forwarded,pageClips,pageReply,organisationsOf};
 }
 
 function createReplyRouter(system){
@@ -202,7 +214,10 @@ function createReplyRouter(system){
     const reply=system.replyStore.get(replyId),entry=reply?system.store.get(reply.cardId):null;
     if(!reply||!entry?.record)return sendPage(res,404,errorPage({message:'No reply with this id.',sampleMode}));
     if(entry.withdrawnAt)return sendPage(res,410,errorPage({message:t('cardWithdrawn'),sampleMode}));
-    sendPage(res,200,replyPage({reply,firstName:entry.record.user?.firstName||'',clips:svc().pageClips(reply,system.now()),sampleMode}));
+    // No line is published before the worker confirms it; an edit clears confirmedAt, so the page closes again.
+    if(!reply.confirmedAt)return sendPage(res,404,errorPage({message:'This reply is not confirmed yet.',sampleMode}));
+    const first=entry.record.user?.firstName||'',nowMs=system.now();
+    sendPage(res,200,replyPage({reply:svc().pageReply(reply,first,nowMs),firstName:first,clips:svc().pageClips(reply,nowMs),sampleMode}));
   }
   function handle(req,res,url){
     const pathname=url.pathname,method=req.method;

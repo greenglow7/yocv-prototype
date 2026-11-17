@@ -295,7 +295,7 @@ function demoPhonePage({from='',replies=null,sampleMode}){
   return flowPage({title:t('simSms'),body,sampleMode,css:FORM_CSS});
 }
 
-// GET /r/:replyId (spec 6.4, 9.5): the six lines the worker confirmed, the attached clips that are still live and
+// GET /r/:replyId (spec 6.4, 9.5), shown only once the worker confirms: the six confirmed lines, the attached clips that are still live and
 // the footer honesty strings. Until an English translation is confirmed by the speaker, the page shows the
 // own-language lines and "Not translated".
 function replyPage({reply,firstName,clips=[],lang='en',sampleMode}){
