@@ -7,6 +7,7 @@ const path=require('node:path');
 const {STRINGS,fullDate,monthYear}=require('./render.js');
 const {noBannedClaims,noInventedNumbers}=require('../validate.js');
 const {BANNED_CONFIRM_PHRASE,namesOrganisation}=require('./draft.js');
+const {t}=require('./copy.js');
 
 // Display value (web form, SMS and IVR alike) to stored value. There is no "no".
 const HOW_OFTEN={'once':'once','a few times':'a few times','regularly':'regularly','rather not say':'not stated'};
@@ -138,4 +139,35 @@ function parseChips(body,{chips=[],nowMs=Date.now(),country,organisationNames=[]
   return fields.length?{ok:false,fields}:{ok:true,chips:{work:out.work,when:out.when,howOften:out.howOften,hireAgain:out.hireAgain}};
 }
 
-module.exports={checkWords,parseChips,HOW_OFTEN,HIRE_AGAIN,whenText,buildLine,voucherLabel,numberLabel,tierLabel,finePrint,tierItem};
+// ---- Reply by Voice short forms (spec 6.1 line 2, 6.6; plan Task 10). Released words only: a held word is in
+// file.held, never in the record, so nothing here can print it. ----
+// The line 2 source label, with its parentheses (spec 17).
+function sourceLabel(record,firstName){
+  void firstName; // the labels name the voucher's kind, never the worker
+  const p=record?.proof||{},v=record?.voucher||{};
+  if(record?.kind==='organisation')return t('srcReferral','en',{org:str(v.orgName||v.label)});
+  if(record?.kind==='worker')return t(p.method==='request'?'srcWorkerRequest':'srcWorkerCode');
+  if(p.method==='request')return t('srcCustomerRequest');
+  if(p.onWorkerPhone===true)return t(v.phoneConfirmedBy==='demo'?'srcCustomerDemo':'srcCustomerTexted');
+  return t('srcCustomerCode');
+}
+// "this month", "last month", "Month YYYY" or "earlier", in the card country's time zone.
+function replyWhen(when,{nowMs=Date.now(),country}={}){
+  if(!/^\d{4}-\d{2}$/.test(str(when)))return 'earlier';
+  const [y,m]=str(when).split('-').map(Number),i=y*12+m-1,cur=monthIndex(nowMs,country);
+  return i===cur?'this month':i===cur-1?'last month':monthYear(when)||'earlier';
+}
+// 'paving, this month, once' then the released words in quotes.
+function experienceShort(record,{nowMs=Date.now(),country}={}){
+  const f=record?.fields||{};
+  return str(f.work).toLowerCase()+', '+replyWhen(f.when,{nowMs,country})+', '+str(f.howOften)+(f.words?' "'+str(f.words)+'"':'');
+}
+// The one-SMS reply's vouch unit (spec 6.6): {vouchShort:'Paving, this month', sourceShort:'vouched by a worker, code matched'}.
+function smsShort(record,{nowMs=Date.now(),country}={}){
+  const p=record?.proof||{},request=p.method==='request';
+  const sourceShort=record?.kind==='worker'?(request?'vouched by a worker, by request':'vouched by a worker, code matched')
+    :request?'said by a customer, by request':p.onWorkerPhone===true?'said by a customer, code texted':'said by a customer, code matched';
+  return {vouchShort:str(record?.fields?.work)+', '+replyWhen(record?.fields?.when,{nowMs,country}),sourceShort};
+}
+
+module.exports={sourceLabel,experienceShort,smsShort,checkWords,parseChips,HOW_OFTEN,HIRE_AGAIN,whenText,buildLine,voucherLabel,numberLabel,tierLabel,finePrint,tierItem};

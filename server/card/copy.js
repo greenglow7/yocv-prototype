@@ -225,12 +225,19 @@ const COPY={
   allYourVouches:'All your vouches', // plan addition (the worker page links to the full list when not every line fits)
   backToCode:'Back to your code', // plan addition (full list)
   prevPage:'Previous page', // plan addition (full list pager)
-  nextPage:'Next page' // plan addition (full list pager)
+  nextPage:'Next page', // plan addition (full list pager)
+  line2:'Experience: {text} {source}', // plan addition (spec 6.1 line 2)
+  line3One:'Confirmed from Yoma: 1 completion · phone confirmed (not an ID check)', // plan addition (one completion)
+  line4:'Available: {text} (stated by {first})', // plan addition (spec 6.1 line 4)
+  line5One:'{item}: {answer} (stated by {first})', // plan addition (spec 6.1 line 5, one item)
+  line6One:"Card with 1 clip: {link} · lines 1, 4, 5 from {first}'s own words · card signed by YoCard, not by Yoma", // plan addition (one clip)
+  line6None:"Card: {link} · lines 1, 4, 5 from {first}'s own words · card signed by YoCard, not by Yoma", // plan addition (no clip: a zero is never sent)
+  replyMenuNoOrg:'Reply 1 to get the English reply to forward, 2 to change a line (like "4 from Tuesday"), 3 to add a 15-second clip about yourself.' // plan addition (no disclosed completion)
 };
 const PLAN_ADDITIONS=['codeWrongWeb','codeLockedWeb','sessionEnded','sampleNumber','recentNo','visitAdded','demoWithdrawHere','docAskItem','docToldItem',
   'smsVouchMenuWorker','smsQ2','smsQ3','smsQ4','smsQ4Worker','smsCompletionOne','smsCompletions','referralWithdrawnMsg','orgKeyWrong','pasteRequestLink',
   'beat3Label','srcCustomerDemo','srcWorkerRequest','demoCodeWrong','demoNumberBad','demoOneNumber',
-  'allYourVouches','backToCode','prevPage','nextPage'];
+  'allYourVouches','backToCode','prevPage','nextPage','line2','line3One','line4','line5One','line6One','line6None','replyMenuNoOrg'];
 
 let TRANSLATIONS={};
 try{TRANSLATIONS=JSON.parse(fs.readFileSync(path.join(__dirname,'..','..','data','yovouch-copy.json'),'utf8'))||{};}catch{TRANSLATIONS={};}

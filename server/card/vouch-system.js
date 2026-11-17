@@ -12,7 +12,7 @@ const {createVouchSessions}=require('./vouch-sessions.js');
 const {createVouchService}=require('./vouch-service.js');
 const {createOutbox}=require('./outbox.js');
 const {createSmsHandler}=require('./sms.js');
-const {createPostStore}=require('./reply.js');
+const {createPostStore,createReplyStore}=require('./reply.js');
 
 const YV_DEFAULTS={sim:false,gatewaySecret:'',shortcode:'12345',callbackNumber:'0800 000 000',smsCountry:'South Africa',orgKeys:{}};
 const SMS_ID_ATTEMPTS=20;
@@ -33,6 +33,7 @@ function buildVouchSystem({config,store,key,accountSource,provider,publicUrl,now
   system.service=createVouchService(system);
   system.sms=createSmsHandler(system);
   system.postStore=createPostStore(store.dir,{now,random});
+  system.replyStore=createReplyStore(store.dir,{now,random});
   return system;
 }
 

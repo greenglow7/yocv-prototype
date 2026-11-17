@@ -295,5 +295,18 @@ function demoPhonePage({from='',replies=null,sampleMode}){
   return flowPage({title:t('simSms'),body,sampleMode,css:FORM_CSS});
 }
 
-module.exports={TIME_ZONES,localTime,flowPage,workerPage,myVouchesPage,scanPage,typedPage,adultsOnlyPage,errorPage,chipsPage,withdrawPage,
+// GET /r/:replyId (spec 6.4, 9.5): the six lines the worker confirmed, the attached clips that are still live and
+// the footer honesty strings. Until an English translation is confirmed by the speaker, the page shows the
+// own-language lines and "Not translated".
+function replyPage({reply,firstName,clips=[],lang='en',sampleMode}){
+  const english=Array.isArray(reply?.lines)&&reply.lines.length===6;
+  const lines=english?reply.lines:Array.isArray(reply?.linesInSourceLang)?reply.linesInSourceLang:[];
+  const title=String(firstName||'')+' · YoCard';
+  const body='<section><h1>'+H(title)+'</h1>'+(english?'':'<p class="small">'+H(STRINGS.notTranslated)+'</p>')+
+    '<ol>'+lines.map(l=>'<li>'+H(l)+'</li>').join('')+'</ol>'+
+    clips.map(c=>'<p><a href="'+E(c.href)+'">'+H(c.text)+'</a></p>').join('')+'</section>';
+  return flowPage({title,body,lang:english?'en':(reply?.lang||lang),sampleMode});
+}
+
+module.exports={TIME_ZONES,replyPage,localTime,flowPage,workerPage,myVouchesPage,scanPage,typedPage,adultsOnlyPage,errorPage,chipsPage,withdrawPage,
   disclosePage,bindPage,readbackPage,donePage,demoPhonePage};

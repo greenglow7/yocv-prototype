@@ -9,7 +9,8 @@
      go (codes.json, smsids.json, numbers/) and entry.vouch and entry.cardTokenHash are set to null;
    - a clip older than 12 months is deleted and the record keeps clip: {expired: true};
    - voucher-file entries older than 12 months are dropped, and a file left empty is deleted;
-   - a job post is deleted 60 days after createdAt (Task 9). */
+   - a job post is deleted 60 days after createdAt (Task 9);
+   - a card withdrawn over 24 hours ago loses its replies and replies/clips/<replyId>.* (Task 10). */
 const fs=require('node:fs');
 const path=require('node:path');
 const {withdrawnAtOf}=require('./vouches.js');
@@ -90,6 +91,14 @@ function sweepPosts(system,nowMs,out){
   for(const post of system.postStore.listAll())if(older(post.createdAt,nowMs,POST_TTL_MS)&&system.postStore.remove(post.jobPostId))out.deleted++;
 }
 
+function sweepReplies(system,nowMs,out){
+  if(!system.replyStore)return;
+  for(const reply of system.replyStore.listAll()){
+    const entry=system.store.get(reply.cardId);
+    if(entry?.withdrawnAt&&older(entry.withdrawnAt,nowMs,CARD_GRACE_MS)&&system.replyStore.remove(reply.replyId))out.deleted++;
+  }
+}
+
 function runSweep(system){
   const nowMs=system.now();
   const out={reduced:0,deleted:0,clipsExpired:0,cardsCleared:0};
@@ -97,6 +106,7 @@ function runSweep(system){
   sweepVouches(system,nowMs,out);
   sweepVoucherFiles(system,nowMs,out);
   sweepPosts(system,nowMs,out);
+  sweepReplies(system,nowMs,out);
   return out;
 }
 
