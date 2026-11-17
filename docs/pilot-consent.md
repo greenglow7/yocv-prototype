@@ -18,11 +18,15 @@ What we store:
 - The vouches your customers make, with the date and how they were made.
 - Clips of your voice, only if you record one.
 - A log of events, such as "a request link was made". It holds ids and times only. It holds no names and no phone numbers.
+- A keyed hash of your phone number. This is a scrambled code made with a secret key. It links your number to your card. Nobody can read your number back from it.
+- The last three digits of your number.
+- Your full number, only if you turn on the WhatsApp button. It is then kept inside that button's link on your public card, so anyone with the card link can see it.
 
 What we do not store:
 
 - Your gender. If you tell us your gender, it goes on the study sheet kept by the student, not on your card or in any record.
-- Any phone number of yours or of your customers in readable form.
+- Your full phone number in readable form, unless you turn on the WhatsApp button.
+- Any phone number of your customers in readable form.
 
 You can stop at any time. You can withdraw your card at any time, and every vouch on it goes with it. Tell the student, or use the withdraw button on your card.
 
