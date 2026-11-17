@@ -1,0 +1,15 @@
+{
+  "hair": ["Braids", "Cornrows", "Weave", "Relaxer", "Cut", "Other"],
+  "labourer": ["Paving", "Plastering", "Painting", "Digging", "Loading", "Other"],
+  "nails": ["Gel nails", "Acrylics", "Pedicure", "Other"],
+  "boda": ["Rides", "Deliveries", "Errands", "Other"],
+  "tailor": ["Alterations", "New outfit", "School uniform", "Other"],
+  "mechanic": ["Service", "Repair", "Tyres", "Other"],
+  "electrician": ["Wiring", "Fault finding", "Installation", "Other"],
+  "plumber": ["Leak repair", "Installation", "Drains", "Other"],
+  "cleaner": ["House cleaning", "Laundry", "Garden", "Other"],
+  "cook": ["Catering", "Meals", "Baking", "Other"],
+  "market": ["Fresh produce", "Goods", "Delivery", "Other"],
+  "mobile-money": ["Deposits", "Withdrawals", "Transfers", "Other"],
+  "default": ["Work done", "Other"]
+}

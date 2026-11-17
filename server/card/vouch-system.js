@@ -7,6 +7,9 @@ const {createCodeService,newSecret}=require('./vouchcode.js');
 const {normalisePhone,keyedHash,createVoucherFiles}=require('./vouchers.js');
 const {loadOrCreateHashKey}=require('./vouches.js');
 const {hashSecret}=require('./store.js');
+const {createEventLog,cardFields}=require('./events.js');
+const {createVouchSessions}=require('./vouch-sessions.js');
+const {createVouchService}=require('./vouch-service.js');
 
 const YV_DEFAULTS={sim:false,gatewaySecret:'',shortcode:'12345',callbackNumber:'0800 000 000',smsCountry:'South Africa',orgKeys:{}};
 const SMS_ID_ATTEMPTS=20;
@@ -19,7 +22,11 @@ function buildVouchSystem({config,store,key,accountSource,provider,publicUrl,now
   const voucherFiles=createVoucherFiles(store.dir,{now});
   const codes=createCodeService({store,voucherFiles,now});
   void outbox;void transcriber; // wired in by the tasks that send messages and transcribe clips
-  return {yv,store,key,accountSource,provider,liveModel,publicUrl:String(publicUrl||'').replace(/\/+$/,''),now,random,hashKey,voucherFiles,codes};
+  const events=createEventLog(store.dir,{now});
+  const sessions=createVouchSessions({now,random});
+  const system={yv,store,key,accountSource,provider,liveModel,publicUrl:String(publicUrl||'').replace(/\/+$/,''),now,random,hashKey,voucherFiles,codes,events,sessions};
+  system.service=createVouchService(system);
+  return system;
 }
 
 function myUrl(system,cardId,cardToken){return system.publicUrl+'/my/'+cardId+'/'+cardToken;}
@@ -49,12 +56,16 @@ function issueVouchFields(system,{user}={}){
 }
 
 // smsids.json always; numbers/<hash>.json only for a phone Yoma confirmed. The newest live card replaces an
-// existing number entry (spec 9.6); the number_index_replaced event is logged once the events log exists.
+// existing number entry and the replacement is logged as number_index_replaced (spec 9.6).
 function indexCard(system,cardId,entry,{phoneConfirmed}){
   const {store}=system;
   store.indexSet('smsids',entry.smsId,cardId);
   if(/^[A-Z2-9]{6}$/.test(String(entry.record?.code??'')))store.indexSet('codes',entry.record.code,cardId);
-  if(phoneConfirmed===true&&entry.ownerPhoneHash)store.indexSet('numbers',entry.ownerPhoneHash,cardId);
+  if(phoneConfirmed===true&&entry.ownerPhoneHash){
+    const before=store.indexGet('numbers',entry.ownerPhoneHash);
+    store.indexSet('numbers',entry.ownerPhoneHash,cardId);
+    if(before&&before!==cardId)system.events?.log('number_index_replaced',{...cardFields(entry),replacedCardId:before});
+  }
 }
 
 module.exports={YV_DEFAULTS,buildVouchSystem,issueVouchFields,indexCard,allocateSmsId,phoneHashOf,newCardToken,myUrl};

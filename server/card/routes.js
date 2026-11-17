@@ -13,7 +13,7 @@
      GET  /.well-known/jwks.json           the signing key
    Draft sessions live in memory for 30 minutes keyed by a 24-hex draftToken; they hold the full snapshot
    (with the real phone number and date of birth) so the browser only ever sees the masked copy.
-   The YoVouch routes (/my/, /api/vouch/, /qr-browser.js) live in vouch-routes.js and are tried last. */
+   The YoVouch routes (/my/, /s/, /api/vouch/, /qr-browser.js) live in vouch-routes.js and are tried last. */
 
 const crypto=require('node:crypto');
 const {ageAt}=require('./account.js');

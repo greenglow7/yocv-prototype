@@ -109,6 +109,26 @@ function readJSONBody(req){
   });
 }
 
+// Reads a raw body of at most maxBytes (audio uploads, spec 9.5). Resolves a Buffer; rejects with InputError
+// when the body is larger. An oversized body is drained rather than left to hang the socket.
+function readRawBody(req,maxBytes){
+  return new Promise((resolve,reject)=>{
+    const tooLargeError=()=>new InputError('The request body must be under '+Math.round(maxBytes/1024)+' KB.');
+    const declared=Number.parseInt(req.headers?.['content-length']??'',10);
+    if(Number.isInteger(declared)&&declared>maxBytes){req.resume();reject(tooLargeError());return;}
+    const chunks=[];
+    let size=0,tooLarge=false;
+    req.on('data',chunk=>{
+      if(tooLarge)return;
+      size+=chunk.length;
+      if(size>maxBytes){tooLarge=true;chunks.length=0;reject(tooLargeError());return;}
+      chunks.push(chunk);
+    });
+    req.on('error',err=>reject(err));
+    req.on('end',()=>{if(!tooLarge)resolve(Buffer.concat(chunks));});
+  });
+}
+
 // Validates the generate request. `role` must equal a roleSkills key exactly (no trimming, no case folding).
 // Experience uses the same rule and wording as core.localExperienceClaims.
 function validateGenerateInput(payload,roleKeys){
@@ -298,6 +318,6 @@ function main(){
   process.on('SIGTERM',shutdown);
 }
 
-module.exports={createApp,validateGenerateInput,readJSONBody,STATIC,MAX_BODY_BYTES};
+module.exports={createApp,validateGenerateInput,readJSONBody,readRawBody,STATIC,MAX_BODY_BYTES};
 
 if(require.main===module)main();

@@ -2,8 +2,8 @@
 /* YoVouch pages (spec sections 4.3 and 9.5). Every flow page is server-rendered, works without JavaScript,
    uses system fonts only (shell({fonts:false})) and carries the footer honesty strings. Times a worker reads
    ("valid until", "Opens again at") are in the card country's time zone, never in server UTC. */
-const {shell,footer,escapeHtml,FLOW_CSS}=require('./render.js');
-const {t,LANGS,LANG_NAMES,splitOptions}=require('./copy.js');
+const {shell,footer,escapeHtml,FLOW_CSS,STRINGS}=require('./render.js');
+const {COPY,t,LANGS,LANG_NAMES,splitOptions}=require('./copy.js');
 const {formatSpoken,spokenCode,qrTag,scanUrl,counterAt,STEP_SECONDS}=require('./vouchcode.js');
 const {qrSvg}=require('../qr.js');
 
@@ -72,4 +72,79 @@ function workerPage({entry,record,batch,locked,lang='en',publicUrl,myUrl,nowMs,s
   return flowPage({title:'YoCard',body,lang,sampleMode,css:WORKER_CSS});
 }
 
-module.exports={TIME_ZONES,localTime,flowPage,workerPage};
+// ---- Scan and vouch pages (spec 7.2, plan Task 4). Each stays under 4096 bytes. ----
+const FORM_CSS='fieldset{border:0;padding:0;margin:0 0 12px}legend{font-weight:600;padding:0}.r label{display:block;min-height:44px}'+
+  '.r input{width:auto;min-height:0;margin:0 8px 0 0}select{font:inherit;min-height:44px;margin-left:8px}form>label{display:block;margin:0 0 12px}';
+const first=card=>card?.record?.user?.firstName||'';
+const tradeWord=card=>String(card?.record?.trade||'').toLowerCase();
+const radio=(name,value,label,extra='')=>'<label><input type="radio" name="'+name+'" value="'+E(value)+'"'+extra+'> '+H(label)+'</label>';
+// One radio group: the stem as the legend, labels from the copy in the page language, values fixed in English.
+function group(name,template,values,{required=false,after=''}={}){
+  const {stem,options}=splitOptions(template);
+  return '<fieldset class="r"><legend>'+H(stem)+'</legend>'+values.map((v,i)=>radio(name,v,options[i]??v,required&&i===0?' required':'')).join('')+after+'</fieldset>';
+}
+function langSelect(lang){
+  return '<label>'+H(t('langMenu'))+'<select name="lang">'+LANGS.map(l=>'<option value="'+l+'"'+(l===lang?' selected':'')+'>'+H(LANG_NAMES[l])+'</option>').join('')+'</select></label>';
+}
+const hidden=(name,value)=>value==null||value===''?'':'<input type="hidden" name="'+name+'" value="'+E(value)+'">';
+const errorLine=error=>error?'<p class="bad" role="alert">'+H(error)+'</p>':'';
+// The 18-or-older question, the language choice and the "Vouch for <First name>" button end every entry form.
+function adultTail(card,lang){
+  const L=(k,v)=>t(k,lang,v);
+  return group('adult',L('adultQ'),['yes','no'],{required:true})+langSelect(lang)+'<button>'+H(L('vouchButton',{first:first(card)}))+'</button>';
+}
+function titleFor(card,lang){return t('vouchTitle',lang,{first:first(card),trade:tradeWord(card)});}
+
+// GET /s/:cardId?t=&k=: the QR landing page. Consumes nothing; the form POST opens the session.
+function scanPage({card,proof,lang='en',onWorkerPhone=false,formNonce,error,sampleMode}){
+  const L=(k,v)=>t(k,lang,v),id=card.cardId;
+  const body='<section><h1>'+H(titleFor(card,lang))+'</h1><p>'+H(STRINGS.limitsShort(first(card),'web'))+'</p>'+
+    (onWorkerPhone?'<p class="notice">'+H(L('onWorkerPhone',{first:first(card)}))+'</p>':'')+errorLine(error)+
+    '<form method="post" action="/s/'+id+'">'+hidden('t',proof?.t)+hidden('k',proof?.k)+hidden('f',formNonce)+(onWorkerPhone?hidden('w','1'):'')+
+    adultTail(card,lang)+'</form>'+
+    '<p class="small"><a href="/s/'+id+'">'+H(L('typeInstead'))+'</a></p></section>';
+  return flowPage({title:titleFor(card,lang),body,lang,sampleMode,css:FORM_CSS});
+}
+
+// GET /s/:cardId (six digits only) and GET /s (card code or card number, then the six digits).
+function typedPage({card=null,lang='en',formNonce,error,sampleMode}){
+  const L=(k,v)=>t(k,lang,v);
+  const title=card?titleFor(card,lang):L('typeInstead');
+  const field=(name,label,extra)=>'<label>'+H(label)+'<input name="'+name+'" autocomplete="off" required'+extra+'></label>';
+  const body='<section><h1>'+H(title)+'</h1>'+(card?'<p>'+H(STRINGS.limitsShort(first(card),'web'))+'</p>':'')+errorLine(error)+
+    '<form method="post" action="/s'+(card?'/'+card.cardId:'')+'">'+hidden('f',formNonce)+
+    (card?'':field('ref',L('cardRefLabel'),' maxlength="12"'))+field('code',L('digitsLabel'),' inputmode="numeric" maxlength="9"')+
+    adultTail(card,lang)+'</form></section>';
+  return flowPage({title,body,lang,sampleMode,css:FORM_CSS});
+}
+
+function adultsOnlyPage({lang='en',sampleMode}){
+  const msg=t('adultsOnly',lang);
+  return flowPage({title:msg,body:'<section class="notice"><h1>'+H(msg)+'</h1></section>',lang,sampleMode});
+}
+
+// A refusal with no form to retry on. link (plan addition) offers the typed path after a failed scan.
+function errorPage({message,lang='en',sampleMode,link=null}){
+  const body='<section class="notice"><h1>'+H(message)+'</h1>'+(link?'<p><a href="'+E(link.href)+'">'+H(link.text)+'</a></p>':'')+'</section>';
+  return flowPage({title:message,body,lang,sampleMode});
+}
+
+const HOW_OFTEN_VALUES=['once','a few times','regularly','rather not say'];
+const AGAIN_VALUES=['yes','rather not say'];
+// The chips page under the vouchToken (spec 7.2 step 2). Choosing chips consumes nothing more.
+function chipsPage({session,card,chips,lang='en',sampleMode}){
+  const L=(k,v)=>t(k,lang,v),f=first(card);
+  const work=chips.map(c=>c==='Other'?radio('work','other',c):radio('work',c,c)).join('')+'<input name="other" maxlength="40" aria-label="Other">';
+  const again=session?.voucher?.kind==='worker'?'workAgainQ':'hireAgainQ';
+  const body='<section><h1>'+H(titleFor(card,lang))+'</h1><p class="small">'+H(STRINGS.limitsShort(f,session?.channel||'web'))+'</p>'+
+    '<form method="post" action="/api/vouch/'+E(session.vouchToken)+'/chips">'+
+    '<fieldset class="r"><legend>'+H(L('whatDid',{first:f}))+'</legend>'+work+'</fieldset>'+
+    group('when',L('when'),splitOptions(COPY.when).options,{after:'<input type="month" name="month">'})+
+    group('howOften',L('howOften'),HOW_OFTEN_VALUES)+
+    group('hireAgain',L(again,{first:f}),AGAIN_VALUES)+
+    '<label>'+H(L('ownWords'))+'<textarea name="words" maxlength="120" rows="3"></textarea></label>'+
+    '<button>'+H(L('vouchButton',{first:f}))+'</button></form></section>';
+  return flowPage({title:titleFor(card,lang),body,lang,sampleMode,css:FORM_CSS});
+}
+
+module.exports={TIME_ZONES,localTime,flowPage,workerPage,scanPage,typedPage,adultsOnlyPage,errorPage,chipsPage};
