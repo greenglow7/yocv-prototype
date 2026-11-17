@@ -420,6 +420,38 @@ function beat3Page({beat3,sampleMode}){
   return flowPage({title:label,body,sampleMode});
 }
 
+// GET /demo/inbox (YOVOUCH_SIM=1 only, plan Task 19): the contractor's post from spec 3.4 and forty generated
+// "I'm interested" replies, the same on every load (an LCG seeded with 1116 picks each template, sender and minute),
+// two with an ID photo note and one asking for transport money, then the six-line reply with a link to its card.
+const INBOX_POST='Need 2 general labourers, Pinetown site, 3 weeks, must have own boots, R250/day';
+const INBOX_REPLIES=["I'm interested","Interested sir","I am interested, I have boots","Me please","Interested. I stay near Pinetown",
+  "Hi, I'm available","Still available?","I can start tomorrow","Interested, please call me","I'm interested boss","Yes please, me",
+  "Interested, I am a hard worker","Is it still open?","I'm interested, where is the site?","Available any day"];
+const INBOX_NOTE='Run node scripts/seed-demo.js to add the six-line reply.';
+const INBOX_CSS='.msg{list-style:none;border:1px solid #d9d2e3;border-radius:8px;padding:8px 10px;margin:0 0 8px}.msg .small{display:block}'+
+  '.ph{display:block;border:1px dashed #9a8fa8;border-radius:6px;padding:12px;margin-top:6px;color:#5d5368}.inbox{padding:0}.msg ol{padding-left:20px;margin:6px 0}';
+function inboxMessages(){
+  let s=1116;const next=()=>(s=(Math.imul(s,1664525)+1013904223)>>>0)/4294967296;
+  const pick=n=>Math.floor(next()*n),special=new Map();
+  while(special.size<3){const i=pick(40);if(!special.has(i))special.set(i,special.size<2?'id':'money');}
+  let minute=0;
+  return Array.from({length:40},(_,i)=>{
+    minute=Math.min(59,minute+pick(3));
+    const from=String(100+pick(900)),text=INBOX_REPLIES[pick(INBOX_REPLIES.length)],kind=special.get(i);
+    return {from,at:'09:'+String(minute).padStart(2,'0'),text:kind==='id'?'Interested. Here is my ID photo':kind==='money'?"I'm interested. Please send R50 for transport first":text,photo:kind==='id'};
+  });
+}
+function inboxPage({reply=null,sampleMode}){
+  const label=t('simWa'),sender=m=>H(t('sampleNumber'))+' ···'+H(m.from)+' · '+H(m.at);
+  const msgs=inboxMessages().map(m=>'<li class="msg"><span class="small">'+sender(m)+'</span>'+H(m.text)+
+    (m.photo?'<span class="ph">Photo not shown in the demo</span>':'')+'</li>');
+  const six=reply?'<li class="msg" id="reply"><span class="small">'+H(t('sampleNumber'))+' · 09:59</span><ol>'+reply.lines.map(l=>'<li>'+H(l)+'</li>').join('')+
+    '</ol><a href="/c/'+E(reply.cardId)+'">Open the card</a></li>':'';
+  const body='<section><h1>Contractor inbox</h1><p class="small">'+H(label)+'</p><p><b>Post:</b> '+H(INBOX_POST)+'</p>'+
+    (reply?'':'<p class="small">'+H(INBOX_NOTE)+'</p>')+'<ul class="inbox">'+msgs.join('')+six+'</ul></section>';
+  return flowPage({title:'Contractor inbox',body,sampleMode,css:INBOX_CSS});
+}
+
 // GET /r/:replyId (spec 6.4, 9.5), shown only once the worker confirms: the six confirmed lines, the attached clips that are still live and
 // the footer honesty strings. Until an English translation is confirmed by the speaker, the page shows the
 // own-language lines and "Not translated".
@@ -438,5 +470,5 @@ function replyPage({reply,firstName,clips=[],lang='en',sampleMode}){
   return flowPage({title,body,lang:english?'en':(reply?.lang||lang),sampleMode});
 }
 
-module.exports={TIME_ZONES,replyPage,beat3Page,linkCodePage,workerVouchPage,requestLandingPage,requestMadePage,orgKeyPage,orgPage,localTime,flowPage,workerPage,myVouchesPage,scanPage,typedPage,adultsOnlyPage,errorPage,chipsPage,withdrawPage,
+module.exports={TIME_ZONES,replyPage,beat3Page,inboxPage,linkCodePage,workerVouchPage,requestLandingPage,requestMadePage,orgKeyPage,orgPage,localTime,flowPage,workerPage,myVouchesPage,scanPage,typedPage,adultsOnlyPage,errorPage,chipsPage,withdrawPage,
   disclosePage,bindPage,readbackPage,donePage,demoPhonePage,ivrPage};
