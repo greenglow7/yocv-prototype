@@ -24,6 +24,16 @@
      GET  /my/:cardId/:cardToken/status.json and POST .../hide|show|show-words {vouchId}
      POST /api/sms/webhook                 gateway, only when YOVOUCH_GATEWAY_SECRET is set (constant-time header check)
      POST /api/sim/sms and GET /demo/phone the simulated gateway, only when YOVOUCH_SIM=1 and no gateway secret
+   Worker to worker and organisation referral (plan Task 13):
+     GET  /my/:cardId/:cardToken/vouch     Vouch for another worker: the typed form (hidden vc, vt) and the yv_worker
+                                           cookie, so a camera scan from this browser opens /s as that worker
+     POST /my/:cardId/:cardToken/withdraw-given {vouchId}   withdraws a vouch this card gave
+     POST /my/:cardId/:cardToken/referral  {post, evidenceId} -> the message to forward to the organisation
+     GET  /o/:requestId                    the organisation key form (password field; the key is never in a URL)
+     POST /o/:requestId {orgKey} | POST /api/refer/open {orgKey, requestId}   the organisation page
+     POST /api/refer/:referToken/send      {statement} -> the draft referral, waiting for the worker's YES
+     POST /o/:requestId/withdraw           {referToken}
+     POST /api/vouch/:vouchId/accept       {cardId, cardToken, answer: yes | no}; a form post answers 303 to /my
    Every response that carries a live code or the card token is private: no-store and no-referrer. A form
    post (application/x-www-form-urlencoded) gets HTML back; JSON gets JSON. */
 const fs=require('node:fs');
@@ -32,14 +42,14 @@ const crypto=require('node:crypto');
 const {validId,secretsMatch}=require('./store.js');
 const {codeBatch,normaliseCardRef}=require('./vouchcode.js');
 const {LANGS,t,splitOptions}=require('./copy.js');
-const {STRINGS}=require('./render.js');
+const {STRINGS,fullDate}=require('./render.js');
 const {flowPage,workerPage,myVouchesPage,scanPage,typedPage,adultsOnlyPage,errorPage,chipsPage,withdrawPage,
-  disclosePage,bindPage,readbackPage,donePage,demoPhonePage}=require('./pages.js');
+  disclosePage,bindPage,readbackPage,donePage,demoPhonePage,workerVouchPage,orgKeyPage,orgPage}=require('./pages.js');
 const {tierItem}=require('./vouch-lines.js');
 const {withdrawnAtOf}=require('./vouches.js');
 const {signRecord}=require('./sign.js');
 const {cardFields}=require('./events.js');
-const {chipsFor,messageFor,gatewayConfigured,STATUS}=require('./vouch-service.js');
+const {chipsFor,messageFor,gatewayConfigured,referralOrgs,STATUS}=require('./vouch-service.js');
 const {myUrl}=require('./vouch-system.js');
 const {audioType,isAudio,clipSeconds,MAX_AUDIO_BYTES}=require('./transcribe.js');
 
@@ -49,6 +59,12 @@ const VOUCH_PATH=/^\/v\/([A-Z2-9]{10})(\.json|\/clip|\/withdraw)?$/;
 const NONCE=/^[0-9a-f]{16}$/;
 const SESSION_PAGE=/^\/s\/t\/([0-9a-f]{24})$/;
 const API_SESSION=/^\/api\/vouch\/([0-9a-f]{24})\/(chips|words|bind|otp|confirm)$/;
+const ACCEPT_PATH=/^\/api\/vouch\/([A-Z2-9]{10})\/accept$/;
+const ORG_PATH=/^\/o\/([A-Z2-9]{10})(\/withdraw)?$/;
+const REFER_SEND=/^\/api\/refer\/([0-9a-f]{24})\/send$/;
+// The vouching worker's browser (spec 7.4 step 1): set by /my/<id>/<token>/vouch for 15 minutes, read only under /s.
+const WORKER_COOKIE=/(?:^|;\s*)yv_worker=([A-Z2-9]{10})\.([0-9a-f]{16})(?=;|$)/;
+const WORKER_COOKIE_AGE=900;
 const ARRIVED_MS=10*60*1000;
 const MAX_FORM_BYTES=64*1024;
 const MAX_CLIP_SECONDS=16;
@@ -158,14 +174,28 @@ function createVouchRouter(system){
     return entry;
   }
 
-  function myPage(res,entry,cardToken){
+  function myPage(res,entry,cardToken,url=null){
     if(entry.withdrawnAt)return sendPage(res,410,flowPage({title:t('cardWithdrawn'),body:'<section class="notice"><h1>'+t('cardWithdrawn')+'</h1></section>',sampleMode}));
     const nowMs=now(),lang=LANGS.includes(entry.vouch.lang)?entry.vouch.lang:'en';
     const mine=ownVouches(entry,nowMs),live=mine.filter(f=>vouchStore.isLive(f,nowMs));
     const newest=Math.max(...mine.map(f=>Date.parse(f.record.confirmedAt)||0),0),vouches=listItems(entry,mine,nowMs);
+    const notice=url?.searchParams.get('n')==='referral'?t('referralDone',lang):null;
     sendPage(res,200,workerPage({entry,record:entry.record,batch:codeBatch(entry.vouch.secret,nowMs),locked:codes.lockState(entry.cardId),lang,
       publicUrl:system.publicUrl,myUrl:myUrl(system,entry.cardId,cardToken),nowMs,sampleMode,yv:system.yv,
-      vouches,arrived:newest>0&&nowMs-newest<=ARRIVED_MS,waiting:live.filter(waitingWords).length,liveCount:live.length}));
+      vouches,arrived:newest>0&&nowMs-newest<=ARRIVED_MS,waiting:live.filter(waitingWords).length,liveCount:live.length,
+      given:givenBy(entry,nowMs),pending:pendingReferrals(entry,lang,nowMs),orgs:referralOrgs(entry.record),notice}));
+  }
+  // The live worker vouches this card gave, newest first, each with the vouched worker's first name.
+  function givenBy(entry,nowMs){
+    return vouchStore.listByVoucherCard(entry.cardId).filter(f=>f.record.kind==='worker'&&!withdrawnAtOf(f,nowMs)).reverse()
+      .map(f=>({vouchId:f.record.vouchId,first:firstOf(store.get(f.record.cardId))||'the worker'}));
+  }
+  // Referrals an organisation sent that wait for this worker's YES (spec 7.5 step 5).
+  function pendingReferrals(entry,lang,nowMs){
+    return vouchStore.listForCard(entry.cardId).filter(f=>f.record.kind==='organisation'&&!f.record.acceptedAt&&!withdrawnAtOf(f,nowMs)).map(f=>{
+      const r=f.record;
+      return {vouchId:r.vouchId,text:t('orgWrote',lang,{org:r.voucher.orgName,sentence:r.statement,job:r.jobPost?.work||'',date:fullDate(new Date(nowMs).toISOString()),title:r.restsOn?.title||''})};
+    });
   }
 
   // ---- The worker's own vouch list (spec 9.5, plan Task 6) ----
@@ -179,7 +209,8 @@ function createVouchRouter(system){
     sendPage(res,200,myVouchesPage({entry,lang,myUrl:myUrl(system,entry.cardId,cardToken),vouches:listItems(entry,mine,nowMs),
       waiting:mine.filter(f=>vouchStore.isLive(f,nowMs)&&waitingWords(f)).length,page,sampleMode}));
   }
-  // Every line of the card not withdrawn, hidden ones included, oldest first; organisation referrals arrive with Task 13.
+  // Every line of the card not withdrawn, hidden ones included, oldest first. Referrals are listed apart: a pending
+  // one waits for the worker's YES at the top of the page (plan Task 13).
   function ownVouches(entry,nowMs){return vouchStore.listForCard(entry.cardId).filter(f=>f.record&&!withdrawnAtOf(f,nowMs)&&f.record.kind!=='organisation');}
   const waitingWords=f=>Boolean(f.held)&&!f.record.wordsShownAt;
   function myStatus(res,entry){
@@ -196,6 +227,38 @@ function createVouchRouter(system){
     const page=field(isPlainObject(payload)?payload.page:''),back='/my/'+entry.cardId+'/'+cardToken+(/^[1-9]\d{0,5}$/.test(page)?'/vouches?page='+page:'');
     if(form)return ok?redirect(res,back):sendPage(res,404,notFound());
     return ok?sendPrivateJSON(res,200,{vouchId,ok:true}):sendError(res,404,'not_found','No vouch with this id on this card.');
+  }
+
+  // ---- Worker to worker (spec 7.4) and the referral request (spec 7.5 step 1), plan Task 13 ----
+  const secureCookie=/^https:/i.test(system.publicUrl);
+  function workerVouch(res,entry,cardToken,{status=200,error=null,lang='en'}={}){
+    if(entry.withdrawnAt)return myPage(res,entry,cardToken);
+    const cookie='yv_worker='+entry.cardId+'.'+cardToken+'; Path=/s; HttpOnly; SameSite=Lax; Max-Age='+WORKER_COOKIE_AGE+(secureCookie?'; Secure':'');
+    send(res,status,workerVouchPage({entry,cardToken,lang,formNonce:newNonce(),error,sampleMode}),'text/html; charset=utf-8',{'set-cookie':cookie});
+  }
+  async function withdrawGiven(req,res,entry,cardToken){
+    const form=isForm(req),payload=await readBody(req,res);
+    if(payload===undefined)return;
+    const vouchId=field(isPlainObject(payload)?payload.vouchId:''),file=validId(vouchId)?vouchStore.get(vouchId):null;
+    const ok=Boolean(file?.record)&&file.record.kind==='worker'&&file.record.voucher?.cardId===entry.cardId&&!withdrawnAtOf(file,now())&&Boolean(vouchStore.withdrawAs(vouchId,'now'));
+    if(ok)events.log('vouch_withdrawn',{vouchId,...cardFields(store.get(file.record.cardId)||{cardId:file.record.cardId}),mode:'now',by:'voucher_card'});
+    if(form)return ok?redirect(res,'/my/'+entry.cardId+'/'+cardToken):sendPage(res,404,notFound());
+    return ok?sendPrivateJSON(res,200,{vouchId,ok:true}):sendError(res,404,'not_found','No vouch with this id from this card.');
+  }
+  // The pasted post is parsed as POST /api/reply/parse does; a parser refusal shows its message.
+  async function referralRequest(req,res,entry,cardToken){
+    const form=isForm(req),payload=await readBody(req,res);
+    if(payload===undefined)return;
+    const p=isPlainObject(payload)?payload:{},lang=LANGS.includes(entry.vouch.lang)?entry.vouch.lang:'en';
+    const fail=(status,code,message)=>form?sendPage(res,status,errorPage({message,lang,sampleMode,link:{href:'/my/'+entry.cardId+'/'+cardToken,text:t('backToCode',lang)}})):sendError(res,status,code,message);
+    let parsed;
+    try{parsed=await system.replyService.parse(field(p.post),{lang});}
+    catch(err){if(err?.code==='busy')return fail(503,'busy',err.message);throw err;}
+    if(!parsed.jobPostId)return fail(400,parsed.refusal?.reason||'invalid_input',parsed.messages[0]);
+    const r=service.createReferralRequest(entry.cardId,cardToken,{jobPostId:parsed.jobPostId,evidenceId:field(p.evidenceId)});
+    if(!r.ok)return fail(r.status,r.code,r.message);
+    if(form)return sendPage(res,200,donePage({messages:[r.text],lang,sampleMode}));
+    sendPrivateJSON(res,200,{requestId:r.requestId,url:r.url,text:r.text,jobPostId:parsed.jobPostId});
   }
 
   async function setLang(req,res,entry,cardToken){
@@ -260,6 +323,14 @@ function createVouchRouter(system){
     const entry=cardId?store.get(cardId):null;
     if(cardId&&!entry?.record)return form?sendPage(res,404,notFound()):sendError(res,404,'not_found',STRINGS.notFound);
     const qr=Boolean(cardId)&&field(p.t)!==''&&field(p.k)!=='',onWorkerPhone=field(p.w)==='1';
+    // The vouching worker: hidden vc and vt from their own form, else the yv_worker cookie when it opens a live card
+    // that is not this one (the worker's own card on the worker's phone stays the customer path).
+    let worker=field(p.vc)||field(p.vt)?{cardId:field(p.vc),cardToken:field(p.vt),typed:true}:null;
+    if(!worker&&!onWorkerPhone){
+      const m=WORKER_COOKIE.exec(String(req.headers?.cookie||'')),target=cardId||codes.resolveCard(field(p.ref));
+      if(m&&m[1]!==target&&cardFor(m[1],m[2]))worker={cardId:m[1],cardToken:m[2]};
+    }
+    if(worker?.typed&&form&&p.adult==='no')return sendPage(res,200,adultsOnlyPage({lang,sampleMode}));
     const again=(status,error,card=entry)=>sendPage(res,status,qr
       ?scanPage({card,proof:{t:field(p.t),k:field(p.k)},lang,onWorkerPhone,formNonce:newNonce(),error,sampleMode})
       :typedPage({card,lang,formNonce:newNonce(),error,sampleMode}));
@@ -267,9 +338,14 @@ function createVouchRouter(system){
     if(form&&p.adult!=='yes')return again(400,splitOptions(t('adultQ',lang)).stem);
     const r=await service.open({...(cardId?{cardId}:{cardRef:field(p.ref)}),
       proof:qr?{method:'qr',t:field(p.t),k:field(p.k)}:{method:'code',code:field(p.code)},
-      voucher:{kind:'customer'},onWorkerPhone,channel:'web',lang,formNonce:NONCE.test(field(p.f))?field(p.f):undefined});
+      voucher:worker?{kind:'worker',cardId:worker.cardId,cardToken:worker.cardToken}:{kind:'customer'},onWorkerPhone,channel:'web',lang,formNonce:NONCE.test(field(p.f))?field(p.f):undefined});
     if(!form)return r.ok?openedJSON(res,r):openFailed(res,r);
     if(r.ok)return renderChips(res,r);
+    // The worker's typed form comes back with its message; a token that does not open the card (the owner secret) is 404.
+    if(worker?.typed){
+      const own=cardFor(worker.cardId,worker.cardToken);
+      return own?workerVouch(res,own,worker.cardToken,{status:r.status,error:r.message,lang}):sendPage(res,404,notFound());
+    }
     if(r.code==='card_withdrawn')return sendPage(res,r.status,errorPage({message:r.message,lang,sampleMode}));
     if(r.code==='not_found')return again(r.status,r.message,null);
     if(qr)return sendPage(res,r.status,errorPage({message:r.message,lang,sampleMode,link:typedLink(cardId,lang)}));
@@ -277,14 +353,25 @@ function createVouchRouter(system){
   }
 
   // POST /api/vouch/open (spec 4.3). The channel is always web here: the SMS and call windows are only for
-  // the gateway handlers, so a browser cannot widen its own window. Worker and organisation vouchers arrive
-  // with Task 13, the request proof with Task 14.
+  // the gateway handlers, so a browser cannot widen its own window. A worker voucher brings its card token; an
+  // organisation brings its key and the referral request. The request proof for customers arrives with Task 14.
   async function apiOpen(req,res){
     const payload=await readBody(req,res);
     if(payload===undefined)return;
     if(!isPlainObject(payload))return sendError(res,400,'invalid_input','Send a JSON object.');
-    if(!isPlainObject(payload.voucher)||payload.voucher.kind!=='customer')return sendError(res,400,'invalid_input','voucher.kind must be "customer".');
+    const v=payload.voucher;
+    if(!isPlainObject(v)||!['customer','worker','organisation'].includes(v.kind))return sendError(res,400,'invalid_input','voucher.kind must be "customer", "worker" or "organisation".');
+    if(v.kind==='worker'&&(typeof v.cardId!=='string'||typeof v.cardToken!=='string'))return sendError(res,400,'invalid_input','A worker voucher needs voucher.cardId and voucher.cardToken.');
     const proof=payload.proof;
+    // An organisation opens a referral request with its key (plan Task 13): the vouchToken is the refer token, no bind.
+    if(v.kind==='organisation'){
+      if(!isPlainObject(proof)||proof.method!=='request')return sendError(res,400,'invalid_input','proof.method must be "request".');
+      const rq=system.requestStore.get(field(proof.requestId));
+      if(rq&&rq.jobPostId&&field(v.jobPostId)!==rq.jobPostId)return sendError(res,403,'forbidden',t('orgKeyWrong'));
+      const r=service.orgOpen(field(proof.requestId),field(v.orgKey));
+      if(!r.ok)return sendError(res,r.status,r.code,r.message);
+      return sendPrivateJSON(res,200,{vouchToken:r.referToken,worker:r.worker,proof:r.proof,expiresInMs:r.expiresInMs});
+    }
     if(!isPlainObject(proof)||(proof.method!=='qr'&&proof.method!=='code'))return sendError(res,400,'invalid_input','proof.method must be "qr" or "code".');
     if(payload.channel!==undefined&&payload.channel!=='web')return sendError(res,400,'invalid_input','channel must be "web".');
     const cardId=typeof payload.cardId==='string'?payload.cardId:null;
@@ -292,7 +379,8 @@ function createVouchRouter(system){
     const cardRef=cardId?null:normaliseCardRef(field(proof.smsId)||field(proof.cardCode));
     const r=await service.open({...(cardId?{cardId}:{cardRef}),
       proof:proof.method==='qr'?{method:'qr',t:field(proof.t),k:field(proof.k)}:{method:'code',code:field(proof.code)},
-      voucher:{kind:'customer'},onWorkerPhone:payload.onWorkerPhone===true,channel:'web',lang:langOf(payload.lang),
+      voucher:v.kind==='worker'?{kind:'worker',cardId:field(v.cardId),cardToken:field(v.cardToken)}:{kind:'customer'},
+      onWorkerPhone:v.kind==='customer'&&payload.onWorkerPhone===true,channel:'web',lang:langOf(payload.lang),
       formNonce:NONCE.test(field(payload.formNonce))?payload.formNonce:undefined});
     return r.ok?openedJSON(res,r):openFailed(res,r);
   }
@@ -367,6 +455,8 @@ function createVouchRouter(system){
     const lang=session.lang;
     if(session.step==='chips'||!session.chips)return sendPage(res,status,chipsPage({session,card,chips:chipsFor(card.record.tradeId),lang,sampleMode,error}));
     if(session.step==='disclose')return sendPage(res,status,disclosePage({session,card,lang,sampleMode,error}));
+    const worker=session.voucher?.kind==='worker';
+    if(session.step==='bind'&&worker)session.step='readback';   // the card token is the voucher: no phone binding
     if(session.step==='bind'){
       if(demoMode&&!session.demo)return sendPage(res,status,bindPage({session,card,lang,sampleMode,demo:true,error}));
       if(!demoMode){
@@ -376,9 +466,9 @@ function createVouchRouter(system){
       session.step='readback';
     }
     session.readbackSeen=true;
-    const bound=!demoMode&&session.bind?.at?session.bind.phoneLast3:null;
+    const bound=!worker&&!demoMode&&session.bind?.at?session.bind.phoneLast3:null;
     sendPage(res,status,readbackPage({session,card,record:service.preview(token),lang,sampleMode,phoneLast3:bound,
-      demoCode:demoMode?session.demo?.code:null,recent:Boolean(session.recentVouchId),error}));
+      demoCode:demoMode&&!worker?session.demo?.code:null,recent:!worker&&Boolean(session.recentVouchId),reciprocal:service.reciprocal(token),error}));
   }
   async function sessionPost(req,res,token){
     const payload=await readBody(req,res);
@@ -447,6 +537,7 @@ function createVouchRouter(system){
     const form=isForm(req),payload=await readBody(req,res);
     if(payload===undefined)return;
     if(!sessions.get(token))return ended(res,form,sessionGone());
+    if(sessions.get(token).voucher?.kind==='worker')return form?redirect(res,'/s/t/'+token):sendError(res,409,'no_binding','A worker vouch needs no phone binding.');
     if(demoMode)return form?redirect(res,'/s/t/'+token):sendError(res,409,'demo_mode',t('demoNoGateway'));
     const r=service.issueBind(token);
     if(r.ok===false)return ended(res,form,r);
@@ -485,11 +576,65 @@ function createVouchRouter(system){
     if(!form)return sendPrivateJSON(res,200,{vouchId:r.vouchId,line:r.line,withdrawUrl:r.withdrawUrl,visitAdded:r.visitAdded});
     const L=(k,v)=>t(k,lang,v);
     let messages;
-    if(r.visitAdded)messages=[L('visitAdded',{first})];
+    if(r.worker)messages=[L('givenNote',{first})];
+    else if(r.visitAdded)messages=[L('visitAdded',{first})];
     else if(!r.vouchId)messages=[L('recentNo',{first})];
     else if(r.withdrawSent)messages=[L('thanks',{first}),L('withdrawSent')];
     else messages=[L('thanks',{first}),...(onWorkerPhone&&r.demo?[L('demoWithdrawHere')]:[]),L('withdrawAt',{link:r.withdrawUrl,vouchId:r.vouchId})];
     sendPage(res,200,donePage({messages,lang,sampleMode}));
+  }
+
+  // ---- Organisation referral (spec 7.5, plan Task 13) ----
+  async function apiAccept(req,res,vouchId){
+    const form=isForm(req),payload=await readBody(req,res);
+    if(payload===undefined)return;
+    const p=isPlainObject(payload)?payload:{},cardId=field(p.cardId),cardToken=field(p.cardToken);
+    const r=service.acceptReferral(vouchId,cardId,cardToken,field(p.answer));
+    if(form)return r.ok?redirect(res,'/my/'+cardId+'/'+cardToken+(field(p.answer)==='yes'?'?n=referral':'')):sendPage(res,r.status,notFound());
+    return r.ok?sendPrivateJSON(res,200,{ok:true,message:r.message}):sendError(res,r.status,r.code,r.message);
+  }
+  function orgGet(res,requestId){
+    const rq=system.requestStore.get(requestId);
+    if(!rq||rq.kind!=='referral')return sendPage(res,404,notFound());
+    if(rq.usedAt)return sendPage(res,409,errorPage({message:t('requestUsed'),sampleMode}));
+    sendPage(res,200,orgKeyPage({requestId,sampleMode}));
+  }
+  function orgFailed(res,form,requestId,r){
+    if(!form)return sendError(res,r.status,r.code,r.message);
+    if(r.code==='forbidden')return sendPage(res,403,orgKeyPage({requestId,error:r.message,sampleMode}));
+    sendPage(res,r.status,r.status===404?notFound():errorPage({message:r.message,sampleMode}));
+  }
+  async function orgOpenPost(req,res,requestId){
+    const form=isForm(req),payload=await readBody(req,res);
+    if(payload===undefined)return;
+    const p=isPlainObject(payload)?payload:{},id=requestId||field(p.requestId);
+    const r=service.orgOpen(id,field(p.orgKey));
+    if(!r.ok)return orgFailed(res,form,id,r);
+    if(form)return sendPage(res,200,orgPage({view:r.view,referToken:r.referToken,sampleMode}));
+    sendPrivateJSON(res,200,{referToken:r.referToken,view:r.view});
+  }
+  async function orgSendPost(req,res,referToken){
+    const form=isForm(req),payload=await readBody(req,res);
+    if(payload===undefined)return;
+    const p=isPlainObject(payload)?payload:{},r=service.orgSend(referToken,field(p.statement));
+    if(!r.ok){
+      const view=service.orgViewFor(referToken);
+      if(form&&view&&r.code==='invalid_input')return sendPage(res,400,orgPage({view,referToken,error:r.message,sampleMode}));
+      return form?sendPage(res,r.status,errorPage({message:r.message,sampleMode})):sendError(res,r.status,r.code,r.message);
+    }
+    if(form){
+      const file=vouchStore.get(r.vouchId),entry=store.get(file.record.cardId);
+      return sendPage(res,200,errorPage({message:t('referralSent','en',{first:firstOf(entry)}),sampleMode}));
+    }
+    sendPrivateJSON(res,200,{vouchId:r.vouchId});
+  }
+  async function orgWithdrawPost(req,res,requestId){
+    const form=isForm(req),payload=await readBody(req,res);
+    if(payload===undefined)return;
+    const r=service.withdrawReferral(field(isPlainObject(payload)?payload.referToken:''),requestId);
+    if(!r.ok)return form?sendPage(res,404,notFound()):sendError(res,404,'not_found','No referral for this token.');
+    if(form)return sendPage(res,200,errorPage({message:t('referralWithdrawnOrg'),sampleMode}));
+    sendPrivateJSON(res,200,{vouchId:r.vouchId,ok:true});
   }
 
   // ---- Gateways (spec 9.5): the production webhook and the simulator drive the same SMS handler ----
@@ -525,6 +670,18 @@ function createVouchRouter(system){
     }
     if(pathname==='/api/vouch/codes')return method==='POST'?wrap(apiCodes(req,res)):notAllowed();
     if(pathname==='/api/vouch/open')return method==='POST'?wrap(apiOpen(req,res)):notAllowed();
+    const acc=ACCEPT_PATH.exec(pathname);
+    if(acc)return method==='POST'?wrap(apiAccept(req,res,acc[1])):notAllowed();
+    if(pathname==='/api/refer/open')return method==='POST'?wrap(orgOpenPost(req,res,null)):notAllowed();
+    const rs=REFER_SEND.exec(pathname);
+    if(rs)return method==='POST'?wrap(orgSendPost(req,res,rs[1])):notAllowed();
+    if(pathname.startsWith('/o/')){
+      const m=ORG_PATH.exec(pathname);
+      if(!m||!validId(m[1]))return wrap(sendPage(res,404,notFound()));
+      if(m[2])return method==='POST'?wrap(orgWithdrawPost(req,res,m[1])):notAllowed();
+      if(method==='GET'||method==='HEAD')return wrap(orgGet(res,m[1]));
+      return method==='POST'?wrap(orgOpenPost(req,res,m[1])):notAllowed();
+    }
     const api=API_SESSION.exec(pathname);
     if(api){
       const [,token,action]=api;
@@ -561,7 +718,10 @@ function createVouchRouter(system){
       const m=MY_PATH.exec(pathname),entry=m?cardFor(m[1],m[2]):null;
       if(!entry)return wrap(sendPage(res,404,notFound()));
       const suffix=m[3]||'';
-      if(!suffix)return method==='GET'||method==='HEAD'?wrap(myPage(res,entry,m[2])):notAllowed();
+      if(!suffix)return method==='GET'||method==='HEAD'?wrap(myPage(res,entry,m[2],url)):notAllowed();
+      if(suffix==='/vouch')return method==='GET'||method==='HEAD'?wrap(workerVouch(res,entry,m[2])):notAllowed();
+      if(suffix==='/withdraw-given')return method==='POST'?wrap(withdrawGiven(req,res,entry,m[2])):notAllowed();
+      if(suffix==='/referral')return method==='POST'?wrap(referralRequest(req,res,entry,m[2])):notAllowed();
       if(suffix==='/lang')return method==='POST'?wrap(setLang(req,res,entry,m[2])):notAllowed();
       if(suffix==='/vouches')return method==='GET'||method==='HEAD'?wrap(myVouches(res,entry,m[2],url)):notAllowed();
       if(suffix==='/status.json')return method==='GET'||method==='HEAD'?wrap(myStatus(res,entry)):notAllowed();

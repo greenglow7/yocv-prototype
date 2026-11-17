@@ -4,7 +4,9 @@
    outbox it texted first, and passes every reply through outbox.send. Commands bound to the sender: YES <session
    code> (binds a web vouch session, no reply), CODE, VOUCH <ref> <code> (or V), L and REMOVE <vouchId> <secret>.
    The four-message vouch keeps a conversation per sender key in memory for 30 minutes; any other text with no
-   conversation gets no reply. REQUEST, STOP, REPLY and the one-question fallback arrive with later tasks. */
+   conversation gets no reply. REQUEST, STOP, REPLY and the one-question fallback arrive with later tasks.
+   Worker variant (spec 7.4, plan Task 13): a VOUCH from a number in numbers/ whose card is not the target runs
+   the worker path, with the worker menu, no name step and the voucher card's label in the read-back. */
 const {normalisePhone,keyedHash}=require('./vouchers.js');
 const {t,LANGS}=require('./copy.js');
 const {spokenCode,formatSpoken,counterAt,normaliseCardRef,normaliseSpoken}=require('./vouchcode.js');
@@ -81,7 +83,12 @@ function createSmsHandler(system){
     if(!entry?.record||!spoken)return wrong(true);
     const e164=e164Of(raw,entry.record.user?.country),voucherKey=keyedHash(system.hashKey,e164);
     const lang=langOf(entry.vouch?.lang),first=firstOf(entry);
-    const r=await service.open({cardId,proof:{method:'code',code:spoken},voucher:{kind:'customer'},voucherKey,phoneLast3:e164.slice(-3),channel:'sms',lang});
+    // The sender's own card, from the Yoma-confirmed number index; on another card it is the vouching worker.
+    // A local number is read in the target's country first, then in the shortcode's market (Review Focus 2).
+    const indexKey=[voucherKey,senderKey].find(k=>store.indexGet('numbers',k)),senderCard=indexKey?store.indexGet('numbers',indexKey):null;
+    const worker=Boolean(senderCard)&&senderCard!==cardId;
+    const r=await service.open({cardId,proof:{method:'code',code:spoken},voucher:worker?{kind:'worker',cardId:senderCard}:{kind:'customer'},
+      voucherKey:worker?indexKey:voucherKey,phoneLast3:e164.slice(-3),channel:'sms',lang});
     if(!r.ok){
       if(CODE_WRONG.has(r.code))return wrong(SENDER_WRONG.has(r.code));
       if(r.code==='voucher_recent'){
@@ -92,9 +99,9 @@ function createSmsHandler(system){
       return [r.message];
     }
     const chips=chipsFor(entry.record.tradeId).filter(c=>c!=='Other').slice(0,3);
-    const st=begin(senderKey,{step:'answers',vouchToken:r.vouchToken,cardId,lang,chips,voucherKey});
+    const st=begin(senderKey,{step:'answers',vouchToken:r.vouchToken,cardId,lang,chips,voucherKey,worker});
     const [chip1=NO_CHIP,chip2=NO_CHIP,chip3=NO_CHIP]=chips.map(c=>c.toLowerCase());
-    return [say(st,'smsVouchMenu',{first,trade:String(entry.record.trade||'').toLowerCase(),chip1,chip2,chip3})];
+    return [say(st,worker?'smsVouchMenuWorker':'smsVouchMenu',{first,trade:String(entry.record.trade||'').toLowerCase(),chip1,chip2,chip3})];
   }
 
   function remove(raw,senderKey,vouchId,secret){
@@ -139,6 +146,7 @@ function createSmsHandler(system){
       if(a.q1===4){st.pending=a;st.step='two_words';return [say(st,'smsTwoWords',{first})];}
       const r=service.setChips(st.vouchToken,{work:st.chips[a.q1-1],when:a.when,howOften:a.howOften,hireAgain:a.hireAgain});
       if(!r.ok)return failed(senderKey,st,r,first)||[render('smsNotUnderstood',lang)];
+      if(st.worker)return readback(senderKey,st,first);   // a worker line shows the card, never a name with digits
       st.step='name';
       return [say(st,'smsShowName')];
     }
@@ -146,6 +154,7 @@ function createSmsHandler(system){
       const a=st.pending;
       const r=service.setChips(st.vouchToken,{work:'Other',other:text,when:a.when,howOften:a.howOften,hireAgain:a.hireAgain});
       if(!r.ok)return failed(senderKey,st,r,first)||[say(st,'smsTwoWords',{first})];
+      if(st.worker)return readback(senderKey,st,first);
       st.step='name';
       return [say(st,'smsShowName')];
     }

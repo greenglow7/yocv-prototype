@@ -69,7 +69,7 @@ test('personas.json holds the six personas with real opportunity ids and confirm
  const byId=Object.fromEntries(personas.map(p=>[p.id,p]));
  assert.deepEqual(byId.thandi.completions.map(c=>c.opportunityId),[HAIR,CARE,FINLIT]);
  assert.deepEqual(byId.brian.completions.map(c=>c.opportunityId),['019e6fa0-1b36-7cba-a344-44f23ab7619d','019e6fb9-bfc4-7dd7-ac9d-c09a384c5160',FINLIT]);
- assert.deepEqual(byId.amara.completions.map(c=>c.opportunityId),['019e6f0f-b3d6-7b5f-b2fa-08709752d809','1a1637fe-dd44-4845-b544-6908516836e3','98b4dc3d-24a0-455d-981b-08da8fc2edc0']);
+ assert.deepEqual(byId.amara.completions.map(c=>c.opportunityId),['019e6f0f-b3d6-7b5f-b2fa-08709752d809','1a1637fe-dd44-4845-b544-6908516836e3',null]);
  assert.deepEqual(byId.sipho.completions,[]);
  assert.deepEqual(byId.sipho.skills,[]);
  for(const p of personas){
@@ -79,7 +79,9 @@ test('personas.json holds the six personas with real opportunity ids and confirm
   assert.ok(p.dateYoIDOnboarded&&p.dateCreated&&p.dateOfBirth&&p.country&&p.city&&p.displayName&&p.firstName&&p.trade);
   assert.equal(p.photoURL,null);
   for(const c of p.completions){
-   assert.match(c.opportunityId,/^[0-9a-f-]{36}$/);
+   // The one completion with no opportunity id is the fictional Sample Skills Trust one (plan Task 13).
+   if(c.opportunityId===null)assert.equal(c.organizationName,'Sample Skills Trust');
+   else assert.match(c.opportunityId,/^[0-9a-f-]{36}$/);
    assert.ok(c.myOpportunityId&&c.title&&c.organizationName&&c.dateCompleted);
    assert.ok(/^202[56]-/.test(c.dateCompleted),p.id+' completion dates are in 2025 or 2026');
    assert.ok(Array.isArray(c.evidenceTypes)&&Array.isArray(c.skills));

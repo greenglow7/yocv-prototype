@@ -76,7 +76,22 @@ function vouchList(vouches,path,L,waiting,{rel=path.split('/').pop()+'/',more=fa
 const STATUS_JS='(function(){var w=document.getElementById("w");if(!w||!window.fetch)return;var c=+w.dataset.n,k=0,i=setInterval(function(){if(++k>12){clearInterval(i);return}'+
   'fetch("/my/"+w.dataset.id+"/"+w.dataset.tk+"/status.json").then(function(r){return r.json()}).then(function(j){if(j.vouchCount>c){clearInterval(i);location.reload()}}).catch(function(){})},10000)})();';
 
-function workerPage({entry,record,batch,locked,lang='en',publicUrl,myUrl,nowMs,sampleMode,yv={},vouches=[],arrived=false,waiting=0,liveCount=0}){
+// The worker's own worker-to-worker and referral parts (plan Task 13): referrals waiting for a YES (orgWrote with Yes
+// and No), the vouches this card gave (givenNote, Withdraw now), Vouch for another worker, and Request a referral
+// with one button per disclosed completion organisation. pending = [{vouchId, text}], given = [{vouchId, first}],
+// orgs = [{org, evidenceId}].
+function workerExtras({path,cardId,token,L,given=[],pending=[],orgs=[]}){
+  const [yes,no]=splitOptions(COPY.adultQ).options;
+  const waitingYes=pending.map(p=>'<form method="post" action="/api/vouch/'+E(p.vouchId)+'/accept" class="notice np">'+hidden('cardId',cardId)+hidden('cardToken',token)+
+    '<p>'+H(p.text)+'</p><button name="answer" value="yes">'+H(yes)+'</button> <button name="answer" value="no" class="alt">'+H(no)+'</button></form>').join('');
+  const gave=given.length?'<form method="post" action="'+E(path)+'/withdraw-given" class="np">'+given.map(g=>'<p>'+H(L('givenNote',{first:g.first}))+
+    '<br><button name="vouchId" value="'+E(g.vouchId)+'" class="alt">'+H(L('withdrawNow'))+'</button></p>').join('')+'</form>':'';
+  const refer=orgs.length?'<form method="post" action="'+E(path)+'/referral" class="np"><h2>'+H(L('requestReferral'))+'</h2><label>'+H(L('pastePost'))+
+    '<textarea name="post" rows="3" maxlength="2000" required></textarea></label>'+orgs.map(o=>'<p><button name="evidenceId" value="'+E(o.evidenceId)+'">'+H(L('askOrg',{org:o.org}))+'</button></p>').join('')+'</form>':'';
+  return {top:waitingYes,bottom:gave+'<p class="np"><a class="btn alt" href="'+E(path)+'/vouch">'+H(L('vouchForWorker'))+'</a></p>'+refer};
+}
+
+function workerPage({entry,record,batch,locked,lang='en',publicUrl,myUrl,nowMs,sampleMode,yv={},vouches=[],arrived=false,waiting=0,liveCount=0,given=[],pending=[],orgs=[],notice=null}){
   const cardId=entry.cardId,country=record?.user?.country,first=record?.user?.firstName||'',secret=entry.vouch?.secret;
   const counter=batch?.fromCounter??counterAt(nowMs);
   const now0=batch?.codes?.[0]||{spoken:spokenCode(secret,counter),qr:qrTag(secret,counter)};
@@ -86,8 +101,9 @@ function workerPage({entry,record,batch,locked,lang='en',publicUrl,myUrl,nowMs,s
   const codeTpl=L('codeLine',{spoken:'%s',time:'%t'});
   const noData=L('noDataLine',{smsId:entry.smsId,code:now0.spoken,shortcode:yv.shortcode||'12345',callback:yv.callbackNumber||'0800 000 000'});
   const scanHref='/s/'+cardId+'?t='+counter+'&k='+now0.qr+'&w=1';
+  const extras=workerExtras({path,cardId,token,L,given,pending,orgs});
   const langs=LANGS.map(l=>'<button name="lang" value="'+l+'"'+(l===lang?' class="alt" aria-pressed="true"':'')+'>'+H(LANG_NAMES[l])+'</button>').join('');
-  const body=(arrived?'<p class="notice">'+H(L('vouchArrived'))+'</p>':'')+
+  const body=(notice?'<p class="notice">'+H(notice)+'</p>':'')+(arrived?'<p class="notice">'+H(L('vouchArrived'))+'</p>':'')+extras.top+
     '<section id="w" data-id="'+cardId+'" data-tk="'+E(token)+'" data-s="'+E(entry.smsId)+'" data-c="'+now0.spoken+'" data-tz="'+(TIME_ZONES[country]||'')+'" data-base="'+E(base)+'" data-n="'+Number(liveCount)+'">'+
     '<h1>'+H(L('showThis'))+'</h1>'+
     '<div id="c"><p class="code" id="l" data-t="'+E(codeTpl)+'">'+H(codeTpl.replace('%s',formatSpoken(now0.spoken)).replace('%t',until))+'</p></div>'+
@@ -101,7 +117,7 @@ function workerPage({entry,record,batch,locked,lang='en',publicUrl,myUrl,nowMs,s
     '<p><a id="a" href="'+E(scanHref)+'">'+H(L('vouchButton',{first}))+'</a></p></details>'+
     (locked?'<p class="bad">'+H(L('locked',{time:localTime(Date.parse(locked.until),country,{seconds:false})}))+'</p>':'')+
     '</section>'+
-    '\u0000'+
+    '\u0000'+extras.bottom+
     '<form method="post" action="'+E(path)+'/lang" class="langs np"><p>'+H(splitOptions(L('languageMenu')).stem)+'</p>'+langs+'</form>'+
     '<script src="/qr-browser.js" defer></script><script>'+WORKER_JS+STATUS_JS+'</script>';
   // The inline list keeps the page inside its budget: the most lines (up to INLINE_MAX) that fit, and a link to
@@ -172,6 +188,19 @@ function typedPage({card=null,lang='en',formNonce,error,sampleMode}){
   return flowPage({title,body,lang,sampleMode,css:FORM_CSS});
 }
 
+// GET /my/:cardId/:cardToken/vouch (spec 7.4 steps 1 and 2): the typed form posts to /s with the vouching card in
+// hidden vc and vt. A camera scan from this browser carries the yv_worker cookie the route sets instead.
+function workerVouchPage({entry,cardToken,lang='en',formNonce,error,sampleMode}){
+  const L=(k,v)=>t(k,lang,v),path='/my/'+entry.cardId+'/'+cardToken;
+  const field=(name,label,extra)=>'<label>'+H(label)+'<input name="'+name+'" autocomplete="off" required'+extra+'></label>';
+  const body='<section><h1>'+H(L('vouchForWorker'))+'</h1><p>'+H(L('scanTheirCode'))+'</p>'+errorLine(error)+
+    '<form method="post" action="/s">'+hidden('vc',entry.cardId)+hidden('vt',cardToken)+hidden('f',formNonce)+
+    field('ref',L('cardRefLabel'),' maxlength="12"')+field('code',L('digitsLabel'),' inputmode="numeric" maxlength="9"')+
+    group('adult',L('adultQ'),['yes','no'],{required:true})+langSelect(lang)+'<button>'+H(L('vouchForWorker'))+'</button></form>'+
+    '<p class="small"><a href="'+E(path)+'">'+H(L('backToCode'))+'</a></p></section>';
+  return flowPage({title:L('vouchForWorker'),body,lang,sampleMode,css:FORM_CSS});
+}
+
 function adultsOnlyPage({lang='en',sampleMode}){
   const msg=t('adultsOnly',lang);
   return flowPage({title:msg,body:'<section class="notice"><h1>'+H(msg)+'</h1></section>',lang,sampleMode});
@@ -220,6 +249,16 @@ const sessionPath=token=>'/s/t/'+token;
 // because on the worker's phone the browser would keep the customer's name.
 function disclosePage({session,card,lang='en',sampleMode,error}){
   const L=(k,v)=>t(k,lang,v),f=first(card),d=session.disclose||{};
+  if(session.voucher?.kind==='worker'){
+    // A worker line always shows the first name and the card, never a number: the one choice is the card link.
+    const q=splitOptions(L('showCardQ',{first:f})),no=d.showCard===false;
+    const wbody='<section><h1>'+H(titleFor(card,lang))+'</h1>'+errorLine(error)+
+      '<form method="post" action="'+sessionPath(session.vouchToken)+'">'+hidden('step','disclose')+
+      '<fieldset class="r"><legend>'+H(q.stem)+'</legend>'+radio('showCard','yes',q.options[0]||'yes',no?'':' checked')+radio('showCard','no',q.options[1]||'no',no?' checked':'')+'</fieldset>'+
+      '<p class="r"><label><input type="checkbox" name="attachClip" value="yes"> '+H(L('attachClip'))+'</label></p>'+
+      '<p class="small">'+H(L('workerLineNote'))+'</p><button>'+H(L('vouchButton',{first:f}))+'</button></form></section>';
+    return flowPage({title:titleFor(card,lang),body:wbody,lang,sampleMode,css:FORM_CSS});
+  }
   const {stem,options}=splitOptions(L('showMeAs',{first:f,name:'{name}',digits:'{digits}'}));
   const named=d.showMe==='name';
   const nameBox='<input name="firstName" maxlength="30" autocomplete="off" aria-label="'+E(options[1]||'')+'" value="'+E(d.firstName||'')+'"> ···';
@@ -261,8 +300,8 @@ function bindPage({session,card,lang='en',sampleMode,shortcode='12345',sessionCo
 // The read-back (spec 7.2 step 6): the label and the chips line exactly as the card will show them, the held
 // words marked as waiting, then Publish (hidden consent=yes) or Change something. A repeat customer is asked to
 // add a visit instead; the demo fallback shows its one-time code next to the box.
-function readbackPage({session,card,record,lang='en',sampleMode,phoneLast3=null,demoCode=null,recent=false,error}){
-  const L=(k,v)=>t(k,lang,v),f=first(card),token=session.vouchToken;
+function readbackPage({session,card,record,lang='en',sampleMode,phoneLast3=null,demoCode=null,recent=false,reciprocal=false,error}){
+  const L=(k,v)=>t(k,lang,v),f=first(card),token=session.vouchToken,worker=session.voucher?.kind==='worker';
   const words=session.words?.text;
   const yesNo=splitOptions(COPY.adultQ).options;
   const actions=recent
@@ -272,6 +311,7 @@ function readbackPage({session,card,record,lang='en',sampleMode,phoneLast3=null,
     '<h1>'+H(L('readIt',{first:f}))+'</h1>'+
     '<p class="small">'+H(tierLabel(record,f))+'</p><p><b>'+H(record.line)+'</b></p>'+
     (words?'<p>"'+H(words)+'"</p><p class="small">'+H(L('heldNote',{first:f}))+'</p>':'')+
+    (worker?'<p class="small">'+H(L('workerLineNote'))+'</p>'+(reciprocal?'<p class="notice">'+H(L('reciprocalNote'))+'</p>':''):'')+
     '<p class="small">'+H(L('canWithdraw'))+'</p>'+
     '<form method="post" action="/api/vouch/'+token+'/confirm">'+hidden('consent','yes')+
     (demoCode?'<p class="notice">'+H(L('demoNoGateway'))+'</p><label>'+H(L('digitsLabel'))+' <b>'+H(demoCode)+'</b>'+
@@ -286,6 +326,29 @@ function donePage({messages,lang='en',sampleMode}){
   const [head,...rest]=messages;
   const body='<section class="notice"><h1>'+H(head)+'</h1>'+rest.map(m=>'<p>'+H(m)+'</p>').join('')+'</section>';
   return flowPage({title:head,body,lang,sampleMode});
+}
+
+// ---- Organisation referral pages (spec 7.5 step 3, plan Task 13). The key is typed into a password field and
+// posted; it never goes in a URL. Every page carries the demo-key label. ----
+function orgKeyPage({requestId,error,sampleMode}){
+  const body='<section><h1>'+H(t('requestReferral'))+'</h1><p class="notice">'+H(t('demoOrgKey'))+'</p>'+errorLine(error)+
+    '<form method="post" action="/o/'+E(requestId)+'"><label>'+H(t('demoOrgKey'))+
+    '<input type="password" name="orgKey" autocomplete="off" required maxlength="200"></label><button>'+H(t('requestReferral'))+'</button></form></section>';
+  return flowPage({title:t('requestReferral'),body,sampleMode,css:FORM_CSS});
+}
+// view comes from the service's orgView. sent shows the sent note in place of the statement box.
+function orgPage({view,referToken,error,sent=false,sampleMode}){
+  const v=view,c=v.completion,f=v.firstName,post=v.post;
+  const facts=[['Work',post.work],['Area',post.area],['Pay',post.pay],['Start',post.start]].filter(([,x])=>x).map(([k,x])=>k+': '+x).join('. ');
+  const rests=(c.link?'<a href="'+E(c.link)+'" rel="noopener">'+H(c.title)+'</a>':H(c.title))+'<br><span class="small">'+H(v.orgName+', completed '+c.date+'. '+v.orgName+' checked: '+c.evidence)+'</span>'+
+    (c.fictional?'<br><span class="small">'+H(STRINGS.fictionalOrg)+'</span>':'');
+  const write=sent?'<p class="notice">'+H(t('referralSent','en',{first:f}))+'</p>'
+    :'<form method="post" action="/api/refer/'+E(referToken)+'/send"><label>'+H(t('orgWrite','en',{first:f,org:v.orgName,job:post.work,date:v.date,title:c.title}))+
+      '<textarea name="statement" rows="3" maxlength="160" required></textarea></label><button>'+H(t('sendToAccept','en',{first:f}))+'</button></form>';
+  const body='<section><h1>'+H(f+' · '+v.trade)+'</h1><p class="notice">'+H(t('demoOrgKey'))+'</p>'+errorLine(error)+
+    '<p>'+rests+'</p><p>'+H(facts)+'</p>'+write+
+    '<form method="post" action="/o/'+E(v.requestId)+'/withdraw">'+hidden('referToken',referToken)+'<button class="alt">'+H(t('withdrawReferral'))+'</button></form></section>';
+  return flowPage({title:t('requestReferral'),body,sampleMode,css:FORM_CSS});
 }
 
 // GET /demo/phone (YOVOUCH_SIM=1 only): a pretend phone that posts to /api/sim/sms. After a send it lists the
@@ -312,5 +375,5 @@ function replyPage({reply,firstName,clips=[],lang='en',sampleMode}){
   return flowPage({title,body,lang:english?'en':(reply?.lang||lang),sampleMode});
 }
 
-module.exports={TIME_ZONES,replyPage,localTime,flowPage,workerPage,myVouchesPage,scanPage,typedPage,adultsOnlyPage,errorPage,chipsPage,withdrawPage,
+module.exports={TIME_ZONES,replyPage,workerVouchPage,orgKeyPage,orgPage,localTime,flowPage,workerPage,myVouchesPage,scanPage,typedPage,adultsOnlyPage,errorPage,chipsPage,withdrawPage,
   disclosePage,bindPage,readbackPage,donePage,demoPhonePage};

@@ -73,4 +73,24 @@ function flagsAtConfirm(vouchStore,record,cardCreatedAtMs,nowMs){
 // The card's first moment for the first-day rule: the store's createdAt, else the record's publishedAt.
 const cardCreatedMs=entry=>{const n=Date.parse(entry?.createdAt||entry?.record?.publishedAt);return Number.isNaN(n)?null:n;};
 
-module.exports={computeFlags,burstHeld,workerEdges,flagsAtConfirm,cardCreatedMs,WINDOW_MS,PAIR_MS,HOLD_MS};
+// Spec 5.3: a card may vouch for another worker when it is live, its phone is confirmed by Yoma, and it has one
+// disclosed completion, or one live, unhidden customer vouch with no flag (stored or held now), confirmed more than
+// 7 days and less than 24 months ago. Liveness is read now, so a quiet withdrawal past withdrawAfter no longer counts.
+const ELIGIBLE_AFTER_MS=7*DAY,ELIGIBLE_MONTHS=24;
+function eligibility(entry,{vouchStore,nowMs=Date.now()}={}){
+  const record=entry?.record;
+  if(!record||entry.withdrawnAt||record.user?.phoneNumberConfirmed!==true)return {ok:false};
+  const at=new Date(nowMs).toISOString();
+  if((Array.isArray(record.disclosed?.completions)?record.disclosed.completions:[]).length)return {ok:true,rule:'completion',at};
+  if(!vouchStore)return {ok:false};
+  const cut=new Date(nowMs);cut.setUTCMonth(cut.getUTCMonth()-ELIGIBLE_MONTHS);
+  const files=vouchStore.listForCard(entry.cardId),held=burstHeld(files,cardCreatedMs(entry),nowMs);
+  const hit=files.find(f=>{
+    const t=Date.parse(f.record.confirmedAt);
+    return f.record.kind==='customer'&&vouchStore.isLive(f,nowMs)&&!(f.record.flags||[]).length&&!held.has(f.record.vouchId)&&
+      Number.isFinite(t)&&nowMs-t>ELIGIBLE_AFTER_MS&&t>cut.getTime();
+  });
+  return hit?{ok:true,rule:'customer_vouch',at}:{ok:false};
+}
+
+module.exports={eligibility,computeFlags,burstHeld,workerEdges,flagsAtConfirm,cardCreatedMs,WINDOW_MS,PAIR_MS,HOLD_MS};

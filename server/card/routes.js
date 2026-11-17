@@ -143,6 +143,7 @@ function buildRecord({snapshot,trade,selfDeclared,confirms,disclose={},code,gene
     opportunityId:c.opportunityId??null,
     title:c.title??null,
     organizationName:c.organizationName??null,
+    organizationId:c.organizationId??null,
     organizationLogoURL:c.organizationLogoURL??null,
     dateCompleted:c.dateCompleted??null,
     opportunityType:c.opportunityType??null,
@@ -258,15 +259,40 @@ function createCardRouter({config,accountSource,provider,store,key,yoma,publicUr
     return {items:files.map(f=>tierItem(system.vouchStore.publicPart(f),firstName,{nowMs,flags:flags.get(f.record.vouchId)||[]})),burstHeld:held};
   }
   function visibleItems(cardId,firstName,nowMs){return tierView(cardId,firstName,nowMs).items;}
-  // Check now: one signal per rendered id of this card; ids of other cards are ignored.
-  function vouchSignals(cardId,vouchIds,nowMs){
-    const out=[];
+  // Check now: one signal per rendered id of this card; ids of other cards are ignored. A live worker line adds
+  // voucherCard:<id> (spec 4.1 L1w): the voucher's card still live, and simulated unless the voucher card is the one
+  // account a YOMA_ACCESS_TOKEN reads (read once per check, as `fresh`). A live referral adds two referral:<id>
+  // signals (L1o): the completion still on the account, and the opportunity still published on Yoma.
+  async function vouchSignals(record,vouchIds,nowMs,fresh){
+    const out=[],cardId=record.cardId;
+    const tokenUser=accountSource.kind==='token'&&fresh?.user?.id!=null?str(fresh.user.id):null;
     for(const id of list(vouchIds)){
       const f=system.vouchStore.get(id);
       if(!f||(f.record?f.record.cardId:f.cardId)!==cardId)continue;
       const live=Boolean(f.record)&&system.vouchStore.isLive(f,nowMs);
       out.push({key:'vouch:'+id,label:live?STRINGS.vouchStillLive:STRINGS.vouchWithdrawn,ok:live,detail:''});
+      if(!live)continue;
+      const r=f.record;
+      if(r.kind==='worker'&&r.voucher?.cardId){
+        const v=store.get(r.voucher.cardId),ok=Boolean(v?.record)&&!v.withdrawnAt;
+        const simulated=!(tokenUser!==null&&ok&&str(v.record.user?.id)===tokenUser);
+        out.push({key:'voucherCard:'+id,label:STRINGS.voucherCardLive,ok,detail:'',simulated});
+      }
+      if(r.kind==='organisation')out.push(...await referralSignals(record,r,fresh));
     }
+    return out;
+  }
+  async function referralSignals(record,r,fresh){
+    const key='referral:'+r.vouchId,c=list(record.disclosed?.completions).find(x=>str(x?.evidenceId)===str(r.restsOn?.evidenceId));
+    const sameAccount=Boolean(fresh)&&(record.user?.id==null||fresh.user?.id==null||str(fresh.user.id)===str(record.user.id));
+    const stillOn=Boolean(c)&&sameAccount&&Boolean(completionHit(c,fresh));
+    const out=[{key,label:STRINGS.completionStillOn,ok:stillOn,detail:stillOn?'':'Not found on the account any more'}];
+    const oid=r.restsOn?.opportunityId;
+    if(!oid){out.push({key,label:STRINGS.orgStillOn,ok:false,detail:STRINGS.fictionalOrg});return out;}
+    let published=null;
+    try{published=(await yoma?.opportunityInfo?.(oid))?.item?.published===true;}
+    catch(err){if(!isUnavailable(err))throw err;published=null;}
+    out.push(published===null?{key,label:STRINGS.orgStillOn,ok:false,detail:STRINGS.checkUnavailable}:{key,label:STRINGS.orgStillOn,ok:published,detail:''});
     return out;
   }
 
@@ -399,6 +425,12 @@ function createCardRouter({config,accountSource,provider,store,key,yoma,publicUr
   }
 
   // ---- check ----
+  // A disclosed completion still Completed on the fresh read. With no opportunity id (the fictional demo completion)
+  // the title and organisation must match too, so two id-less completions never stand for each other.
+  function completionHit(c,fresh){
+    return list(fresh?.completions).find(f=>str(f?.opportunityId)===str(c.opportunityId)&&(f?.verificationStatus==null||f.verificationStatus==='Completed')&&
+      (str(c.opportunityId)||(str(f?.title)===str(c.title)&&str(f?.organizationName)===str(c.organizationName))));
+  }
   function signalsFor(record,fresh){
     const signals=[];
     const push=(key,label,ok,detail='')=>signals.push({key,label,ok:Boolean(ok),detail});
@@ -408,9 +440,8 @@ function createCardRouter({config,accountSource,provider,store,key,yoma,publicUr
     const digits=str(fresh?.user?.phoneNumber).replace(/\D/g,'');
     const phoneOk=sameAccount&&fresh.user?.phoneNumberConfirmed===true&&(!record.user?.phoneLast3||digits.slice(-3)===str(record.user.phoneLast3));
     push('phone_confirmed','Phone confirmed by Yoma (not an ID check)',phoneOk,phoneOk?'':'Phone no longer confirmed on the account');
-    const freshCompletions=list(fresh?.completions);
     for(const c of list(record.disclosed?.completions)){
-      const hit=sameAccount&&freshCompletions.find(f=>str(f?.opportunityId)===str(c.opportunityId)&&(f?.verificationStatus==null||f.verificationStatus==='Completed'));
+      const hit=sameAccount&&completionHit(c,fresh);
       push('completion:'+c.evidenceId,str(c.title)||'Completion',Boolean(hit),hit?str(c.organizationName):'Not found on the account any more');
     }
     const freshSkills=list(fresh?.skills);
@@ -435,7 +466,7 @@ function createCardRouter({config,accountSource,provider,store,key,yoma,publicUr
       }
       throw err;
     }
-    const result={checkedAt,signals:[...signalsFor(record,fresh),...vouchSignals(record.cardId,vouchIds,now())],simulated:record.accountSource==='sample',unavailable:false};
+    const result={checkedAt,signals:[...signalsFor(record,fresh),...await vouchSignals(record,vouchIds,now(),fresh)],simulated:record.accountSource==='sample',unavailable:false};
     store.touchCheck(record.cardId,result);
     return result;
   }

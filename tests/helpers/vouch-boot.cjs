@@ -22,7 +22,7 @@ const servers=[];
 after(()=>{for(const s of servers){s.closeAllConnections();s.close();}});
 
 const INFO={};
-for(const p of personas)for(const c of p.completions||[])INFO[c.opportunityId]={id:c.opportunityId,title:c.title,organizationName:c.organizationName,organizationLogoURL:c.organizationLogoURL??null,type:c.opportunityType||'Learning',verificationEnabled:true,verificationMethod:c.verificationMethod||'Automatic',verificationTypes:[],participantCountCompleted:3,yomaInfoURL:'https://app.yoma.world/opportunities/'+c.opportunityId,published:true,isCompletable:true,skills:c.skills||[]};
+for(const p of personas)for(const c of p.completions||[])if(c.opportunityId)INFO[c.opportunityId]={id:c.opportunityId,title:c.title,organizationName:c.organizationName,organizationLogoURL:c.organizationLogoURL??null,type:c.opportunityType||'Learning',verificationEnabled:true,verificationMethod:c.verificationMethod||'Automatic',verificationTypes:[],participantCountCompleted:3,yomaInfoURL:'https://app.yoma.world/opportunities/'+c.opportunityId,published:true,isCompletable:true,skills:c.skills||[]};
 function fakeYoma(){
  return {baseUrl:'https://api.yoma.test/api/v3',
   async opportunityInfo(id){const item=INFO[id];return {item:item?JSON.parse(JSON.stringify(item)):null,source:'live'};},

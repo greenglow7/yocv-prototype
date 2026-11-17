@@ -244,10 +244,13 @@ function completionItem(c){
   const title=escapeHtml(str(c?.title).trim()||'Opportunity');
   const org=escapeHtml(str(c?.organizationName).trim()||'the organisation');
   const when=monthYear(c?.dateCompleted);
-  const link=c?.live?safeUrl(c.live.yomaInfoURL):null;
+  // A completion with no opportunity id is the fictional demo one: no link, and it says so (plan Task 13).
+  const fictional=!str(c?.opportunityId);
+  const link=c?.live&&!fictional?safeUrl(c.live.yomaInfoURL):null;
   const head=link?'<a href="'+escapeHtml(link)+'" rel="noopener">'+title+'</a>':title;
   let item='<li>'+head+'<div class="small">'+org+(when?', completed '+escapeHtml(when):'')+'. '+org+' checked: '+escapeHtml(evidenceLabel(c))+'</div>';
-  if(!c?.live)item+='<div class="small grey">'+escapeHtml(STRINGS.liveMissing)+'</div>';
+  if(fictional)item+='<div class="small grey">'+escapeHtml(STRINGS.fictionalOrg)+'</div>';
+  else if(!c?.live)item+='<div class="small grey">'+escapeHtml(STRINGS.liveMissing)+'</div>';
   else if(Number.isFinite(c.live.participantCountCompleted)&&c.live.participantCountCompleted>0)item+='<div class="small">'+c.live.participantCountCompleted+' people have completed this on Yoma</div>';
   return item+'</li>';
 }
@@ -372,7 +375,8 @@ function publicPage({record,status='ok',check=null,withdrawn=null,publicUrl='',n
     '<form method="post" action="/c/'+escapeHtml(id)+'/check" id="check-form" data-api="/api/card/'+escapeHtml(id)+'/check">'+
     (shown.length?'<input type="hidden" name="v" value="'+escapeHtml(shown.map(i=>str(i?.vouchId)).join(','))+'">':'')+
     '<button type="submit">'+escapeHtml(STRINGS.checkNow)+'</button></form></header>';
-  let top=record?.accountSource==='sample'?'<p class="small sample">'+escapeHtml(STRINGS.sampleAccount)+'</p>':'';
+  const fictional=list(record?.disclosed?.completions).some(c=>!str(c?.opportunityId));
+  let top=record?.accountSource==='sample'?'<p class="small sample">'+escapeHtml(fictional?STRINGS.sampleAccountFictional:STRINGS.sampleAccount)+'</p>':'';
   top+=checkSection(check,notice);
   top+='<section><div class="identity">'+(photo?'<img src="'+escapeHtml(photo)+'" alt="" loading="lazy">':'')+
     '<div><h1>'+escapeHtml(name)+'</h1>'+(trade?'<p class="trade">'+escapeHtml(trade)+(area?' · '+escapeHtml(area):'')+'</p>':(area?'<p class="trade">'+escapeHtml(area)+'</p>':''))+
@@ -525,4 +529,4 @@ function cardSvg({record,publicUrl='',qrSvgFn,withdrawn=false,vouchStrip=false}=
   return parts.join('');
 }
 
-module.exports={publicPage,vouchedSection,vouchListPage,notFoundPage,withdrawnPage,cardSvg,maskPhone,waLink,escapeHtml,safeUrl,fullDate,timeOfDay,monthYear,firstNameOf,shell,footer,CSS,FLOW_CSS,STRINGS};
+module.exports={evidenceLabel,publicPage,vouchedSection,vouchListPage,notFoundPage,withdrawnPage,cardSvg,maskPhone,waLink,escapeHtml,safeUrl,fullDate,timeOfDay,monthYear,firstNameOf,shell,footer,CSS,FLOW_CSS,STRINGS};

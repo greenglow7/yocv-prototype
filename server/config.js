@@ -14,6 +14,9 @@ const DEFAULTS={
 };
 
 const stripSlashes=(value)=>String(value).replace(/\/+$/,'');
+// YOVOUCH_ORG_KEY_SAMPLE_SKILLS_TRUST -> 'Sample Skills Trust': the name's words split on _, each capitalised.
+const ORG_KEY=/^YOVOUCH_ORG_KEY_([A-Z0-9_]+)$/;
+const orgNameOf=suffix=>suffix.split('_').filter(Boolean).map(w=>w[0]+w.slice(1).toLowerCase()).join(' ');
 
 function loadConfig({env=process.env,cwd=process.cwd()}={}){
   const file=loadEnvFile(path.join(cwd,'.env'));
@@ -44,7 +47,9 @@ function loadConfig({env=process.env,cwd=process.cwd()}={}){
       shortcode:get('YOVOUCH_SHORTCODE')||'12345',
       callbackNumber:get('YOVOUCH_CALLBACK_NUMBER')||'0800 000 000',
       smsCountry:get('YOVOUCH_SMS_COUNTRY')||'South Africa',
-      orgKeys:{}
+      // Demo organisation keys for the referral page (spec 7.5), one per YOVOUCH_ORG_KEY_<NAME>.
+      orgKeys:Object.fromEntries([...new Set([...Object.keys(file),...Object.keys(env||{})])].filter(k=>ORG_KEY.test(k)&&get(k))
+        .map(k=>[orgNameOf(ORG_KEY.exec(k)[1]),get(k)]).filter(([name])=>name))
     },
     // YoVouch transcription (spec 8), read directly so the chat deployment is not needed: an Azure deployment,
     // else an OpenAI-compatible model, else null (template: the typed text box).

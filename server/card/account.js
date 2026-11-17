@@ -77,7 +77,8 @@ function createAccountSource({config,yoma,fetch=globalThis.fetch,now=Date.now,pe
   // the account and fall back to the opportunity's skill list.
   async function enrich(stored,index){
     let item=null;
-    if(yoma&&typeof yoma.opportunityInfo==='function'){
+    // A completion with no opportunity id (the fictional Sample Skills Trust one) has nothing to read on Yoma.
+    if(stored.opportunityId!=null&&yoma&&typeof yoma.opportunityInfo==='function'){
       try{item=(await yoma.opportunityInfo(stored.opportunityId))?.item??null;}
       catch(err){if(!isUnavailable(err))throw err;item=null;}
     }
@@ -85,9 +86,10 @@ function createAccountSource({config,yoma,fetch=globalThis.fetch,now=Date.now,pe
     return {
       evidenceId:'c'+(index+1),
       myOpportunityId:str(stored.myOpportunityId),
-      opportunityId:str(stored.opportunityId),
+      opportunityId:stored.opportunityId==null?null:str(stored.opportunityId),
       title:str(item?.title??stored.title),
       organizationName:str(item?.organizationName??stored.organizationName),
+      organizationId:str(item?.organizationId)||null,
       organizationLogoURL:str(item?.organizationLogoURL??stored.organizationLogoURL),
       dateCompleted:str(stored.dateCompleted),
       verificationStatus:'Completed',

@@ -232,12 +232,17 @@ const COPY={
   line5One:'{item}: {answer} (stated by {first})', // plan addition (spec 6.1 line 5, one item)
   line6One:"Card with 1 clip: {link} · lines 1, 4, 5 from {first}'s own words · card signed by YoCard, not by Yoma", // plan addition (one clip)
   line6None:"Card: {link} · lines 1, 4, 5 from {first}'s own words · card signed by YoCard, not by Yoma", // plan addition (no clip: a zero is never sent)
-  replyMenuNoOrg:'Reply 1 to get the English reply to forward, 2 to change a line (like "4 from Tuesday"), 3 to add a 15-second clip about yourself.' // plan addition (no disclosed completion)
+  replyMenuNoOrg:'Reply 1 to get the English reply to forward, 2 to change a line (like "4 from Tuesday"), 3 to add a 15-second clip about yourself.', // plan addition (no disclosed completion)
+  referralNoOrg:'Only an organisation on a completion on your card can refer you.', // plan addition (Task 13)
+  referralDeclined:'Declined. Nothing was put on your card.', // plan addition (Task 13, the worker's NO)
+  referralSent:'Sent to {first}. It goes on the card only once {first} says yes.', // plan addition (Task 13, organisation page)
+  referralWithdrawnOrg:'The referral was withdrawn. It is no longer on the card.' // plan addition (Task 13, organisation page)
 };
 const PLAN_ADDITIONS=['codeWrongWeb','codeLockedWeb','sessionEnded','sampleNumber','recentNo','visitAdded','demoWithdrawHere','docAskItem','docToldItem',
   'smsVouchMenuWorker','smsQ2','smsQ3','smsQ4','smsQ4Worker','smsCompletionOne','smsCompletions','referralWithdrawnMsg','orgKeyWrong','pasteRequestLink',
   'beat3Label','srcCustomerDemo','srcWorkerRequest','demoCodeWrong','demoNumberBad','demoOneNumber',
-  'allYourVouches','backToCode','prevPage','nextPage','line2','line3One','line4','line5One','line6One','line6None','replyMenuNoOrg'];
+  'allYourVouches','backToCode','prevPage','nextPage','line2','line3One','line4','line5One','line6One','line6None','replyMenuNoOrg',
+  'referralNoOrg','referralDeclined','referralSent','referralWithdrawnOrg'];
 
 let TRANSLATIONS={};
 try{TRANSLATIONS=JSON.parse(fs.readFileSync(path.join(__dirname,'..','..','data','yovouch-copy.json'),'utf8'))||{};}catch{TRANSLATIONS={};}

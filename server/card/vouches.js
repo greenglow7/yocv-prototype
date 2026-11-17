@@ -187,6 +187,12 @@ function createVouchStore(dir,{now=Date.now,random=crypto.randomBytes,cardStore=
     return stone;
   }
 
+  // A draft referral the worker declined is deleted outright: it was never on the card (spec 7.5 step 6).
+  function remove(vouchId){
+    if(!validId(vouchId))return false;
+    deleteClip(vouchId);
+    try{fs.rmSync(fileOf(vouchId));return true;}catch{return false;}
+  }
   const publicPart=file=>file?.record??null;
   function isLive(file,nowMs=now()){
     if(!fileLive(file,nowMs))return false;
@@ -195,7 +201,7 @@ function createVouchStore(dir,{now=Date.now,random=crypto.randomBytes,cardStore=
 
   return {dir:root,create,get,update,listAll,listForCard,listByVoucherCard,listByVoucherKey,withdraw,withdrawAs,
     hide:(vouchId,cardId)=>setHidden(vouchId,cardId,true),show:(vouchId,cardId)=>setHidden(vouchId,cardId,false),
-    showWords,deleteClip,readClip,tombstone,publicPart,isLive};
+    showWords,deleteClip,readClip,tombstone,remove,publicPart,isLive};
 }
 
 // ---- Caps (spec 5.4). They count sessions that reached confirm, never refusals. ----

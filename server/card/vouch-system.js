@@ -14,6 +14,8 @@ const {createOutbox}=require('./outbox.js');
 const {createSmsHandler}=require('./sms.js');
 const {createPostStore,createReplyStore}=require('./reply.js');
 const {createTranscriber}=require('./transcribe.js');
+const {createOrgStore}=require('./orgs.js');
+const {createRequestStore}=require('./requests.js');
 
 const YV_DEFAULTS={sim:false,gatewaySecret:'',shortcode:'12345',callbackNumber:'0800 000 000',smsCountry:'South Africa',orgKeys:{}};
 const SMS_ID_ATTEMPTS=20;
@@ -30,6 +32,10 @@ function buildVouchSystem({config,store,key,accountSource,provider,publicUrl,now
   const vouchStore=createVouchStore(store.dir,{now,random,cardStore:store});
   const system={yv,store,key,accountSource,provider,liveModel,publicUrl:String(publicUrl||'').replace(/\/+$/,''),now,random,hashKey,voucherFiles,codes,events,sessions,vouchStore};
   system.outbox=outbox||createOutbox({now,hashKey});
+  // Organisations keyed by name, one file per configured demo key (plan Task 13); requests, single use.
+  system.orgStore=createOrgStore(store.dir,{now});
+  for(const [orgName,orgKey] of Object.entries(yv.orgKeys&&typeof yv.orgKeys==='object'?yv.orgKeys:{}))if(orgName&&orgKey)system.orgStore.ensure(orgName,String(orgKey));
+  system.requestStore=createRequestStore(store.dir,{now,random});
   system.service=createVouchService(system);
   system.sms=createSmsHandler(system);
   system.postStore=createPostStore(store.dir,{now,random});

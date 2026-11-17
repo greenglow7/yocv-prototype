@@ -6,13 +6,16 @@
 const fs=require('node:fs');
 const path=require('node:path');
 const {t,LANGS}=require('./copy.js');
-const {STRINGS}=require('./render.js');
+const {STRINGS,fullDate,evidenceLabel,safeUrl}=require('./render.js');
+const {orgKeyOf}=require('./orgs.js');
 const {cardFields}=require('./events.js');
-const {ALPHABET}=require('./store.js');
+const {ALPHABET,validId,secretsMatch,hashSecret}=require('./store.js');
 const {normalisePhone,keyedHash}=require('./vouchers.js');
-const {capFor,recentFor,isSelfVouch,capMessage}=require('./vouches.js');
+const {capFor,recentFor,isSelfVouch,capMessage,workerCapReached,withdrawnAtOf}=require('./vouches.js');
 const {parseChips,checkWords,buildLine}=require('./vouch-lines.js');
-const {flagsAtConfirm,cardCreatedMs}=require('./flags.js');
+const {flagsAtConfirm,cardCreatedMs,eligibility,PAIR_MS}=require('./flags.js');
+const {noBannedClaims,noInventedNumbers}=require('../validate.js');
+const {BANNED_CONFIRM_PHRASE}=require('./draft.js');
 const {CONFIDENCE_FLOOR,sha256}=require('./transcribe.js');
 
 const CHIPS=JSON.parse(fs.readFileSync(path.join(__dirname,'..','..','data','vouch-chips.json'),'utf8'));
@@ -22,6 +25,7 @@ const BIND_TTL_MS=10*MINUTE,BINDS_PER_HOUR=3;
 const DEMO_TTL_MS=10*MINUTE,DEMO_WRONG=3,DEMO_PER_HOUR=3;
 const REPLY_WINDOW_MS=15*MINUTE;
 const MAX_FIRST_NAME=30;
+const DAY_MS=86400000,REFERRAL_DAYS=30,MAX_STATEMENT=160,REFER_TTL_MS=30*MINUTE;
 const STATUS={code_expired:400,code_wrong:400,code_used:409,card_locked:429,card_withdrawn:410,not_found:404,self_vouch:403,
   voucher_cap_day:429,voucher_cap_cards:429,voucher_recent:409,not_eligible:403,request_used:409,request_expired:410};
 
@@ -42,6 +46,9 @@ function messageFor(code,first,lang){
   if(code==='self_vouch')return t('selfVouch',lang,vars);
   if(code==='voucher_recent')return t('recent',lang,vars);
   if(code==='voucher_cap_day'||code==='voucher_cap_cards')return capMessage(code,lang);
+  if(code==='not_eligible')return t('notEligible',lang);
+  if(code==='request_used')return t('requestUsed',lang);
+  if(code==='request_expired')return t('requestExpired',lang,vars);
   return STRINGS.notFound;
 }
 
@@ -58,13 +65,28 @@ function createVouchService(system){
   const {store,codes,sessions,events,yv}=system;
 
   function workerOf(entry){return {firstName:entry.record?.user?.firstName||'',trade:entry.record?.trade||''};}
-  function refuse(code,{entry=null,channel,lang}){
+  function refuse(code,{entry=null,channel,lang,message}){
     events.log('code_refused',{reason:code,channel,...(entry?cardFields(entry):{})});
-    return {ok:false,status:STATUS[code]||400,code,message:messageFor(code,entry?.record?.user?.firstName,lang)};
+    return {ok:false,status:STATUS[code]||400,code,message:message||messageFor(code,entry?.record?.user?.firstName,lang)};
   }
+  // A worker voucher needs no phone binding: the card token (or, on SMS, the number index) is the voucher.
   function opened(vouchToken,session,entry){
     return {ok:true,vouchToken,worker:workerOf(entry),proof:{method:session.proof.method,step:session.proof.step,provedAt:session.proof.provedAt},
-      bind:gatewayConfigured(yv)?'sms':'demo',expiresInMs:EXPIRES_IN_MS};
+      bind:session.voucher?.kind==='worker'?null:gatewayConfigured(yv)?'sms':'demo',expiresInMs:EXPIRES_IN_MS};
+  }
+  // The vouching card (spec 5.3, 7.4): found by its card token, or on SMS by the sender's Yoma-confirmed number.
+  // The owner secret never matches. Then not the vouched card, eligible, and under the worker cap.
+  function workerVoucher(entry,voucher,{channel,voucherKey,lang}){
+    const vcId=typeof voucher.cardId==='string'?voucher.cardId:'',vEntry=validId(vcId)?store.get(vcId):null;
+    const bySms=channel==='sms'&&Boolean(voucherKey)&&store.indexGet('numbers',voucherKey)===vcId;
+    const token=typeof voucher.cardToken==='string'&&/^[0-9a-f]{16}$/.test(voucher.cardToken)?voucher.cardToken:null;
+    if(!vEntry?.record||vEntry.withdrawnAt||!vEntry.vouch?.secret||(!bySms&&!(token&&secretsMatch(vEntry.cardTokenHash,token))))return {code:'not_found'};
+    if(vcId===entry.cardId)return {code:'self_vouch'};
+    const el=eligibility(vEntry,{vouchStore:system.vouchStore,nowMs:system.now()});
+    if(!el.ok)return {code:'not_eligible'};
+    // The spec 4.3 enum has no worker cap code, so the cards cap code carries the worker message (plan Task 13).
+    if(workerCapReached(system.vouchStore.listByVoucherCard(vcId),system.now()))return {code:'voucher_cap_cards',message:t('workerCap',lang)};
+    return {voucher:{kind:'worker',cardId:vcId,firstName:vEntry.record.user?.firstName||'',eligibility:{rule:el.rule,at:el.at}}};
   }
 
   // input = {cardId | cardRef, proof, voucher, voucherKey = null, phoneLast3, onWorkerPhone, channel, lang, formNonce}.
@@ -83,7 +105,12 @@ function createVouchService(system){
     const proof=input.proof||{};
     if(proof.method!=='qr'&&proof.method!=='code')return refuse('code_wrong',{entry,channel,lang});
     const voucherKey=typeof input.voucherKey==='string'&&/^[0-9a-f]{64}$/.test(input.voucherKey)?input.voucherKey:null;
-    if(voucherKey){
+    let voucher={kind:'customer'};
+    if(input.voucher?.kind==='worker'){
+      const w=workerVoucher(entry,input.voucher,{channel,voucherKey,lang});
+      if(!w.voucher)return refuse(w.code,{entry,channel,lang,message:w.message});
+      voucher=w.voucher;
+    }else if(voucherKey){
       const pre=codes.verify(entry.cardId,proof,{channel,consume:false});
       if(!pre.ok)return refuse(pre.code,{entry,channel,lang});
       if(isSelfVouch(entry,voucherKey))return refuse('self_vouch',{entry,channel,lang});
@@ -96,7 +123,7 @@ function createVouchService(system){
     if(!r.ok)return refuse(r.code,{entry,channel,lang});
     const onWorkerPhone=input.onWorkerPhone===true;
     const {vouchToken,session}=sessions.open({cardId:entry.cardId,proof:{method:proof.method,step:r.step,provedAt:r.provedAt,channel,onWorkerPhone},
-      voucher:input.voucher||{kind:'customer'},onWorkerPhone,channel,lang,adult:true,formNonce:input.formNonce});
+      voucher,onWorkerPhone,channel,lang,adult:true,formNonce:input.formNonce});
     // The SMS sender is the voucher: the number is taken from the sender, phoneConfirmedBy 'sms_origin' (spec 7.3).
     if(voucherKey)session.smsOrigin={key:voucherKey,last3:/^\d{3}$/.test(String(input.phoneLast3??''))?String(input.phoneLast3):null};
     events.log('vouch_opened',{channel,method:proof.method,...cardFields(entry)});
@@ -260,6 +287,16 @@ function createVouchService(system){
     const named=d.showMe==='name'&&d.firstName&&last3;
     const p=session.proof||{};
     const transcription=session.words?(session.words.source==='clip'&&session.words.fromModel?'model':'typed'):'none';
+    const w=session.voucher?.kind==='worker'?session.voucher:null;
+    // A worker line shows the vouching worker's first name and card, never a number; the SMS path asks no showCard.
+    if(w)return {vouchId:null,cardId:session.cardId,kind:'worker',
+      proof:{method:p.method,step:p.step,provedAt:p.provedAt,channel:p.channel||session.channel,onWorkerPhone:false},
+      voucher:{label:w.firstName+"'s card",firstName:w.firstName,phoneLast3:null,phoneConfirmedBy:method,cardId:w.cardId,
+        showCard:method==='card'&&d.showCard===true,orgName:null,orgId:null,adultSelfDeclared:true},
+      eligibility:{rule:w.eligibility?.rule??null,at:w.eligibility?.at??null},
+      fields,line:buildLine('worker',fields),lang:session.lang,wordsShownAt:null,clip:null,restsOn:null,statement:null,acceptedAt:null,
+      jobPostId:null,flags:[],visits:1,confirmedAt:iso(nowMs()),expiresAt:null,
+      generation:{mode:transcription==='model'?'live':'sample',transcription}};
     return {vouchId:null,cardId:session.cardId,kind:'customer',
       proof:{method:p.method,step:p.step,provedAt:p.provedAt,channel:p.channel||session.channel,onWorkerPhone:session.onWorkerPhone===true},
       voucher:{label:named?STRINGS.voucherShown(d.firstName,last3):STRINGS.aCustomer,firstName:named?d.firstName:null,phoneLast3:named?last3:null,
@@ -270,6 +307,7 @@ function createVouchService(system){
   }
   // The voucher as far as the session knows it: the bound phone, or the demo code's number.
   function voucherOf(session){
+    if(session.voucher?.kind==='worker'&&!session.smsOrigin)return {method:'card',key:null,last3:null};
     if(session.smsOrigin)return {method:'sms_origin',key:session.smsOrigin.key,last3:session.smsOrigin.last3};
     if(!gatewayConfigured(yv))return session.demo?{method:'demo',key:session.demo.key,last3:session.demo.phoneLast3}:null;
     return session.bind?.at?{method:'sms_bind',key:session.bind.voucherKey,last3:session.bind.phoneLast3}:null;
@@ -295,6 +333,7 @@ function createVouchService(system){
     if(!session.chips)return {ok:false,status:400,code:'invalid_input',fields:['work','when','howOften','hireAgain'],message:t('whatDid',lang,{first})};
     const visit=b.visit==='yes'||b.visit==='no'?b.visit:null;
     if(b.consent!==true&&visit!=='no')return {ok:false,status:400,code:'consent_needed',message:t('readIt',lang,{first})};
+    if(session.voucher?.kind==='worker')return confirmWorker(token,c);
     let voucher;
     if(session.smsOrigin)voucher=voucherOf(session);
     else if(!gatewayConfigured(yv)){
@@ -350,6 +389,35 @@ function createVouchService(system){
     return {ok:true,vouchId,line:record.line,withdrawUrl:bySms?null:withdrawUrl,visitAdded:false,withdrawSent:bySms,demo:voucher.method==='demo'};
   }
 
+  // A worker vouch (spec 7.4 step 5): no binding, the worker cap again at confirm, no voucher file. The vouched worker
+  // is told only through a chat they opened in the last 15 minutes; otherwise nothing is sent.
+  function confirmWorker(token,{session,entry}){
+    const w=session.voucher,vEntry=store.get(w.cardId),voucher=voucherOf(session);
+    const end=r=>{system.sessions.delete(token);return r;};
+    if(!vEntry?.record||vEntry.withdrawnAt)return end({ok:false,status:410,code:'card_withdrawn',message:t('cardWithdrawn',session.lang)});
+    if(workerCapReached(system.vouchStore.listByVoucherCard(w.cardId),nowMs()))return end({ok:false,status:429,code:'voucher_cap_cards',message:t('workerCap',session.lang)});
+    const record=draftRecord(session,voucher);
+    record.flags=flagsAtConfirm(system.vouchStore,record,cardCreatedMs(entry),nowMs());
+    const clip=session.disclose?.attachClip&&session.clip?.data?session.clip:null;
+    const held=session.words||clip?{words:session.words?.text??null,wordsSource:session.words?.source??null,clip:null}:null;
+    const {vouchId,withdrawSecret}=system.vouchStore.create({record,held,channel:session.channel,clip,
+      private:{voucherKey:voucher.key,editedFields:session.editedFields||[],rawTranscript:session.transcript?.text??null,rejected:session.rejected||[]}});
+    events.log('vouch_confirmed',{vouchId,...cardFields(entry),channel:session.channel,method:record.proof.method,kind:'worker',voucherCardId:w.cardId});
+    const lang=LANGS.includes(entry.vouch?.lang)?entry.vouch.lang:'en';
+    if(entry.ownerPhoneHash)system.outbox.sendToKey(entry.ownerPhoneHash,t('vouchedForYou',lang,{name:w.firstName}));
+    end();
+    return {ok:true,vouchId,line:record.line,withdrawUrl:null,worker:true,visitAdded:false,...(voucher.method==='sms_origin'?{withdrawSecret}:{})};
+  }
+  // A live worker vouch from the vouched card to the vouching card, under 14 days old: the read-back says the
+  // pair will be marked "Vouched for each other" (spec 7.4 step 4).
+  function reciprocal(token){
+    const session=system.sessions.get(token),w=session?.voucher;
+    if(w?.kind!=='worker')return false;
+    // As the flag itself does (workerEdges), a hidden line still counts; a withdrawn one does not.
+    return system.vouchStore.listByVoucherCard(session.cardId).some(f=>f.record.kind==='worker'&&f.record.cardId===w.cardId&&
+      system.vouchStore.isLive({...f,private:{...f.private,hiddenAt:null}},nowMs())&&nowMs()-Date.parse(f.record.confirmedAt)<=PAIR_MS);
+  }
+
   // A second matched code this month from the same number adds a visit to its live vouch (the SMS YES after "recent").
   function addVisit({vouchId,voucherKey,channel='sms',lang='en'}={}){
     const file=system.vouchStore.get(vouchId);
@@ -362,8 +430,159 @@ function createVouchService(system){
     return {ok:true,vouchId};
   }
 
-  return {open,setChips,setWords,clipWords,setDisclose,issueBind,bindBySms,bindStatus,demoOtp,confirm,preview,addVisit};
+  return {open,setChips,setWords,clipWords,setDisclose,issueBind,bindBySms,bindStatus,demoOtp,confirm,preview,addVisit,reciprocal,...createReferrals(system)};
+}
+// ---- Organisation referral (spec 7.5, plan Task 13) ----
+// Each disclosed completion organisation once, with its newest completion by dateCompleted: the worker page's
+// "Ask <organisation> to refer me" buttons carry that completion's evidenceId.
+function referralOrgs(record){
+  const byOrg=new Map();
+  for(const c of record?.disclosed?.completions||[]){
+    const org=String(c?.organizationName||'').trim();
+    if(!org)continue;
+    const before=byOrg.get(org);
+    if(!before||(Date.parse(c.dateCompleted)||0)>(Date.parse(before.dateCompleted)||0))byOrg.set(org,c);
+  }
+  return [...byOrg].map(([org,c])=>({org,evidenceId:String(c.evidenceId)}));
+}
+// The statement (spec 7.5 step 4): under 160 characters, no credential words, no Yoma confirmation phrase, and no
+// number the completion year or the post does not hold. It is kept verbatim.
+function statementOk(statement,{year,rawText}){
+  const s=String(statement??'').trim(),n=[...s].length;
+  return n>=1&&n<=MAX_STATEMENT&&noBannedClaims(s).ok&&!BANNED_CONFIRM_PHRASE.test(s)&&noInventedNumbers(s,{dates:year,context:rawText}).ok;
+}
+function createReferrals(system){
+  const {store,events}=system;
+  const nowMs=()=>system.now(),referSessions=new Map();
+  const fail=(status,code,message)=>({ok:false,status,code,message});
+  const firstOf=entry=>entry?.record?.user?.firstName||'';
+  const langOf=entry=>LANGS.includes(entry?.vouch?.lang)?entry.vouch.lang:'en';
+  function cardByToken(cardId,cardToken){
+    if(!validId(cardId)||typeof cardToken!=='string'||!/^[0-9a-f]{16}$/.test(cardToken))return null;
+    const entry=store.get(cardId);
+    return entry?.record&&entry.vouch?.secret&&secretsMatch(entry.cardTokenHash,cardToken)?entry:null;
+  }
+  const completionOf=(entry,evidenceId)=>(entry?.record?.disclosed?.completions||[]).find(c=>String(c?.evidenceId)===String(evidenceId))||null;
+  const textOf=v=>String(v?.text??'').trim();
+  // The chat the worker opened: the linked WhatsApp number, else the owner's number. Nothing when none is open.
+  const tellWorker=(entry,text)=>{const key=entry.linkedPhoneHash||entry.ownerPhoneHash;return key?system.outbox.sendToKey(key,text):false;};
+
+  function createReferralRequest(cardId,cardToken,{jobPostId,evidenceId}={}){
+    const entry=cardByToken(cardId,cardToken);
+    if(!entry)return fail(404,'not_found',STRINGS.notFound);
+    if(entry.withdrawnAt)return fail(410,'card_withdrawn',t('cardWithdrawn'));
+    const lang=langOf(entry),post=validId(jobPostId)?system.postStore.get(jobPostId):null;
+    if(!post)return fail(404,'not_found',t('cannotRead',lang));
+    const c=completionOf(entry,evidenceId),org=String(c?.organizationName||'').trim();
+    if(!c||!org)return fail(403,'not_eligible',t('referralNoOrg',lang));
+    const expires=(Date.parse(post.postedAt)||nowMs())+REFERRAL_DAYS*DAY_MS;
+    if(expires<=nowMs())return fail(410,'request_expired',t('requestExpired',lang,{first:firstOf(entry)}));
+    const {requestId,expiresAt}=system.requestStore.create({kind:'referral',cardId,ttlMs:expires-nowMs(),jobPostId,evidenceId:String(c.evidenceId),orgName:org});
+    events.log('request_created',{requestId,...cardFields(entry),kind:'referral'});
+    const url=system.publicUrl+'/o/'+requestId;
+    return {ok:true,requestId,url,expiresAt,text:t('forwardOrg',lang,{org,link:url})};
+  }
+
+  // The open referral request with its card, completion and post, or the refusal.
+  function requestContext(requestId){
+    const rq=system.requestStore.get(requestId);
+    if(!rq||rq.kind!=='referral')return fail(404,'not_found',STRINGS.notFound);
+    const entry=store.get(rq.cardId);
+    if(!entry?.record)return fail(404,'not_found',STRINGS.notFound);
+    if(entry.withdrawnAt)return fail(410,'card_withdrawn',t('cardWithdrawn'));
+    if(rq.usedAt)return fail(409,'request_used',t('requestUsed'));
+    const post=system.postStore.get(rq.jobPostId);
+    if(Date.parse(rq.expiresAt)<=nowMs()||!post)return fail(410,'request_expired',t('requestExpired','en',{first:firstOf(entry)}));
+    const c=completionOf(entry,rq.evidenceId);
+    if(!c||orgKeyOf(c.organizationName)!==orgKeyOf(rq.orgName))return fail(403,'forbidden',t('orgKeyWrong'));
+    return {ok:true,rq,entry,c,post};
+  }
+  // What the organisation page shows (spec 7.5 step 3). The label uses today's date: it is signed on the worker's YES.
+  function orgView({rq,entry,c,post}){
+    const p=post.parsed||{},fictional=!String(c.opportunityId||'');
+    return {requestId:rq.requestId,orgName:String(c.organizationName),firstName:firstOf(entry),trade:entry.record.trade||'',
+      completion:{title:String(c.title||''),date:fullDate(c.dateCompleted),evidence:evidenceLabel(c),fictional,link:fictional?null:safeUrl(c.live?.yomaInfoURL)},
+      post:{work:textOf(p.work),area:textOf(p.area),pay:textOf(p.pay),start:textOf(p.start)},
+      date:fullDate(iso(nowMs()))};
+  }
+  function orgOpen(requestId,orgKey){
+    const r=requestContext(requestId);
+    if(!r.ok)return r;
+    if(!system.orgStore.check(r.rq.orgName,typeof orgKey==='string'?orgKey:''))return fail(403,'forbidden',t('orgKeyWrong'));
+    const referToken=system.random(12).toString('hex');
+    for(const [k,v] of referSessions)if(nowMs()-v.at>REFER_TTL_MS)referSessions.delete(k);
+    referSessions.set(referToken,{requestId:r.rq.requestId,at:nowMs()});
+    events.log('request_opened',{requestId:r.rq.requestId,...cardFields(r.entry),kind:'referral'});
+    return {ok:true,referToken,view:orgView(r),worker:{firstName:firstOf(r.entry),trade:r.entry.record.trade||''},
+      proof:{method:'request',step:null,provedAt:iso(nowMs())},expiresInMs:REFER_TTL_MS};
+  }
+  function referSession(referToken){
+    const ses=typeof referToken==='string'?referSessions.get(referToken):null;
+    if(!ses||nowMs()-ses.at>REFER_TTL_MS)return null;
+    return ses;
+  }
+  function orgViewFor(referToken){
+    const ses=referSession(referToken),r=ses?requestContext(ses.requestId):null;
+    return r?.ok?orgView(r):null;
+  }
+
+  // The draft referral: stored, not live until the worker's YES. orgWrote goes only into a chat the worker opened.
+  function orgSend(referToken,statement){
+    const ses=referSession(referToken);
+    if(!ses)return fail(410,'session_ended',t('sessionEnded','en',{first:'the worker'}));
+    const r=requestContext(ses.requestId);
+    if(!r.ok)return r;
+    const {rq,entry,c,post}=r,s=String(statement??'').trim();
+    if(!statementOk(s,{year:String(new Date(c.dateCompleted).getUTCFullYear()),rawText:post.rawText}))return fail(400,'invalid_input',t('sayWhatYouSaw'));
+    if(!system.requestStore.markUsed(rq.requestId))return fail(409,'request_used',t('requestUsed'));
+    const at=iso(nowMs()),org=String(c.organizationName),p=post.parsed||{};
+    const restsOn={evidenceId:String(c.evidenceId),opportunityId:c.opportunityId||null,title:String(c.title||'')};
+    const jobPost={work:textOf(p.work),area:textOf(p.area),postedAt:post.postedAt};
+    const record={vouchId:null,cardId:entry.cardId,kind:'organisation',proof:{method:'request',step:null,provedAt:at,channel:'web',onWorkerPhone:false},
+      voucher:{label:org,firstName:null,phoneLast3:null,phoneConfirmedBy:'org_key',cardId:null,showCard:false,orgName:org,
+        orgId:c.organizationId||system.orgStore.get(org)?.orgId||null,adultSelfDeclared:null},
+      fields:null,line:buildLine('organisation',null,{statement:s,restsOn,jobPost,at}),lang:'en',wordsShownAt:null,clip:null,restsOn,statement:s,
+      acceptedAt:null,jobPostId:rq.jobPostId,jobPost,flags:[],visits:1,confirmedAt:null,
+      expiresAt:iso((Date.parse(post.postedAt)||nowMs())+REFERRAL_DAYS*DAY_MS),generation:{mode:'sample',transcription:'none'}};
+    const {vouchId}=system.vouchStore.create({record,private:{referTokenHash:hashSecret(referToken),requestId:rq.requestId}});
+    tellWorker(entry,t('orgWrote',langOf(entry),{org,sentence:s,job:jobPost.work,date:fullDate(at),title:restsOn.title}));
+    return {ok:true,vouchId};
+  }
+
+  // The worker's YES signs the referral and puts it on the card; NO deletes the draft (spec 7.5 step 6).
+  function acceptReferral(vouchId,cardId,cardToken,answer){
+    const entry=cardByToken(cardId,cardToken);
+    if(!entry||entry.withdrawnAt)return fail(404,'not_found',STRINGS.notFound);
+    const lang=langOf(entry),file=system.vouchStore.get(vouchId);
+    if(!file?.record||file.record.kind!=='organisation'||file.record.cardId!==entry.cardId||withdrawnAtOf(file,nowMs()))return fail(404,'not_found',STRINGS.notFound);
+    if(file.record.acceptedAt)return {ok:true,message:t('referralDone',lang)};
+    if(answer!=='yes'&&answer!=='no')return fail(400,'invalid_input','answer must be "yes" or "no".');
+    if(answer==='no'){system.vouchStore.remove(vouchId);return {ok:true,message:t('referralDeclined',lang)};}
+    const at=iso(nowMs());
+    system.vouchStore.update(vouchId,f=>{
+      const rec=f.record;
+      rec.acceptedAt=at;rec.confirmedAt=at;
+      rec.line=buildLine('organisation',null,{statement:rec.statement,restsOn:rec.restsOn,jobPost:rec.jobPost,at});
+    });
+    events.log('vouch_confirmed',{vouchId,...cardFields(entry),channel:'web',method:'request',kind:'organisation'});
+    return {ok:true,message:t('referralDone',lang)};
+  }
+
+  // The organisation's withdraw form carries the refer token; only its hash is kept on the referral.
+  function withdrawReferral(referToken,requestId=null){
+    if(typeof referToken!=='string'||!/^[0-9a-f]{24}$/.test(referToken))return {ok:false};
+    const file=system.vouchStore.listAll().find(f=>f.record?.kind==='organisation'&&secretsMatch(f.private?.referTokenHash,referToken));
+    if(!file||(requestId&&file.private.requestId!==requestId))return {ok:false};
+    const vouchId=file.record.vouchId,entry=store.get(file.record.cardId);
+    if(withdrawnAtOf(file,nowMs()))return {ok:true,vouchId};
+    system.vouchStore.withdrawAs(vouchId,'now');
+    events.log('vouch_withdrawn',{vouchId,...cardFields(entry||{cardId:file.record.cardId}),mode:'now',by:'org'});
+    if(file.record.acceptedAt&&entry)tellWorker(entry,t('referralWithdrawnMsg',langOf(entry),{org:file.record.voucher.orgName}));
+    return {ok:true,vouchId};
+  }
+
+  return {createReferralRequest,orgOpen,orgViewFor,orgSend,acceptReferral,withdrawReferral};
 }
 const splitOptionsStem=s=>{const i=String(s).search(/[?:]/);return i<0?String(s):String(s).slice(0,i+1);};
 
-module.exports={createVouchService,chipsFor,messageFor,gatewayConfigured,STATUS,EXPIRES_IN_MS,BIND_TTL_MS,REPLY_WINDOW_MS};
+module.exports={referralOrgs,statementOk,createVouchService,chipsFor,messageFor,gatewayConfigured,STATUS,EXPIRES_IN_MS,BIND_TTL_MS,REPLY_WINDOW_MS};
