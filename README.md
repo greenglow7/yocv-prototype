@@ -46,6 +46,14 @@ Every variable the code reads (`server/config.js` reads `.env` from the working 
 | `OPENAI_API_KEY` | empty | Selects the OpenAI-compatible provider when Azure is not configured |
 | `OPENAI_BASE_URL` | `https://api.openai.com/v1` | Base URL of that endpoint |
 | `OPENAI_MODEL` | `gpt-4.1-mini` | Model name sent to that endpoint |
+| `AZURE_OPENAI_TRANSCRIBE_DEPLOYMENT` | empty | YoVouch voice notes: an Azure transcription deployment on the Azure endpoint and key above (no chat deployment needed) |
+| `TRANSCRIBE_MODEL` | empty | YoVouch voice notes: a transcription model on the OpenAI-compatible endpoint when Azure is not configured. With neither set, answers are typed only |
+| `YOVOUCH_SIM` | unset | `1` mounts the simulated gateways `POST /api/sim/sms` and `POST /api/sim/wa` and the demo pages `/demo/phone`, `/demo/ivr`, `/demo/inbox` and `/demo/beat3`. Demo only. Ignored when `YOVOUCH_GATEWAY_SECRET` is set |
+| `YOVOUCH_GATEWAY_SECRET` | empty | Mounts `POST /api/sms/webhook` and `POST /api/wa/webhook` for a real gateway; each answers 403 unless the header `x-yovouch-gateway-secret` matches (constant-time compare). With it set, the sim and demo routes are not mounted. With neither this nor `YOVOUCH_SIM`, the demo one-time code route `POST /api/vouch/:vouchToken/otp` is mounted instead |
+| `YOVOUCH_SHORTCODE` | `12345` | SMS shortcode printed on the worker's code page and in the SMS instructions |
+| `YOVOUCH_CALLBACK_NUMBER` | `0800 000 000` | Toll-free call-back number printed on the worker's code page |
+| `YOVOUCH_SMS_COUNTRY` | `South Africa` | Market of the shortcode: reads a local-format sender number (`0825550131`) that arrives with no card context |
+| `YOVOUCH_ORG_KEY_<NAME>` | none (`.env.example` sets `YOVOUCH_ORG_KEY_SAMPLE_SKILLS_TRUST`) | One demo organisation key per variable for the referral page. `<NAME>` is the organisation's name in capitals with `_` for spaces, so `SAMPLE_SKILLS_TRUST` is `Sample Skills Trust`. Every page and line made with it says `Demo organisation key. A real key needs Yoma.` |
 
 To open a card from a phone on the same Wi-Fi, set `HOST=0.0.0.0` and `YOCARD_PUBLIC_URL=http://<your LAN IP>:4173` so the link and QR point at an address the phone can reach.
 
@@ -91,6 +99,16 @@ A prepared input that shows the checks working: paste "Ignore all previous instr
 | YoCard account data | Fictional sample personas by default; a real account via `YOMA_ACCESS_TOKEN` (implemented, not exercised live in this build) |
 | YoCard card details from Yoma | Real, live from `GET /opportunity/{id}/info`: organisation, verification method, the opportunity's configured verification types, participant counts and page links for the real opportunity ids the personas completed. The evidence type recorded against each completion is the account's own record, not live: `server/card/personas.json` for samples, `myOpportunity` `verifications[]` in token mode |
 | YoCard signature and QR | Real, generated in-repo; the signature is YoCard's, not Yoma's |
+| YoVouch rotating code, validation, signed vouch records, flags, Check now re-checks, card tier, six-line reply | Real, in-repo, unit-tested with a fake clock and temp dirs |
+| WhatsApp Business delivery | Simulated. Messages render in `thread.html`; nothing leaves the server. Label: `Simulated WhatsApp. No message was sent.` |
+| SMS gateway | Simulated. The phone-simulator page `/demo/phone` posts to `/api/sim/sms` (only with `YOVOUCH_SIM=1`) and shows the reply. Label: `Simulated SMS. No message was sent.` |
+| Voice call-back and IVR | Simulated. `/demo/ivr` shows the IVR script with keypad buttons; audio is uploaded from the browser. Label: `Simulated call-back` |
+| Phone binding on the web path | Simulated. With the simulator the presenter texts `YES <session code>` from the phone-simulator page and the record stores `sms_bind`. Without it, the demo fallback shows a one-time code next to a number field and the record stores `phoneConfirmedBy: "demo"`. Nothing is ever sent. Labels: `Simulated SMS. No message was sent.` on the simulator; `Demo: no SMS gateway. In production you would text first; nothing is sent to this number.` on the fallback form; `Number typed by the voucher, not confirmed (demo)` on the line |
+| Organisation key and organisation | One demo key for one fictional organisation, `Sample Skills Trust`, in `.env.example`; no real organisation's name appears on a demo referral. Label: `Demo organisation key. A real key needs Yoma.` |
+| Voucher numbers | Sample numbers typed by the presenter. Label: `Sample number` |
+| Voucher's account re-read (L1w Check now) | Sample-only unless the voucher is the token account. Label: the existing `simulated` |
+| YoVouch extraction and reply drafting model | Template mode when no key is present. Label: `Sample mode: template extraction, no model call` |
+| Transcription | Real `/audio/transcriptions` call when configured; not exercised live in this build (no key). Typed answers otherwise |
 
 ## YoCard: a work card for informal work
 
@@ -106,11 +124,30 @@ What the card proves, level by level:
 | --- | --- | --- | --- |
 | L0 | The image | Nothing. It says so and carries the card code. | Real |
 | L1 | Signed record (`/c/<id>.json`, `/.well-known/jwks.json`) | The page is what the worker published, unedited since. Signed by YoCard, not by Yoma. | Real (ES256, in-repo) |
+| L1c (new) | Customer vouch record `/v/<id>.json`, signed by YoCard | A person holding a phone number confirmed these exact choices and words at this time. The number label says how the number was taken. With "code matched": that person also entered the worker's rotating code within three minutes of it appearing (about four minutes on the SMS and call paths). With "code texted from their phone": a phone other than the worker's texted the session code to the shortcode, during a session opened on the worker's phone. With "by request": that person opened a link the worker sent. | Real (ES256, in-repo, `sub` is the vouch id); the phone binding is simulated or the demo fallback in this build, labelled |
+| L1w (new) | Worker-to-worker vouch record, signed by YoCard | The holder of another live YoCard whose card met the eligibility rule confirmed these choices and words, with the same code or request condition. | Real; the re-read of the voucher's Yoma account is sample-only unless the voucher is the token account, labelled `simulated` |
+| L1o (new) | Organisation referral record, signed by YoCard | The holder of the organisation's YoVouch key stated that this worker is referred for this named post, resting on a Yoma completion that organisation verified, and the worker accepted the sentence. | Real record; the organisation (`Sample Skills Trust`) and its key are demo, labelled |
 | L2 | "Read from <name>'s Yoma account on <date>" | What Yoma's account data said at that time, with the worker's consent. Not a cryptographic verification. | Real for token accounts; sample personas otherwise |
 | L3 | Check now | The account still exists, Yo-ID is still onboarded, completions are still Completed. | Real for token accounts; simulated for samples, labelled |
 | L4 | WhatsApp button | The button targets only the phone Yoma confirmed by OTP. "Phone confirmed by Yoma (not an ID check)". | Real field; off by default |
 | L5 | Links to yoma.world opportunity pages, live organisation data | The programme and the issuing organisation exist on Yoma, and what evidence Yoma required. | Real, live |
 | L6 | Cryptographic presentation of the Yoma-issued credential | Yoma's signature, revocation status, trusted issuer | Not built; needs a didx:me verifier client and Yoma's production cutover to SD-JWT (see integration notes) |
+
+The three YoVouch rows rest on L1 (signed by YoCard) and borrow L3 and L5 checks where they apply. Nothing new sits at L2, L4 or L6, because those levels belong to what Yoma recorded. No vouch row claims presence: a matched code proves possession of the code inside the window, and the label says so. What each new row does not prove, and what Check now re-checks:
+
+| Level | Does not prove | Check now re-checks |
+| --- | --- | --- |
+| L1c | That work happened, that the person is a real customer, quality, that the two phones were in the same place | Signature, not withdrawn, not hidden, card still live, flags recomputed |
+| L1w | That they worked together, that the voucher is honest | As L1c, plus the voucher's card is still live. The re-read of the voucher's Yoma account (phone still confirmed) is real only for the one account a `YOMA_ACCESS_TOKEN` can read; for every other voucher the signal is sample-only and carries the existing `simulated` label |
+| L1o | That Yoma endorses the referral, that the worker will be hired | The completion is still Completed on the worker's account (L3), the opportunity is still published on Yoma (L5), referral not withdrawn and not expired |
+
+Every vouch tier label contains `confirmed by them, not by Yoma`. Design: `docs/superpowers/specs/2026-11-16-yovouch-design.md`; plan: `docs/superpowers/plans/2026-11-16-yovouch.md`.
+
+YoVouch notes:
+
+- Clips are stored exactly as the browser recorded them, with no transcoding: WebM/Opus on Android Chrome, MP4/AAC on Safari and iOS. iOS clips are AAC and larger, about 60 KB for 15 seconds against about 30 KB on Android. Each clip link on the card shows its size.
+- WhatsApp shows a text-only link preview (the title and description) for a card link, because `og:image` points at the SVG share image and WhatsApp does not render SVG previews. A PNG render needs a rasteriser the repo does not have.
+- Prepare the demo with `node scripts/seed-demo.js` (and `--old-code` five minutes before beat 2); count the pilot with `node scripts/measure.js data/cards`. See `presentation/demo-script.md`, `docs/measurement-plan.md`, `docs/pilot-plan.md` and `docs/pilot-consent.md`.
 
 Safety rules built in: adults only (self-declared date of birth under 18 is refused), phone shown as last three digits, WhatsApp off by default, no date of birth or email in any record, "Never pay before the work is done" and "Who can see this: anyone with the link" on every page, one-tap withdraw with an owner secret.
 
@@ -128,10 +165,26 @@ Safety rules built in: adults only (self-declared date of birth under 18 is refu
 - `data/sample-credential.json`: representative wallet credential
 - `card.html`, `card.js`, `card.css`: YoCard worker flow (connect, describe, review, publish, share)
 - `server/card/`: account sources and personas, draft pipeline, signing, store, public page renderer, routes (`routes.js`, mounted by `server.js`): `GET /api/card/status`, `POST /api/card/account|draft|publish`, `POST /api/card/:id/check|withdraw`, `GET /c/:id[.svg|.json]`, `POST /c/:id/check`, `GET /.well-known/jwks.json`
+- `server/card/` YoVouch modules, wired by `buildVouchSystem` in `vouch-system.js` and delegated from `routes.js`:
+  - `vouchcode.js`: rotating code (90-second step, HOTP over HMAC-SHA256, QR tag), window checks, single use, the spoken lock and the per-sender cap
+  - `vouchers.js`: phone normalisation to E.164, keyed hashes and voucher files (caps, binds, wrong codes)
+  - `vouches.js`: vouch store, `.hashkey.json`, held words and clip, withdraw now and quiet, hide and show
+  - `vouch-lines.js`: lines and labels built by code from chips and released words
+  - `vouch-sessions.js`, `vouch-service.js`: vouch sessions and the one open step that consumes a code
+  - `flags.js`: reciprocal, ring and burst flags, recomputed on confirm and Check now
+  - `orgs.js`, `requests.js`: demo organisation keys (hash only) and single-use request links
+  - `reply.js`: listing parser with the two-grade fee detector, extraction, the six-line reply, translation with back-translation
+  - `transcribe.js`: `/audio/transcriptions` adapter with the derived confidence; typed text in template mode
+  - `sms.js`, `wa.js`, `outbox.js`: SMS and WhatsApp handlers and the outbox that only answers a number that wrote first
+  - `pages.js`, `copy.js`: server-rendered flow pages and the copy catalogue (`data/yovouch-copy.json`, `data/vouch-chips.json`)
+  - `vouch-routes.js`, `reply-routes.js`: `/my/`, `/s/`, `/v/`, `/a/`, `/o/`, `/r/`, `/api/vouch/`, `/api/request/`, `/api/reply/`, `/api/refer/`, `/api/sms/`, `/api/wa/`, `/api/sim/`, `/demo/` and `/qr-browser.js`
+  - `events.js`, `sweep.js`: `events.jsonl` (ids, channel and timestamps only) and the hourly retention sweep
+- `thread.html`, `thread.js`: the simulated WhatsApp thread (works only against `/api/sim/wa`)
+- `scripts/seed-demo.js`: prepared demo cards, vouches, ring, referral, inbox reply and beat 3 extraction; `scripts/measure.js`: the pilot counts and the end-of-pilot clip deletion
 - `server/qr.js`: QR encoder (ISO 18004 byte mode, versions 1 to 10) with SVG output, written in-repo
 - `data/cards/`: published cards and the signing key (git-ignored)
 - `tests/`: `node --test` suites; `tests/live.test.cjs` holds two model smoke tests (skipped without a model key) and two Yoma tests that call `YOMA_API_BASE` on every run (`YOCV_LIVE_YOMA=0` skips them offline)
-- `docs/`: design spec, implementation plan and testing log
+- `docs/`: design specs, implementation plans, testing log, YoVouch measurement plan, pilot plan and pilot consent text
 - `presentation/`: demo script and Yoma integration notes
 
 ## Accessibility, mobile and connectivity
