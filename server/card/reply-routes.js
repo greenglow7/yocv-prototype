@@ -8,7 +8,10 @@
                                           x-job-post-id, x-lang, x-clip-seconds at most 20) -> the same plus {transcript}
      POST /api/reply/:replyId/self-clip   audio, x-card-id, x-card-token, x-clip-seconds at most 16 -> {clipIds, lines}
      POST /api/reply/:replyId/edit        {cardId, cardToken, line, text} -> {ok, lines} | {ok:false, reason}
-     POST /api/reply/:replyId/confirm     {cardId, cardToken, lines, lang} -> {forward} | {forward:null, lines, notTranslated:true}
+     POST /api/reply/:replyId/confirm     {cardId, cardToken, lines, lang} -> {forward} for English; otherwise
+                                          {backTranslation, messages:['Is this what you said?']} | {forward:null, lines, notTranslated:true}
+     POST /api/reply/:replyId/back-translation {cardId, cardToken, answer} -> yes {forward}; first no {messages:[menu]};
+                                          second no {forward:null, notTranslated:true} (plan Task 15)
      POST /api/reply/:replyId/forwarded   {cardId, cardToken} -> {forwardedAt}, set once
      GET  /r/:replyId                     the reply page: the lines, clip links, private headers, honest footer;
                                           404 until the worker confirms, and line 2 turns neutral once its vouch is gone
@@ -17,8 +20,11 @@
    The routes are thin: they read the body, check the card token and call createReplyService, so the WhatsApp
    handler (Task 16) calls the same functions. A model call goes through system.withSlot, the router's in-flight
    guard, and a full guard answers 503 busy. A refusal stores no post and logs parser_refused with its reason.
-   Every reply route answers 404 "No card with this code" unless the card token matches. */
-const {parsePost,docMessages,isMediaOnly,extractAnswers,postOrganisations,answersText,chooseExperience,buildReplyLines,line6,fitReply,smsReply,editLine,detectDocuments,MAX_CLIPS}=require('./reply.js');
+   Every reply route answers 404 "No card with this code" unless the card token matches.
+   Translation (spec 6.4, plan Task 15): the English waits in the in-memory pendingEnglish map for 30 minutes and is
+   written to the record and returned only after the back-translation YES. An edit, a new self clip or a new
+   confirm drops it. */
+const {translateReply,parsePost,docMessages,isMediaOnly,extractAnswers,postOrganisations,answersText,chooseExperience,buildReplyLines,line6,fitReply,smsReply,editLine,detectDocuments,MAX_CLIPS}=require('./reply.js');
 const {audioType,isAudio,clipSeconds,CONFIDENCE_FLOOR,MAX_AUDIO_BYTES}=require('./transcribe.js');
 const {t,LANGS}=require('./copy.js');
 const {STRINGS}=require('./render.js');
@@ -28,9 +34,9 @@ const {computeFlags,burstHeld,workerEdges,cardCreatedMs}=require('./flags.js');
 const {replyPage,errorPage}=require('./pages.js');
 const {sendPrivateJSON,sendPage}=require('./vouch-routes.js');
 
-const REPLY_API=/^\/api\/reply\/([A-Z2-9]{10})\/(edit|confirm|forwarded|self-clip)$/;
+const REPLY_API=/^\/api\/reply\/([A-Z2-9]{10})\/(edit|confirm|back-translation|forwarded|self-clip)$/;
 const REPLY_PAGE=/^\/r\/([A-Z2-9]{10})(\/clip)?$/;
-const MAX_NOTE_SECONDS=20,MAX_SELF_SECONDS=16;
+const MAX_NOTE_SECONDS=20,MAX_SELF_SECONDS=16,PENDING_MS=30*60000;
 const isPlainObject=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 const str=v=>typeof v==='string'?v:'';
 const list=v=>Array.isArray(v)?v:[];
@@ -40,6 +46,15 @@ function fail(status,code,message){const err=new Error(message);err.status=statu
 
 function createReplyService(system){
   const {events,store}=system;
+  // replyId -> {english, at}: the English before the back-translation YES, never on disk (spec 6.4).
+  const pendingEnglish=new Map();
+  function pendingFor(replyId){
+    const nowMs=system.now();
+    for(const [id,p] of pendingEnglish)if(nowMs-p.at>PENDING_MS)pendingEnglish.delete(id);
+    return pendingEnglish.get(replyId)||null;
+  }
+  // A non-English reply whose lines changed: the English and the back-translation go, until the next YES.
+  const untranslated=r=>r.lang==='en'?{}:{lines:null,translation:{...(r.translation||{}),backTranslation:null,confirmedBySpeaker:false,confirmedAt:null}};
   function refused(refusal,channel,{parsed=null,flags=null}={}){
     events.log('parser_refused',{reason:refusal.reason,channel});
     return {jobPostId:null,parsed,flags,refusal,warning:null,documents:flags?.documents||[],messages:[refusal.message]};
@@ -152,8 +167,9 @@ function createReplyService(system){
     const self='self:'+replyId,clipIds=[...list(reply.clipIds).filter(id=>id!==self),self];
     const six=line6(clipIds.length,system.publicUrl+'/c/'+entry.cardId,firstOf(entry));
     const swap=v=>Array.isArray(v)&&v.length===6?v.map((l,i)=>i===5?six:l):v;
+    pendingEnglish.delete(replyId);
     const next=system.replyStore.update(replyId,r=>({...r,clipIds,lines:swap(r.lines),linesInSourceLang:swap(r.linesInSourceLang),
-      selfClip:{url:'/r/'+replyId+'/clip',contentType:saved.contentType,seconds,bytes:saved.bytes,sha256:saved.sha256},confirmedAt:null,confirmedLang:null}));
+      selfClip:{url:'/r/'+replyId+'/clip',contentType:saved.contentType,seconds,bytes:saved.bytes,sha256:saved.sha256},confirmedAt:null,confirmedLang:null,...untranslated(r)}));
     return {clipIds:next.clipIds,lines:next.linesInSourceLang};
   }
 
@@ -167,21 +183,58 @@ function createReplyService(system){
     const entry=liveCard(cardId),reply=ownReply(replyId,entry.cardId);
     const r=editLine(reply,line,text,{firstName:firstOf(entry),organisationNames:[...organisationsOf(entry.record),...postOrganisations(reply.post)],documents:documentsOf(reply.post).slice(0,2),nowMs:system.now()});
     if(!r.ok)return r;
-    const next=system.replyStore.update(replyId,()=>({...r.reply,confirmedAt:null,confirmedLang:null}));
+    pendingEnglish.delete(replyId);
+    const next=system.replyStore.update(replyId,()=>({...r.reply,confirmedAt:null,confirmedLang:null,...untranslated(r.reply)}));
     return {ok:true,lines:next.linesInSourceLang};
   }
-  // The worker confirms the own-language lines verbatim; the one-SMS reply is frozen then.
-  function confirm(replyId,lines,lang,{cardId,channel='web'}={}){
+  // The worker confirms the own-language lines verbatim; the one-SMS reply is frozen then. English goes out at
+  // once. Any other language is translated inside the in-flight guard and the back-translation is returned; with no
+  // model, a failed check, a provider error or after a second NO the own-language lines stay, Not translated.
+  async function confirm(replyId,lines,lang,{cardId,channel='web'}={}){
     const entry=liveCard(cardId),reply=ownReply(replyId,entry.cardId),nowMs=system.now();
     const own=list(reply.linesInSourceLang);
     if(!Array.isArray(lines)||lines.length!==own.length||lines.some((l,i)=>l!==own[i]))throw fail(409,'lines_changed','The lines changed. Read them again.');
+    const english=reply.lang==='en',confirmedLang=LANGS.includes(lang)?lang:reply.lang;
+    pendingEnglish.delete(replyId);
+    let tr=null;
+    if(!english&&system.liveModel&&(Number(reply.translation?.noCount)||0)<2){
+      try{tr=await system.withSlot(()=>translateReply({...reply,confirmedLang},{provider:system.provider,transcript:reply.transcript,firstName:firstOf(entry)}));}
+      catch(err){if(err?.code==='busy')throw err;tr=null;}
+    }
     const {files,flags}=vouchContext(entry.cardId,nowMs);
     const sms=smsReply({card:entry.record,vouches:files,publicUrl:system.publicUrl,nowMs,flags});
-    system.replyStore.update(replyId,r=>{r.confirmedLang=LANGS.includes(lang)?lang:r.lang;r.confirmedAt=iso(nowMs);r.sms=sms;});
+    system.replyStore.update(replyId,r=>{
+      r.confirmedLang=confirmedLang;r.confirmedAt=iso(nowMs);r.sms=sms;
+      if(!english){r.lines=null;r.translation={...(r.translation||{}),by:tr?'model':'none',from:r.lang,backTranslation:tr?tr.back:null,confirmedBySpeaker:false,confirmedAt:null};}
+    });
     system.replyStore.deleteRaw(replyId); // raw voice-note audio goes once the reply is confirmed (spec 9.7)
     events.log('reply_confirmed',{...cardFields(entry),replyId,channel});
-    if(reply.lang==='en'&&Array.isArray(reply.lines))return {forward:t('forwardThis')+'\n'+reply.lines.join('\n')};
-    return {forward:null,lines:own,notTranslated:true};
+    if(english&&Array.isArray(reply.lines))return {forward:t('forwardThis')+'\n'+reply.lines.join('\n')};
+    if(!tr)return {forward:null,lines:own,notTranslated:true};
+    pendingEnglish.set(replyId,{english:tr.english,at:nowMs});
+    return {backTranslation:tr.back,messages:[t('isThisWhat',reply.lang)]};
+  }
+  // The back-translation answer (spec 7.6 step 5). YES writes the waiting English and returns the forward text; the
+  // first NO goes back to the edit loop (the page closes until the next confirm); the second NO ends untranslated.
+  async function backTranslate(replyId,answer,{cardId}={}){
+    const entry=liveCard(cardId),reply=ownReply(replyId,entry.cardId),nowMs=system.now();
+    const a=str(answer).trim().toLowerCase().replace(/[\s.!]+$/,'');
+    const said=a==='yes'||a==='y'||a==='1'?'yes':a==='no'||a==='n'||a==='2'?'no':null;
+    if(!said)throw fail(400,'invalid_input','Answer yes or no.');
+    const tr=reply.translation||{},waiting=pendingFor(replyId);
+    if(reply.lang==='en'||!reply.confirmedAt||!Array.isArray(tr.backTranslation)||!waiting)throw fail(409,'not_pending','Nothing is waiting for your answer. Confirm the lines again.');
+    pendingEnglish.delete(replyId);
+    if(said==='yes'){
+      system.replyStore.update(replyId,r=>{r.lines=waiting.english.slice();r.translation={...r.translation,confirmedBySpeaker:true,confirmedAt:iso(nowMs)};});
+      return {forward:t('forwardThis',reply.lang)+'\n'+waiting.english.join('\n')};
+    }
+    const noCount=(Number(tr.noCount)||0)+1;
+    if(noCount>=2){
+      system.replyStore.update(replyId,r=>{r.lines=null;r.translation={...r.translation,by:'none',backTranslation:null,confirmedBySpeaker:false,noCount:2};});
+      return {forward:null,notTranslated:true};
+    }
+    system.replyStore.update(replyId,r=>{r.lines=null;r.confirmedAt=null;r.confirmedLang=null;r.translation={...r.translation,backTranslation:null,noCount};});
+    return {messages:[menuFor(entry.record,reply.lang)]};
   }
   function forwarded(replyId,{cardId}={}){
     const entry=liveCard(cardId);
@@ -206,9 +259,11 @@ function createReplyService(system){
     if(f?.record&&system.vouchStore.isLive(f,nowMs))return reply;
     const neutral=t('line2','en',{text:t('notStated'),source:t('srcStated','en',{first:str(firstName)})});
     const swap=v=>Array.isArray(v)&&v.length>1?v.map((l,i)=>i===1?neutral:l):v;
-    return {...reply,lines:swap(reply.lines),linesInSourceLang:swap(reply.linesInSourceLang)};
+    const tr=reply.translation;
+    return {...reply,lines:swap(reply.lines),linesInSourceLang:swap(reply.linesInSourceLang),
+      ...(tr&&Array.isArray(tr.backTranslation)?{translation:{...tr,backTranslation:swap(tr.backTranslation)}}:{})};
   }
-  return {parse,draft,draftAudio,selfClip,edit,confirm,forwarded,pageClips,pageReply,organisationsOf};
+  return {parse,draft,draftAudio,selfClip,edit,confirm,backTranslate,forwarded,pageClips,pageReply,organisationsOf};
 }
 
 function createReplyRouter(system){
@@ -270,6 +325,7 @@ function createReplyRouter(system){
     if(action==='self-clip')return withAudio(req,res,MAX_SELF_SECONDS,a=>svc().selfClip(replyId,a));
     if(action==='edit')return withCard(req,res,p=>svc().edit(replyId,p.line,str(p.text),{cardId:p.cardId}));
     if(action==='confirm')return withCard(req,res,p=>svc().confirm(replyId,p.lines,p.lang,{cardId:p.cardId}));
+    if(action==='back-translation')return withCard(req,res,p=>svc().backTranslate(replyId,p.answer,{cardId:p.cardId}));
     return withCard(req,res,p=>svc().forwarded(replyId,{cardId:p.cardId}));
   }
   function page(res,replyId){

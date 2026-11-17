@@ -386,10 +386,15 @@ function demoPhonePage({from='',thread=null,sampleMode}){
 // own-language lines and "Not translated".
 function replyPage({reply,firstName,clips=[],lang='en',sampleMode}){
   const english=Array.isArray(reply?.lines)&&reply.lines.length===6;
-  const lines=english?reply.lines:Array.isArray(reply?.linesInSourceLang)?reply.linesInSourceLang:[];
+  const own=Array.isArray(reply?.linesInSourceLang)?reply.linesInSourceLang:[];
+  const tr=reply?.translation||{},from=String(tr.from||reply?.lang||'');
+  // Before the YES: each own-language line with its back-translation under it, and no English (plan Task 15).
+  const back=!english&&Array.isArray(tr.backTranslation)&&tr.backTranslation.length===own.length?tr.backTranslation:null;
+  const translated=english&&reply?.lang!=='en'&&tr.confirmedBySpeaker===true;
+  const note=translated?t('translatedLabel','en',{language:LANG_NAMES[from]||from,first:String(firstName||'')}):back?t('isThisWhat',reply?.lang||lang):english?'':STRINGS.notTranslated;
   const title=String(firstName||'')+' · YoCard';
-  const body='<section><h1>'+H(title)+'</h1>'+(english?'':'<p class="small">'+H(STRINGS.notTranslated)+'</p>')+
-    '<ol>'+lines.map(l=>'<li>'+H(l)+'</li>').join('')+'</ol>'+
+  const items=english?reply.lines.map(l=>'<li>'+H(l)+'</li>'):own.map((l,i)=>'<li>'+H(l)+(back?'<div class="small">'+H(back[i])+'</div>':'')+'</li>');
+  const body='<section><h1>'+H(title)+'</h1>'+(note?'<p class="small">'+H(note)+'</p>':'')+'<ol>'+items.join('')+'</ol>'+
     clips.map(c=>'<p><a href="'+E(c.href)+'">'+H(c.text)+'</a></p>').join('')+'</section>';
   return flowPage({title,body,lang:english?'en':(reply?.lang||lang),sampleMode});
 }
