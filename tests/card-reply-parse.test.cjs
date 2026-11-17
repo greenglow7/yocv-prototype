@@ -25,6 +25,15 @@ test('fee refusal grade', () => {
   for (const t of ['Pay KSh 1000 to secure your place, 0712345678', 'Send N5000 now, 08031234567', 'Deposit R200 on M-Pesa first'])
     assert.ok(detectFees(t).feeRequest, t);
 });
+test('pay after will or a pronoun is an action', async () => {
+  for (const t of ['You will pay a R300 registration fee, call 0821234567', 'You will pay R300 for training before you start, call 0821234567'])
+    assert.equal(outcome(await parsePost(t)), 'fee_refusal', t);
+});
+test('a wage next to a fee word and an action is refused', async () => {
+  for (const t of ['Registration fee R300 per month, pay to apply, 0821234567', 'Training fee R500 a month, pay to apply, call 0821234567'])
+    assert.equal(outcome(await parsePost(t)), 'fee_refusal', t);
+  assert.equal(detectFees('Salary R5000 per month by deposit, call 0821234567').feeRequest, null);
+});
 test('a wage is not a fee request', () => {
   for (const t of ['Pay: R300/day, uniform provided, call 0821234567', 'We pay R250 a day, training provided, call 0821234567', 'Good pay R5000 per month, training provided']) {
     const f = detectFees(t);

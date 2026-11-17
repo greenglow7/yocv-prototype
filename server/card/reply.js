@@ -4,8 +4,9 @@
    quoteInSource and noInventedNumbers or it is emptied and listed in `rejected`. Fees come in two grades:
    an amount near a fee word that is itself near pay, send, deposit or "to apply" is refused; training, a kit,
    a uniform or a medical near an amount with no such word near is a warning to the worker only. An amount
-   read as a wage ("R250/day", "KSh 800 per day") and "pay" read as a noun ("Pay:", "good pay", "we pay") are
-   not fee evidence (our call, so a post that states its wage is not refused). The model never sees a phone
+   read as a wage ("R250/day", "KSh 800 per day") is not evidence next to a warning word, and "pay" read as a noun
+   ("Pay:", "good pay") is not an action (our call, so a post that states its wage is not refused). A wage next to
+   fee, registration, processing or deposit and an action is still refused. The model never sees a phone
    number: numbers are masked as [number] and `contact` always comes from the rules. */
 const crypto=require('node:crypto');
 const fs=require('node:fs');
@@ -23,7 +24,8 @@ const FIELDS=['work','area','pay','start','contact'],LISTS=['documents','money_a
 const FEE_WORD=/^(?:fees?|registration|training|kits?|uniforms?|medicals?|processing|deposits?)$/;
 const WARN_WORD=/^(?:training|kits?|uniforms?|medicals?)$/;
 const MOBILE_MONEY=/^(?:mpesa|m-pesa|momo|opay|ecocash)$/;
-const PAY_NOUN_BEFORE=new Set(['good','the','daily','weekly','monthly','your','basic','net','we','will','nice','great','decent','salary','competitive','fair','our']);
+// Only adjectives read "pay" as a noun: after will, we, our, your or the it can be the action ("You will pay a R300 fee").
+const PAY_NOUN_BEFORE=new Set(['good','daily','weekly','monthly','basic','net','nice','great','decent','salary','competitive','fair']);
 const PAY_NOUN_AFTER=new Set(['is','per','rate','of','will','negotiable','depends']);
 const RATE_WORD=/^(?:daily|weekly|monthly|hourly|pm|p\/m|pd|p\/d|ph|p\/h)$/;
 const RATE_UNIT=/^(?:day|week|month|hour|hr|shift|fortnight)s?$/;
@@ -120,11 +122,12 @@ function detectFees(rawText){
   const withAmount=(s,e)=>{const a=amountNear(s,e);return a?quote(Math.min(s,a.start),Math.max(e,a.end)):quote(s,e);};
   let feeRequest=null;
   for(const a of amts){
-    if(isWage(toks,a))continue;
-    const idx=[];
+    // A wage is exempt only from the warning words: fee, registration, processing or deposit near it still refuses,
+    // with an action other than the fee word itself ("R5000 per month by deposit" is not a request).
+    const wage=isWage(toks,a),idx=[];
     for(let i=0;i<toks.length;i++){
-      if(!FEE_WORD.test(toks[i].w)||dist(a,i)>NEAR)continue;
-      const acts=actions.filter(act=>actionNear(act,i));
+      if(!FEE_WORD.test(toks[i].w)||dist(a,i)>NEAR||wage&&WARN_WORD.test(toks[i].w))continue;
+      const acts=actions.filter(act=>actionNear(act,i)&&!(wage&&act[0]===i&&act[1]===i));
       if(acts.length)idx.push(i,...acts.flat());
     }
     if(!idx.length)continue;
