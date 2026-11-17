@@ -507,7 +507,7 @@ function createVouchRouter(system){
     if(payload===undefined)return;
     const p=isPlainObject(payload)?payload:{};
     const r=await system.sms.handle({from:field(p.from),text:field(p.text)});
-    if(form)return sendPage(res,200,demoPhonePage({from:field(p.from),replies:r.replies,sampleMode}));
+    if(form)return sendPage(res,200,demoPhonePage({from:field(p.from),thread:system.sms.thread(field(p.from)),sampleMode}));
     sendPrivateJSON(res,200,r);
   }
 

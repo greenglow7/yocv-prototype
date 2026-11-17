@@ -1,7 +1,8 @@
 'use strict';
 /* YoVouch open step (spec 4.3, 7.2 step 2). open() is the one place a code is consumed and a vouch session
    opened: the scan form's 18-or-older POST, POST /api/vouch/open and, later, the SMS and call handlers all
-   call it. Every refusal logs code_refused with its reason; every open logs vouch_opened. */
+   call it. Every refusal logs code_refused with its reason; every open logs vouch_opened. With a voucherKey (the
+   SMS path, plan Task 12) the self, cap and recent checks run after a matched code and before the step is used. */
 const fs=require('node:fs');
 const path=require('node:path');
 const {t,LANGS}=require('./copy.js');
@@ -21,7 +22,7 @@ const BIND_TTL_MS=10*MINUTE,BINDS_PER_HOUR=3;
 const DEMO_TTL_MS=10*MINUTE,DEMO_WRONG=3,DEMO_PER_HOUR=3;
 const REPLY_WINDOW_MS=15*MINUTE;
 const MAX_FIRST_NAME=30;
-const STATUS={code_expired:400,code_wrong:400,code_used:409,card_locked:429,card_withdrawn:410,not_found:404,
+const STATUS={code_expired:400,code_wrong:400,code_used:409,card_locked:429,card_withdrawn:410,not_found:404,self_vouch:403,
   voucher_cap_day:429,voucher_cap_cards:429,voucher_recent:409,not_eligible:403,request_used:409,request_expired:410};
 
 // The work chips for a TRADES id; free-text trades and unknown ids get the default list.
@@ -38,6 +39,9 @@ function messageFor(code,first,lang){
   if(code==='code_wrong')return t('codeWrongWeb',lang,vars);
   if(code==='card_locked')return t('codeLockedWeb',lang);
   if(code==='card_withdrawn')return t('cardWithdrawn',lang);
+  if(code==='self_vouch')return t('selfVouch',lang,vars);
+  if(code==='voucher_recent')return t('recent',lang,vars);
+  if(code==='voucher_cap_day'||code==='voucher_cap_cards')return capMessage(code,lang);
   return STRINGS.notFound;
 }
 
@@ -63,8 +67,8 @@ function createVouchService(system){
       bind:gatewayConfigured(yv)?'sms':'demo',expiresInMs:EXPIRES_IN_MS};
   }
 
-  // input = {cardId | cardRef, proof, voucher, voucherKey = null, onWorkerPhone, channel, lang, formNonce}. voucherKey is
-  // known only on the SMS and call paths; the caps that read it arrive with Task 5 and Task 12.
+  // input = {cardId | cardRef, proof, voucher, voucherKey = null, phoneLast3, onWorkerPhone, channel, lang, formNonce}.
+  // voucherKey (with phoneLast3) is known only on the SMS and call paths, where the sender's number is the voucher.
   async function open(input={}){
     const channel=['web','sms','ivr'].includes(input.channel)?input.channel:'web';
     const lang=LANGS.includes(input.lang)?input.lang:'en';
@@ -78,11 +82,23 @@ function createVouchService(system){
     if(prior&&prior.cardId===entry.cardId)return opened(again,prior,entry);
     const proof=input.proof||{};
     if(proof.method!=='qr'&&proof.method!=='code')return refuse('code_wrong',{entry,channel,lang});
+    const voucherKey=typeof input.voucherKey==='string'&&/^[0-9a-f]{64}$/.test(input.voucherKey)?input.voucherKey:null;
+    if(voucherKey){
+      const pre=codes.verify(entry.cardId,proof,{channel,consume:false});
+      if(!pre.ok)return refuse(pre.code,{entry,channel,lang});
+      if(isSelfVouch(entry,voucherKey))return refuse('self_vouch',{entry,channel,lang});
+      const cap=capFor(system.voucherFiles.read(voucherKey),entry.cardId,system.now());
+      if(cap)return refuse(cap,{entry,channel,lang});
+      const recent=recentFor(system.vouchStore.listByVoucherKey(voucherKey),entry.cardId,system.now());
+      if(recent)return {...refuse('voucher_recent',{entry,channel,lang}),existingVouchId:recent.record.vouchId};
+    }
     const r=codes.verify(entry.cardId,proof,{channel,consume:true});
     if(!r.ok)return refuse(r.code,{entry,channel,lang});
     const onWorkerPhone=input.onWorkerPhone===true;
     const {vouchToken,session}=sessions.open({cardId:entry.cardId,proof:{method:proof.method,step:r.step,provedAt:r.provedAt,channel,onWorkerPhone},
       voucher:input.voucher||{kind:'customer'},onWorkerPhone,channel,lang,adult:true,formNonce:input.formNonce});
+    // The SMS sender is the voucher: the number is taken from the sender, phoneConfirmedBy 'sms_origin' (spec 7.3).
+    if(voucherKey)session.smsOrigin={key:voucherKey,last3:/^\d{3}$/.test(String(input.phoneLast3??''))?String(input.phoneLast3):null};
     events.log('vouch_opened',{channel,method:proof.method,...cardFields(entry)});
     return opened(vouchToken,session,entry);
   }
@@ -254,6 +270,7 @@ function createVouchService(system){
   }
   // The voucher as far as the session knows it: the bound phone, or the demo code's number.
   function voucherOf(session){
+    if(session.smsOrigin)return {method:'sms_origin',key:session.smsOrigin.key,last3:session.smsOrigin.last3};
     if(!gatewayConfigured(yv))return session.demo?{method:'demo',key:session.demo.key,last3:session.demo.phoneLast3}:null;
     return session.bind?.at?{method:'sms_bind',key:session.bind.voucherKey,last3:session.bind.phoneLast3}:null;
   }
@@ -279,7 +296,8 @@ function createVouchService(system){
     const visit=b.visit==='yes'||b.visit==='no'?b.visit:null;
     if(b.consent!==true&&visit!=='no')return {ok:false,status:400,code:'consent_needed',message:t('readIt',lang,{first})};
     let voucher;
-    if(!gatewayConfigured(yv)){
+    if(session.smsOrigin)voucher=voucherOf(session);
+    else if(!gatewayConfigured(yv)){
       const d=session.demo;
       if(!d)return {ok:false,status:409,code:'not_bound',message:t('demoNoGateway',lang)};
       const otp=String(b.otp??'').replace(/[\s-]/g,'');
@@ -327,10 +345,24 @@ function createVouchService(system){
     if(bySms)system.outbox.send(session.bind.replyTo,t('withdrawSms',lang,{first,link:withdrawUrl}));
     if(session.bind)session.bind.replyTo=null;
     system.sessions.delete(token);
+    // The SMS voucher types the 6-character secret back in REMOVE; no link is sent.
+    if(voucher.method==='sms_origin')return {ok:true,vouchId,line:record.line,withdrawUrl:null,withdrawSecret,visitAdded:false};
     return {ok:true,vouchId,line:record.line,withdrawUrl:bySms?null:withdrawUrl,visitAdded:false,withdrawSent:bySms,demo:voucher.method==='demo'};
   }
 
-  return {open,setChips,setWords,clipWords,setDisclose,issueBind,bindBySms,bindStatus,demoOtp,confirm,preview};
+  // A second matched code this month from the same number adds a visit to its live vouch (the SMS YES after "recent").
+  function addVisit({vouchId,voucherKey,channel='sms',lang='en'}={}){
+    const file=system.vouchStore.get(vouchId);
+    if(!file?.record||!voucherKey||file.private?.voucherKey!==voucherKey||!system.vouchStore.isLive(file,nowMs()))return {ok:false,code:'not_found',message:t('smsNothing',lang)};
+    const cap=capFor(system.voucherFiles.read(voucherKey),file.record.cardId,nowMs());
+    if(cap)return {ok:false,code:cap,message:capMessage(cap,lang)};
+    system.vouchStore.update(vouchId,f=>{f.record.visits=(Number(f.record.visits)||1)+1;});
+    system.voucherFiles.update(voucherKey,f=>{f.sessions.push({cardId:file.record.cardId,at:iso(nowMs())});});
+    events.log('vouch_visit_added',{vouchId,...cardFields(store.get(file.record.cardId)||{cardId:file.record.cardId}),channel});
+    return {ok:true,vouchId};
+  }
+
+  return {open,setChips,setWords,clipWords,setDisclose,issueBind,bindBySms,bindStatus,demoOtp,confirm,preview,addVisit};
 }
 const splitOptionsStem=s=>{const i=String(s).search(/[?:]/);return i<0?String(s):String(s).slice(0,i+1);};
 

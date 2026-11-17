@@ -288,9 +288,11 @@ function donePage({messages,lang='en',sampleMode}){
   return flowPage({title:head,body,lang,sampleMode});
 }
 
-// GET /demo/phone (YOVOUCH_SIM=1 only): a pretend phone that posts to /api/sim/sms and lists the replies.
-function demoPhonePage({from='',replies=null,sampleMode}){
-  const list=Array.isArray(replies)?'<ol>'+replies.map(r=>'<li>'+H(r)+'</li>').join('')+'</ol>':'';
+// GET /demo/phone (YOVOUCH_SIM=1 only): a pretend phone that posts to /api/sim/sms. After a send it lists the
+// thread for the typed sample number, newest last, each reply under the simSms label.
+function demoPhonePage({from='',thread=null,sampleMode}){
+  const item=m=>m.dir==='in'?'<li><b>'+H(t('sampleNumber'))+':</b> '+H(m.text)+'</li>':'<li><span class="small">'+H(t('simSms'))+'</span><br>'+H(m.text)+'</li>';
+  const list=Array.isArray(thread)&&thread.length?'<ol>'+thread.map(item).join('')+'</ol>':'';
   const body='<section><h1>'+H(t('simSms'))+'</h1>'+list+
     '<form method="post" action="/api/sim/sms"><label>'+H(t('sampleNumber'))+'<input name="from" type="tel" autocomplete="off" required maxlength="20" value="'+E(from)+'"></label>'+
     '<label>SMS<textarea name="text" rows="2" maxlength="480" required></textarea></label><button>Send</button></form></section>';
