@@ -33,6 +33,8 @@ async function bootVouch({env={},provider=null,clock={t:NOW},outbox}={}){
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'yovouch-'));
  const now=()=>clock.t;
  const config={...loadConfig({env,cwd:dir}),provider:'local',model:null,azure:null,openai:null,port:0,host:'127.0.0.1',yomaAccessToken:'',publicUrl:PUBLIC_URL};
+ // env keys named like config.yovouch fields ({sim:true}, {gatewaySecret:'s3cret'}) override its defaults.
+ config.yovouch={...config.yovouch,...Object.fromEntries(Object.entries(env).filter(([k])=>Object.hasOwn(config.yovouch,k)))};
  const yoma=fakeYoma();
  const store=createCardStore(dir,{now});
  const key=loadOrCreateKey(dir);

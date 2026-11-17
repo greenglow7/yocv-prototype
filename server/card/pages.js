@@ -5,10 +5,23 @@
 const {shell,footer,escapeHtml,FLOW_CSS,STRINGS}=require('./render.js');
 const {COPY,t,LANGS,LANG_NAMES,splitOptions}=require('./copy.js');
 const {formatSpoken,spokenCode,qrTag,scanUrl,counterAt,STEP_SECONDS}=require('./vouchcode.js');
-const {qrSvg}=require('../qr.js');
+const {encodeQr}=require('../qr.js');
+const {tierLabel}=require('./vouch-lines.js');
 
 const TIME_ZONES={'South Africa':'Africa/Johannesburg',Kenya:'Africa/Nairobi',Nigeria:'Africa/Lagos',Ghana:'Africa/Accra',Uganda:'Africa/Kampala',Tanzania:'Africa/Dar_es_Salaam'};
-const QR_OPTS={cellSize:4,margin:2};
+const QR_MARGIN=2;
+// The worker page's QR, drawn like qrSvg(text,{cellSize:1,margin:2}) but with each horizontal run of dark modules as
+// one rectangle, so the page stays inside its size budget with a vouch list. The CSS sets the drawn size.
+function qrCompact(text){
+  const {size,modules}=encodeQr(text,{level:'M'}),total=size+2*QR_MARGIN;let d='';
+  for(let r=0;r<size;r++)for(let c=0;c<size;){
+    if(!modules[r][c]){c++;continue;}
+    let n=1;while(c+n<size&&modules[r][c+n])n++;
+    d+='M'+(c+QR_MARGIN)+' '+(r+QR_MARGIN)+'h'+n+'v1h-'+n+'z';c+=n;
+  }
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+total+' '+total+'" width="'+total+'" height="'+total+'" shape-rendering="crispEdges" role="img" aria-label="QR code">'+
+    '<rect width="'+total+'" height="'+total+'" fill="#ffffff"/><path d="'+d+'" fill="#1a1024"/></svg>';
+}
 const E=escapeHtml;
 // Text nodes keep straight quotes as typed (the copy quotes the worker's question); attributes use E.
 const H=v=>String(v??'').replace(/[&<>]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;'})[ch]);
@@ -36,14 +49,30 @@ const WORKER_JS=['(function(){var w=document.getElementById("w");if(!w||!window.
   'function tick(){clearTimeout(tm);if(!B)return;var ms=Date.parse(B.serverNow)+performance.now()-t0,n=Math.floor(ms/',STEP_SECONDS*1000,'),c=B.codes[n-B.fromCounter];if(!c){B=null;load();return}',
   'var s=c.spoken.slice(0,3)+" "+c.spoken.slice(3),v=f((n+2)*',STEP_SECONDS*1000,');',
   'var e=$("l"),k="VOUCH "+d.s+" ";e.textContent=e.dataset.t.replace("%s",s).replace("%t",v);e=$("n");e.textContent=e.textContent.replace(k+P,k+c.spoken);P=c.spoken;',
-  'e="/s/"+d.id+"?t="+n+"&k="+c.qr;$("a").href=e+"&w=1";if(window.qrSvg)$("q").innerHTML=qrSvg(d.base+e,{cellSize:4,margin:2});',
+  'e="/s/"+d.id+"?t="+n+"&k="+c.qr;$("a").href=e+"&w=1";if(window.qrSvg)$("q").innerHTML=qrSvg(d.base+e,{cellSize:1,margin:2});',
   'tm=setTimeout(tick,(n+1)*',STEP_SECONDS*1000,'-ms+50)}addEventListener("online",load);load()})();'].join('');
 const WORKER_CSS='.code{font-size:28px;font-weight:700}#q svg{width:100%;max-width:240px;height:auto}.pr{display:none}.langs button{margin:4px 4px 0 0}'+
   '@media print{#c,#q,details,.np{display:none}.pr{display:block}}';
 
 // The worker's code page (spec 4.3). yv is config.yovouch (shortcode and call-back number); a plan addition to
 // the signature, since the "Customer has no data" line prints both.
-function workerPage({entry,record,batch,locked,lang='en',publicUrl,myUrl,nowMs,sampleMode,yv={}}){
+// vouches (plan Task 6) are the worker's own lines, newest first: {vouchId, line, words, hidden, held}. Held words
+// show here, on the worker's private page only, so the worker can read them before tapping Show.
+function vouchList(vouches,path,L,waiting){
+  if(!vouches.length)return '';
+  // One form; each button carries its vouchId and a path relative to /my/<cardId>/<token>, so a line stays small.
+  const rel=path.split('/').pop()+'/';
+  const act=(v,to,label,cls='')=>'<button name="vouchId" value="'+E(v.vouchId)+'" formaction="'+E(rel+to)+'"'+cls+'>'+H(L(label))+'</button>';
+  return '<form method="post" action="'+E(path)+'/hide" class="np"><h2>'+H(L('yourVouches'))+'</h2>'+(waiting?'<p>'+H(L('wordsWaiting',{n:waiting}))+'</p>':'')+
+    vouches.map(v=>'<p'+(v.hidden?' class="small"':'')+'>'+H(v.line)+(v.held&&v.words?' <i>"'+H(v.words)+'"</i>':'')+'<br>'+
+      (v.hidden?act(v,'show','showAgain'):act(v,'hide','hide',' class="alt"'))+(v.held&&!v.hidden?' '+act(v,'show-words','showWords'):'')+'</p>').join('')+
+    '<p class="small">'+H(L('biscate'))+'</p></form>';
+}
+// Polls status.json every 10 s for two minutes and reloads when a new vouch arrives (spec 7.1 step 4).
+const STATUS_JS='(function(){var w=document.getElementById("w");if(!w||!window.fetch)return;var c=+w.dataset.n,k=0,i=setInterval(function(){if(++k>12){clearInterval(i);return}'+
+  'fetch("/my/"+w.dataset.id+"/"+w.dataset.tk+"/status.json").then(function(r){return r.json()}).then(function(j){if(j.vouchCount>c){clearInterval(i);location.reload()}}).catch(function(){})},10000)})();';
+
+function workerPage({entry,record,batch,locked,lang='en',publicUrl,myUrl,nowMs,sampleMode,yv={},vouches=[],arrived=false,waiting=0,liveCount=0}){
   const cardId=entry.cardId,country=record?.user?.country,first=record?.user?.firstName||'',secret=entry.vouch?.secret;
   const counter=batch?.fromCounter??counterAt(nowMs);
   const now0=batch?.codes?.[0]||{spoken:spokenCode(secret,counter),qr:qrTag(secret,counter)};
@@ -54,21 +83,23 @@ function workerPage({entry,record,batch,locked,lang='en',publicUrl,myUrl,nowMs,s
   const noData=L('noDataLine',{smsId:entry.smsId,code:now0.spoken,shortcode:yv.shortcode||'12345',callback:yv.callbackNumber||'0800 000 000'});
   const scanHref='/s/'+cardId+'?t='+counter+'&k='+now0.qr+'&w=1';
   const langs=LANGS.map(l=>'<button name="lang" value="'+l+'"'+(l===lang?' class="alt" aria-pressed="true"':'')+'>'+H(LANG_NAMES[l])+'</button>').join('');
-  const body='<section id="w" data-id="'+cardId+'" data-tk="'+E(token)+'" data-s="'+E(entry.smsId)+'" data-c="'+now0.spoken+'" data-tz="'+(TIME_ZONES[country]||'')+'" data-base="'+E(base)+'">'+
+  const body=(arrived?'<p class="notice">'+H(L('vouchArrived'))+'</p>':'')+
+    '<section id="w" data-id="'+cardId+'" data-tk="'+E(token)+'" data-s="'+E(entry.smsId)+'" data-c="'+now0.spoken+'" data-tz="'+(TIME_ZONES[country]||'')+'" data-base="'+E(base)+'" data-n="'+Number(liveCount)+'">'+
     '<h1>'+H(L('showThis'))+'</h1>'+
     '<div id="c"><p class="code" id="l" data-t="'+E(codeTpl)+'">'+H(codeTpl.replace('%s',formatSpoken(now0.spoken)).replace('%t',until))+'</p></div>'+
-    '<div id="q">'+qrSvg(scanUrl(base,cardId,counter,now0.qr),QR_OPTS)+'</div>'+
+    '<div id="q">'+qrCompact(scanUrl(base,cardId,counter,now0.qr))+'</div>'+
     '<p>Card code <b>'+H(record?.code)+'</b> · card number <b>'+H(entry.smsId)+'</b></p>'+
     '<p class="np"><a class="btn alt" href="'+E(path)+'">'+H(L('newCode'))+'</a></p>'+
     '<p class="pr">'+H(L('doNotPrint'))+'</p>'+
     '<p>'+H(L('askLine'))+'</p>'+
-    '<p class="small">'+H(L('invite'))+'</p>'+
+    (vouches.length?'':'<p class="small">'+H(L('invite'))+'</p>')+
     '<details><summary>'+H(L('noData'))+'</summary>'+'<p id="n">'+H(noData)+'</p>'+
     '<p><a id="a" href="'+E(scanHref)+'">'+H(L('vouchButton',{first}))+'</a></p></details>'+
     (locked?'<p class="bad">'+H(L('locked',{time:localTime(Date.parse(locked.until),country,{seconds:false})}))+'</p>':'')+
     '</section>'+
+    vouchList(vouches,path,L,waiting)+
     '<form method="post" action="'+E(path)+'/lang" class="langs np"><p>'+H(splitOptions(L('languageMenu')).stem)+'</p>'+langs+'</form>'+
-    '<script src="/qr-browser.js" defer></script><script>'+WORKER_JS+'</script>';
+    '<script src="/qr-browser.js" defer></script><script>'+WORKER_JS+STATUS_JS+'</script>';
   return flowPage({title:'YoCard',body,lang,sampleMode,css:WORKER_CSS});
 }
 
@@ -132,17 +163,17 @@ function errorPage({message,lang='en',sampleMode,link=null}){
 const HOW_OFTEN_VALUES=['once','a few times','regularly','rather not say'];
 const AGAIN_VALUES=['yes','rather not say'];
 // The chips page under the vouchToken (spec 7.2 step 2). Choosing chips consumes nothing more.
-function chipsPage({session,card,chips,lang='en',sampleMode}){
+function chipsPage({session,card,chips,lang='en',sampleMode,error}){
   const L=(k,v)=>t(k,lang,v),f=first(card);
-  const work=chips.map(c=>c==='Other'?radio('work','other',c):radio('work',c,c)).join('')+'<input name="other" maxlength="40" aria-label="Other">';
+  const work=chips.map(c=>c==='Other'?radio('work','other',c):radio('work',c,c)).join('')+'<input name="other" maxlength="30" aria-label="Other">';
   const again=session?.voucher?.kind==='worker'?'workAgainQ':'hireAgainQ';
-  const body='<section><h1>'+H(titleFor(card,lang))+'</h1><p class="small">'+H(STRINGS.limitsShort(f,session?.channel||'web'))+'</p>'+
+  const body='<section><h1>'+H(titleFor(card,lang))+'</h1><p class="small">'+H(STRINGS.limitsShort(f,session?.channel||'web'))+'</p>'+errorLine(error)+
     '<form method="post" action="/api/vouch/'+E(session.vouchToken)+'/chips">'+
     '<fieldset class="r"><legend>'+H(L('whatDid',{first:f}))+'</legend>'+work+'</fieldset>'+
     group('when',L('when'),splitOptions(COPY.when).options,{after:'<input type="month" name="month">'})+
     group('howOften',L('howOften'),HOW_OFTEN_VALUES)+
     group('hireAgain',L(again,{first:f}),AGAIN_VALUES)+
-    '<label>'+H(L('ownWords'))+'<textarea name="words" maxlength="120" rows="3"></textarea></label>'+
+    '<label>'+H(L('ownWords'))+'<textarea name="words" maxlength="120" rows="3">'+H(session?.words?.text||'')+'</textarea></label>'+
     '<button>'+H(L('vouchButton',{first:f}))+'</button></form></section>';
   return flowPage({title:titleFor(card,lang),body,lang,sampleMode,css:FORM_CSS});
 }
@@ -158,4 +189,88 @@ function withdrawPage({first:name,vouchId,secret,lang='en',error,sampleMode}){
   return flowPage({title:L('withdrawNow'),body,lang,sampleMode});
 }
 
-module.exports={TIME_ZONES,localTime,flowPage,workerPage,scanPage,typedPage,adultsOnlyPage,errorPage,chipsPage,withdrawPage};
+// ---- Disclosure, phone binding, read-back and done (spec 7.2 steps 4 to 7, plan Task 6). Each under 4096 bytes. ----
+const sessionPath=token=>'/s/t/'+token;
+// The no-JS disclosure form posts to the session page with step=disclose. The first-name box never autocompletes,
+// because on the worker's phone the browser would keep the customer's name.
+function disclosePage({session,card,lang='en',sampleMode,error}){
+  const L=(k,v)=>t(k,lang,v),f=first(card),d=session.disclose||{};
+  const {stem,options}=splitOptions(L('showMeAs',{first:f,name:'{name}',digits:'{digits}'}));
+  const named=d.showMe==='name';
+  const nameBox='<input name="firstName" maxlength="30" autocomplete="off" aria-label="'+E(options[1]||'')+'" value="'+E(d.firstName||'')+'"> ···';
+  const body='<section><h1>'+H(titleFor(card,lang))+'</h1>'+errorLine(error)+
+    '<form method="post" action="'+sessionPath(session.vouchToken)+'">'+hidden('step','disclose')+
+    '<fieldset class="r"><legend>'+H(stem)+'</legend>'+radio('showMe','customer',options[0]||'',named?'':' checked')+
+    '<label><input type="radio" name="showMe" value="name"'+(named?' checked':'')+'> '+nameBox+'</label></fieldset>'+
+    '<p class="r"><label><input type="checkbox" name="attachClip" value="yes"> '+H(L('attachClip'))+'</label></p>'+
+    '<button>'+H(L('vouchButton',{first:f}))+'</button></form></section>';
+  return flowPage({title:titleFor(card,lang),body,lang,sampleMode,css:FORM_CSS});
+}
+
+// The 5-second poll of GET /api/vouch/<token>/bind for 10 minutes; it reloads once the number is bound or the
+// error changes. The page works without it: "I have sent it" reloads by hand.
+function bindPoll(token,error){
+  const cur=JSON.stringify(error||'').replace(/</g,'\\u003c');
+  return '<script>(function(){if(!window.fetch)return;var n=0,i=setInterval(function(){if(++n>120){clearInterval(i);return}'+
+    'fetch("/api/vouch/'+token+'/bind").then(function(r){return r.json()}).then(function(j){if(j&&(j.bound||(j.error||"")!=='+cur+')){clearInterval(i);location.reload()}}).catch(function(){})},5000)})();</script>';
+}
+// Phone binding (spec 7.2 step 5). With a gateway the customer texts YES <code> first; without one, the demo
+// fallback asks for a number (autocomplete off), shows the code on screen and sends nothing.
+function bindPage({session,card,lang='en',sampleMode,shortcode='12345',sessionCode=null,demo=false,bound=false,phoneLast3=null,error}){
+  const L=(k,v)=>t(k,lang,v),token=session.vouchToken;
+  let body='<section><h1>'+H(titleFor(card,lang))+'</h1>'+errorLine(error);
+  if(demo){
+    body+='<p class="notice">'+H(L('demoNoGateway'))+'</p>'+
+      '<form method="post" action="/api/vouch/'+token+'/otp"><label>'+H(L('sampleNumber'))+
+      '<input name="phone" type="tel" inputmode="tel" autocomplete="off" required maxlength="20"></label><button>'+H(L('vouchButton',{first:first(card)}))+'</button></form>';
+  }else if(bound){
+    body+='<p class="notice">'+H(L('gotIt',{digits:phoneLast3||''}))+'</p><p><a class="btn" href="'+sessionPath(token)+'">'+H(L('sentIt'))+'</a></p>';
+  }else{
+    body+='<p class="code">'+H(sessionCode||'')+'</p>'+
+      '<p>'+H(L(session.onWorkerPhone?'textYesWorkerPhone':'textYesScan',{sessionCode:sessionCode||'',shortcode}))+'</p>'+
+      '<p class="notice">'+H(L('waiting'))+'</p><p><a class="btn" href="'+sessionPath(token)+'">'+H(L('sentIt'))+'</a></p>'+bindPoll(token,error);
+  }
+  return flowPage({title:titleFor(card,lang),body:body+'</section>',lang,sampleMode,css:FORM_CSS+'.code{font-size:28px;font-weight:700;letter-spacing:2px}'});
+}
+
+// The read-back (spec 7.2 step 6): the label and the chips line exactly as the card will show them, the held
+// words marked as waiting, then Publish (hidden consent=yes) or Change something. A repeat customer is asked to
+// add a visit instead; the demo fallback shows its one-time code next to the box.
+function readbackPage({session,card,record,lang='en',sampleMode,phoneLast3=null,demoCode=null,recent=false,error}){
+  const L=(k,v)=>t(k,lang,v),f=first(card),token=session.vouchToken;
+  const words=session.words?.text;
+  const yesNo=splitOptions(COPY.adultQ).options;
+  const actions=recent
+    ?'<p>'+H(L('recent',{first:f}))+'</p><p><button name="visit" value="yes">'+H(yesNo[0]||'Yes')+'</button> <button name="visit" value="no" class="alt">'+H(yesNo[1]||'No')+'</button></p>'
+    :'<button>'+H(L('publish'))+'</button>';
+  const body='<section>'+(phoneLast3?'<p class="small">'+H(L('gotIt',{digits:phoneLast3}))+'</p>':'')+errorLine(error)+
+    '<h1>'+H(L('readIt',{first:f}))+'</h1>'+
+    '<p class="small">'+H(tierLabel(record,f))+'</p><p><b>'+H(record.line)+'</b></p>'+
+    (words?'<p>"'+H(words)+'"</p><p class="small">'+H(L('heldNote',{first:f}))+'</p>':'')+
+    '<p class="small">'+H(L('canWithdraw'))+'</p>'+
+    '<form method="post" action="/api/vouch/'+token+'/confirm">'+hidden('consent','yes')+
+    (demoCode?'<p class="notice">'+H(L('demoNoGateway'))+'</p><label>'+H(L('digitsLabel'))+' <b>'+H(demoCode)+'</b>'+
+      '<input name="otp" inputmode="numeric" autocomplete="off" required maxlength="7"></label>':'')+
+    actions+'</form>'+
+    '<form method="post" action="'+sessionPath(token)+'">'+hidden('step','change')+'<button class="alt">'+H(L('change'))+'</button></form></section>';
+  return flowPage({title:L('readIt',{first:f}),body,lang,sampleMode,css:FORM_CSS});
+}
+
+// The done page (spec 7.2 step 7). messages are already in the voucher's language.
+function donePage({messages,lang='en',sampleMode}){
+  const [head,...rest]=messages;
+  const body='<section class="notice"><h1>'+H(head)+'</h1>'+rest.map(m=>'<p>'+H(m)+'</p>').join('')+'</section>';
+  return flowPage({title:head,body,lang,sampleMode});
+}
+
+// GET /demo/phone (YOVOUCH_SIM=1 only): a pretend phone that posts to /api/sim/sms and lists the replies.
+function demoPhonePage({from='',replies=null,sampleMode}){
+  const list=Array.isArray(replies)?'<ol>'+replies.map(r=>'<li>'+H(r)+'</li>').join('')+'</ol>':'';
+  const body='<section><h1>'+H(t('simSms'))+'</h1>'+list+
+    '<form method="post" action="/api/sim/sms"><label>'+H(t('sampleNumber'))+'<input name="from" type="tel" autocomplete="off" required maxlength="20" value="'+E(from)+'"></label>'+
+    '<label>SMS<textarea name="text" rows="2" maxlength="480" required></textarea></label><button>Send</button></form></section>';
+  return flowPage({title:t('simSms'),body,sampleMode,css:FORM_CSS});
+}
+
+module.exports={TIME_ZONES,localTime,flowPage,workerPage,scanPage,typedPage,adultsOnlyPage,errorPage,chipsPage,withdrawPage,
+  disclosePage,bindPage,readbackPage,donePage,demoPhonePage};

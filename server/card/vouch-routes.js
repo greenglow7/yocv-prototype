@@ -12,24 +12,41 @@
      GET  /v/:vouchId.json                 {record, jwt, jwksUrl, held}, signed with sub: vouchId; 410 unless live
      GET  /v/:vouchId/clip                 410 unless live (clip storage arrives with Task 11)
      GET  /v/:vouchId/withdraw?w=          the withdraw question; POST (w, mode now|quiet) withdraws
+     POST /api/vouch/:vouchToken/chips     chips (and, from the no-JS form, words); JSON or form
+     POST /api/vouch/:vouchToken/words     {text, lang}
+     POST|GET /api/vouch/:vouchToken/bind  issue the YES session code | {bound, phoneLast3, error}
+     POST /api/vouch/:vouchToken/otp       demo fallback, mounted only when no gateway is configured
+     POST /api/vouch/:vouchToken/confirm   publish; the form gets the done page
+     GET|POST /s/t/:vouchToken             the session page for its step (chips, disclose, bind, readback);
+                                           the no-JS disclosure form and "Change something" post here
+     GET  /my/:cardId/:cardToken/status.json and POST .../hide|show|show-words {vouchId}
+     POST /api/sms/webhook                 gateway, only when YOVOUCH_GATEWAY_SECRET is set (constant-time header check)
+     POST /api/sim/sms and GET /demo/phone the simulated gateway, only when YOVOUCH_SIM=1 and no gateway secret
    Every response that carries a live code or the card token is private: no-store and no-referrer. A form
    post (application/x-www-form-urlencoded) gets HTML back; JSON gets JSON. */
 const fs=require('node:fs');
 const path=require('node:path');
+const crypto=require('node:crypto');
 const {validId,secretsMatch}=require('./store.js');
 const {codeBatch,normaliseCardRef}=require('./vouchcode.js');
 const {LANGS,t,splitOptions}=require('./copy.js');
 const {STRINGS}=require('./render.js');
-const {flowPage,workerPage,scanPage,typedPage,adultsOnlyPage,errorPage,chipsPage,withdrawPage}=require('./pages.js');
+const {flowPage,workerPage,scanPage,typedPage,adultsOnlyPage,errorPage,chipsPage,withdrawPage,
+  disclosePage,bindPage,readbackPage,donePage,demoPhonePage}=require('./pages.js');
+const {tierItem}=require('./vouch-lines.js');
+const {withdrawnAtOf}=require('./vouches.js');
 const {signRecord}=require('./sign.js');
 const {cardFields}=require('./events.js');
-const {chipsFor,messageFor,STATUS}=require('./vouch-service.js');
+const {chipsFor,messageFor,gatewayConfigured,STATUS}=require('./vouch-service.js');
 const {myUrl}=require('./vouch-system.js');
 
 const MY_PATH=/^\/my\/([A-Z2-9]{10})\/([0-9a-f]{16})(\/[a-z-]+(?:\.json)?)?$/;
 const SCAN_PATH=/^\/s(?:\/([A-Z2-9]{10}))?$/;
 const VOUCH_PATH=/^\/v\/([A-Z2-9]{10})(\.json|\/clip|\/withdraw)?$/;
 const NONCE=/^[0-9a-f]{16}$/;
+const SESSION_PAGE=/^\/s\/t\/([0-9a-f]{24})$/;
+const API_SESSION=/^\/api\/vouch\/([0-9a-f]{24})\/(chips|words|bind|otp|confirm)$/;
+const ARRIVED_MS=10*60*1000;
 const MAX_FORM_BYTES=64*1024;
 const PRIVATE={'cache-control':'no-store','referrer-policy':'no-referrer','x-content-type-options':'nosniff'};
 
@@ -42,6 +59,13 @@ function sendPage(res,status,html){send(res,status,html,'text/html; charset=utf-
 function sendPrivateJSON(res,status,payload){send(res,status,JSON.stringify(payload),'application/json; charset=utf-8');}
 function sendError(res,status,code,message,retryable=false){sendPrivateJSON(res,status,{error:{code,message,retryable}});}
 function redirect(res,location){res.writeHead(303,{location,'content-length':0,...PRIVATE});res.end();}
+
+// The gateway's shared secret, compared in constant time over SHA-256 digests so the lengths always match.
+function gatewaySecretOk(header,secret){
+  if(typeof header!=='string'||typeof secret!=='string'||!header||!secret)return false;
+  const a=crypto.createHash('sha256').update(header).digest(),b=crypto.createHash('sha256').update(secret).digest();
+  return crypto.timingSafeEqual(a,b);
+}
 
 function inputError(message){const err=new Error(message);err.code='invalid_input';return err;}
 // URL-encoded form body, 64 KB cap; repeated names keep the last value.
@@ -106,8 +130,31 @@ function createVouchRouter(system){
   function myPage(res,entry,cardToken){
     if(entry.withdrawnAt)return sendPage(res,410,flowPage({title:t('cardWithdrawn'),body:'<section class="notice"><h1>'+t('cardWithdrawn')+'</h1></section>',sampleMode}));
     const nowMs=now(),lang=LANGS.includes(entry.vouch.lang)?entry.vouch.lang:'en';
+    const mine=ownVouches(entry,nowMs),live=mine.filter(f=>vouchStore.isLive(f,nowMs));
+    const newest=Math.max(...mine.map(f=>Date.parse(f.record.confirmedAt)||0),0);
+    const vouches=mine.slice().reverse().map(f=>({vouchId:f.record.vouchId,line:tierItem(f.record,firstOf(entry),{nowMs}).line,
+      words:f.held?.words||null,hidden:Boolean(f.private?.hiddenAt),held:Boolean(f.held)&&!f.record.wordsShownAt}));
     sendPage(res,200,workerPage({entry,record:entry.record,batch:codeBatch(entry.vouch.secret,nowMs),locked:codes.lockState(entry.cardId),lang,
-      publicUrl:system.publicUrl,myUrl:myUrl(system,entry.cardId,cardToken),nowMs,sampleMode,yv:system.yv}));
+      publicUrl:system.publicUrl,myUrl:myUrl(system,entry.cardId,cardToken),nowMs,sampleMode,yv:system.yv,
+      vouches,arrived:newest>0&&nowMs-newest<=ARRIVED_MS,waiting:live.filter(waitingWords).length,liveCount:live.length}));
+  }
+
+  // ---- The worker's own vouch list (spec 9.5, plan Task 6) ----
+  // Every line of the card not withdrawn, hidden ones included, oldest first; organisation referrals arrive with Task 13.
+  function ownVouches(entry,nowMs){return vouchStore.listForCard(entry.cardId).filter(f=>f.record&&!withdrawnAtOf(f,nowMs)&&f.record.kind!=='organisation');}
+  const waitingWords=f=>Boolean(f.held)&&!f.record.wordsShownAt;
+  function myStatus(res,entry){
+    const nowMs=now(),live=ownVouches(entry,nowMs).filter(f=>vouchStore.isLive(f,nowMs));
+    const last=live.map(f=>f.record.confirmedAt).sort().at(-1)||null;
+    sendPrivateJSON(res,200,{vouchCount:live.length,lastVouchAt:last,wordsWaiting:live.filter(waitingWords).length});
+  }
+  async function myAction(req,res,entry,cardToken,action){
+    const form=isForm(req),payload=await readBody(req,res);
+    if(payload===undefined)return;
+    const vouchId=field(isPlainObject(payload)?payload.vouchId:'');
+    const ok=validId(vouchId)&&(action==='hide'?vouchStore.hide(vouchId,entry.cardId):action==='show'?vouchStore.show(vouchId,entry.cardId):Boolean(vouchStore.showWords(vouchId,entry.cardId)));
+    if(form)return ok?redirect(res,'/my/'+entry.cardId+'/'+cardToken):sendPage(res,404,notFound());
+    return ok?sendPrivateJSON(res,200,{vouchId,ok:true}):sendError(res,404,'not_found','No vouch with this id on this card.');
   }
 
   async function setLang(req,res,entry,cardToken){
@@ -256,6 +303,154 @@ function createVouchRouter(system){
     sendPrivateJSON(res,200,{vouchId,mode:r.file.private.withdrawnAt?'now':'quiet'});
   }
 
+  // ---- Chips, words, disclosure, binding, read-back and confirm (spec 7.2, plan Task 6) ----
+  const demoMode=!gatewayConfigured(system.yv);
+  const shortcode=system.yv?.shortcode||'12345';
+  function ended(res,form,r){
+    if(form)return sendPage(res,r.status||410,errorPage({message:r.message,sampleMode}));
+    sendError(res,r.status||410,r.code||'session_ended',r.message);
+  }
+  const sessionGone=()=>({status:410,code:'session_ended',message:t('sessionEnded','en',{first:'the worker'})});
+  const QUESTION={work:'whatDid',when:'when',howOften:'howOften',hireAgain:'hireAgainQ'};
+  function fieldMessage(fields,first,lang){
+    const k=QUESTION[fields?.[0]]||'whatDid';
+    return splitOptions(t(k,lang,{first})).stem;
+  }
+  // Renders the page for the session's step. A bound phone moves bind on to the read-back.
+  function sessionPage(res,token,{status=200,error}={}){
+    const session=sessions.get(token),card=session?store.get(session.cardId):null;
+    if(!session||!card?.record)return ended(res,true,sessionGone());
+    const lang=session.lang;
+    if(session.step==='chips'||!session.chips)return sendPage(res,status,chipsPage({session,card,chips:chipsFor(card.record.tradeId),lang,sampleMode,error}));
+    if(session.step==='disclose')return sendPage(res,status,disclosePage({session,card,lang,sampleMode,error}));
+    if(session.step==='bind'){
+      if(demoMode&&!session.demo)return sendPage(res,status,bindPage({session,card,lang,sampleMode,demo:true,error}));
+      if(!demoMode){
+        const b=service.issueBind(token);
+        if(!b.bound)return sendPage(res,status,bindPage({session,card,lang,sampleMode,shortcode,sessionCode:b.sessionCode,error:error||session.bind?.error}));
+      }
+      session.step='readback';
+    }
+    session.readbackSeen=true;
+    const bound=!demoMode&&session.bind?.at?session.bind.phoneLast3:null;
+    sendPage(res,status,readbackPage({session,card,record:service.preview(token),lang,sampleMode,phoneLast3:bound,
+      demoCode:demoMode?session.demo?.code:null,recent:Boolean(session.recentVouchId),error}));
+  }
+  async function sessionPost(req,res,token){
+    const payload=await readBody(req,res);
+    if(payload===undefined)return;
+    const p=isPlainObject(payload)?payload:{},session=sessions.get(token);
+    if(!session)return ended(res,true,sessionGone());
+    if(p.step==='change'){session.step='chips';return redirect(res,'/s/t/'+token);}
+    if(p.step==='disclose'){
+      const r=service.setDisclose(token,{showMe:field(p.showMe),firstName:field(p.firstName),attachClip:field(p.attachClip),showCard:field(p.showCard)});
+      if(!r.ok)return r.code==='invalid_input'?sessionPage(res,token,{status:400,error:r.message}):ended(res,true,r);
+    }
+    redirect(res,'/s/t/'+token);
+  }
+  async function apiChips(req,res,token){
+    const form=isForm(req),payload=await readBody(req,res);
+    if(payload===undefined)return;
+    const p=isPlainObject(payload)?payload:{},session=sessions.get(token);
+    const r=service.setChips(token,p);
+    if(!r.ok&&!r.fields)return ended(res,form,r);
+    const first=firstOf(store.get(session.cardId)),lang=session.lang;
+    if(!r.ok){
+      if(form){session.step='chips';return sessionPage(res,token,{status:400,error:fieldMessage(r.fields,first,lang)});}
+      return sendPrivateJSON(res,400,{error:{code:'invalid_input',message:fieldMessage(r.fields,first,lang),retryable:false,fields:r.fields}});
+    }
+    if(p.words!==undefined){
+      const w=service.setWords(token,{text:field(p.words),lang:p.lang});
+      if(!w.ok){
+        if(form){session.step='chips';return sessionPage(res,token,{status:400,error:w.message});}
+        return sendPrivateJSON(res,400,{error:{code:w.reason,message:w.message,retryable:false,fields:['words']}});
+      }
+    }
+    if(form)return redirect(res,'/s/t/'+token);
+    sendPrivateJSON(res,200,{ok:true,chips:r.chips});
+  }
+  async function apiWords(req,res,token){
+    const form=isForm(req),payload=await readBody(req,res);
+    if(payload===undefined)return;
+    const p=isPlainObject(payload)?payload:{};
+    const r=service.setWords(token,{text:field(p.text),lang:p.lang});
+    if(!r.ok&&!r.reason)return ended(res,form,r);
+    if(form)return r.ok?redirect(res,'/s/t/'+token):sessionPage(res,token,{status:400,error:r.message});
+    if(!r.ok)return sendPrivateJSON(res,400,{error:{code:r.reason,message:r.message,retryable:false}});
+    sendPrivateJSON(res,200,{text:r.text});
+  }
+  async function apiBind(req,res,token,method){
+    if(method==='GET'||method==='HEAD'){
+      const st=service.bindStatus(token);
+      return st?sendPrivateJSON(res,200,st):ended(res,false,sessionGone());
+    }
+    const form=isForm(req),payload=await readBody(req,res);
+    if(payload===undefined)return;
+    if(!sessions.get(token))return ended(res,form,sessionGone());
+    if(demoMode)return form?redirect(res,'/s/t/'+token):sendError(res,409,'demo_mode',t('demoNoGateway'));
+    const r=service.issueBind(token);
+    if(r.ok===false)return ended(res,form,r);
+    if(form)return redirect(res,'/s/t/'+token);
+    sendPrivateJSON(res,200,r);
+  }
+  async function apiOtp(req,res,token){
+    const form=isForm(req),payload=await readBody(req,res);
+    if(payload===undefined)return;
+    if(!sessions.get(token))return ended(res,form,sessionGone());
+    const r=service.demoOtp(token,field(isPlainObject(payload)?payload.phone:''));
+    if(r.error){
+      if(r.error.code==='session_ended'||r.error.code==='card_withdrawn')return ended(res,form,{status:410,...r.error});
+      if(form){const s=sessions.get(token);s.step='bind';return sessionPage(res,token,{status:400,error:r.error.message});}
+      return sendPrivateJSON(res,400,{error:{...r.error,retryable:false}});
+    }
+    if(form)return redirect(res,'/s/t/'+token);
+    sendPrivateJSON(res,200,r);
+  }
+  async function apiConfirm(req,res,token){
+    const form=isForm(req),payload=await readBody(req,res);
+    if(payload===undefined)return;
+    const p=isPlainObject(payload)?payload:{},session=sessions.get(token);
+    if(!session)return ended(res,form,sessionGone());
+    const card=store.get(session.cardId),first=firstOf(card),lang=session.lang,onWorkerPhone=session.onWorkerPhone;
+    // A form post had its 18-or-older answer when the session opened; Publish posts consent=yes.
+    const body=form?{consent:p.consent==='yes',adult:true,visit:field(p.visit)||undefined,otp:field(p.otp)}:p;
+    const r=service.confirm(token,body);
+    if(r.rebind)return form?redirect(res,'/s/t/'+token):sendPrivateJSON(res,409,{error:{code:'rebind',message:t('waiting',lang),retryable:true},sessionCode:r.sessionCode});
+    if(!r.ok){
+      if(r.code==='not_bound'&&sessions.get(token))sessions.get(token).step='bind';
+      const again=['voucher_recent','otp_wrong','consent_needed','not_bound','invalid_input'].includes(r.code)&&sessions.get(token);
+      if(form)return again?sessionPage(res,token,{status:r.status,error:r.code==='voucher_recent'?null:r.message}):ended(res,true,r);
+      return sendPrivateJSON(res,r.status||400,{error:{code:r.code,message:r.message,retryable:false,...(r.existingVouchId?{existingVouchId:r.existingVouchId}:{}),...(r.fields?{fields:r.fields}:{})}});
+    }
+    if(!form)return sendPrivateJSON(res,200,{vouchId:r.vouchId,line:r.line,withdrawUrl:r.withdrawUrl,visitAdded:r.visitAdded});
+    const L=(k,v)=>t(k,lang,v);
+    let messages;
+    if(r.visitAdded)messages=[L('visitAdded',{first})];
+    else if(!r.vouchId)messages=[L('recentNo',{first})];
+    else if(r.withdrawSent)messages=[L('thanks',{first}),L('withdrawSent')];
+    else messages=[L('thanks',{first}),...(onWorkerPhone&&r.demo?[L('demoWithdrawHere')]:[]),L('withdrawAt',{link:r.withdrawUrl,vouchId:r.vouchId})];
+    sendPage(res,200,donePage({messages,lang,sampleMode}));
+  }
+
+  // ---- Gateways (spec 9.5): the production webhook and the simulator drive the same SMS handler ----
+  const gatewaySecret=String(system.yv?.gatewaySecret||'');
+  const simOn=Boolean(system.yv?.sim)&&!gatewaySecret;
+  async function smsWebhook(req,res){
+    if(!gatewaySecretOk(String(req.headers['x-yovouch-gateway-secret']||''),gatewaySecret))return sendError(res,403,'forbidden','Unknown gateway.');
+    const payload=await readBody(req,res);
+    if(payload===undefined)return;
+    const p=isPlainObject(payload)?payload:{};
+    sendPrivateJSON(res,200,await system.sms.handle({from:field(p.from),text:field(p.text)}));
+  }
+  async function simSms(req,res){
+    const form=isForm(req),payload=await readBody(req,res);
+    if(payload===undefined)return;
+    const p=isPlainObject(payload)?payload:{};
+    const r=await system.sms.handle({from:field(p.from),text:field(p.text)});
+    if(form)return sendPage(res,200,demoPhonePage({from:field(p.from),replies:r.replies,sampleMode}));
+    sendPrivateJSON(res,200,r);
+  }
+
   function handle(req,res,url){
     const pathname=url.pathname,method=req.method;
     const wrap=p=>Promise.resolve(p).then(()=>true);
@@ -266,6 +461,22 @@ function createVouchRouter(system){
     }
     if(pathname==='/api/vouch/codes')return method==='POST'?wrap(apiCodes(req,res)):notAllowed();
     if(pathname==='/api/vouch/open')return method==='POST'?wrap(apiOpen(req,res)):notAllowed();
+    const api=API_SESSION.exec(pathname);
+    if(api){
+      const [,token,action]=api;
+      if(action==='bind')return method==='GET'||method==='HEAD'||method==='POST'?wrap(apiBind(req,res,token,method)):notAllowed();
+      if(action==='otp'&&!demoMode)return false;
+      if(method!=='POST')return notAllowed();
+      return wrap(action==='chips'?apiChips(req,res,token):action==='words'?apiWords(req,res,token):action==='otp'?apiOtp(req,res,token):apiConfirm(req,res,token));
+    }
+    if(pathname==='/api/sms/webhook'&&gatewaySecret)return method==='POST'?wrap(smsWebhook(req,res)):notAllowed();
+    if(pathname==='/api/sim/sms'&&simOn)return method==='POST'?wrap(simSms(req,res)):notAllowed();
+    if(pathname==='/demo/phone'&&simOn)return method==='GET'||method==='HEAD'?wrap(sendPage(res,200,demoPhonePage({sampleMode}))):notAllowed();
+    const sp=SESSION_PAGE.exec(pathname);
+    if(sp){
+      if(method==='GET'||method==='HEAD')return wrap(sessionPage(res,sp[1]));
+      return method==='POST'?wrap(sessionPost(req,res,sp[1])):notAllowed();
+    }
     if(pathname==='/s'||pathname.startsWith('/s/')){
       const m=SCAN_PATH.exec(pathname),cardId=m?.[1]??null;
       if(!m||(cardId&&!validId(cardId)))return wrap(sendPage(res,404,notFound()));
@@ -288,6 +499,8 @@ function createVouchRouter(system){
       const suffix=m[3]||'';
       if(!suffix)return method==='GET'||method==='HEAD'?wrap(myPage(res,entry,m[2])):notAllowed();
       if(suffix==='/lang')return method==='POST'?wrap(setLang(req,res,entry,m[2])):notAllowed();
+      if(suffix==='/status.json')return method==='GET'||method==='HEAD'?wrap(myStatus(res,entry)):notAllowed();
+      if(suffix==='/hide'||suffix==='/show'||suffix==='/show-words')return method==='POST'?wrap(myAction(req,res,entry,m[2],suffix.slice(1))):notAllowed();
       return wrap(sendPage(res,404,notFound()));
     }
     return false;
@@ -296,4 +509,4 @@ function createVouchRouter(system){
   return {handle};
 }
 
-module.exports={createVouchRouter,sendPage,sendPrivateJSON,readForm,MY_PATH,VOUCH_PATH};
+module.exports={createVouchRouter,sendPage,sendPrivateJSON,readForm,gatewaySecretOk,gatewayConfigured,MY_PATH,VOUCH_PATH};

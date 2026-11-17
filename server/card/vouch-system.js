@@ -10,6 +10,8 @@ const {hashSecret}=require('./store.js');
 const {createEventLog,cardFields}=require('./events.js');
 const {createVouchSessions}=require('./vouch-sessions.js');
 const {createVouchService}=require('./vouch-service.js');
+const {createOutbox}=require('./outbox.js');
+const {createSmsHandler}=require('./sms.js');
 
 const YV_DEFAULTS={sim:false,gatewaySecret:'',shortcode:'12345',callbackNumber:'0800 000 000',smsCountry:'South Africa',orgKeys:{}};
 const SMS_ID_ATTEMPTS=20;
@@ -21,12 +23,14 @@ function buildVouchSystem({config,store,key,accountSource,provider,publicUrl,now
   const hashKey=loadOrCreateHashKey(store.dir,{random});
   const voucherFiles=createVoucherFiles(store.dir,{now});
   const codes=createCodeService({store,voucherFiles,now});
-  void outbox;void transcriber; // wired in by the tasks that send messages and transcribe clips
+  void transcriber; // wired in by the task that transcribes clips
   const events=createEventLog(store.dir,{now});
   const sessions=createVouchSessions({now,random});
   const vouchStore=createVouchStore(store.dir,{now,random,cardStore:store});
   const system={yv,store,key,accountSource,provider,liveModel,publicUrl:String(publicUrl||'').replace(/\/+$/,''),now,random,hashKey,voucherFiles,codes,events,sessions,vouchStore};
+  system.outbox=outbox||createOutbox({now,hashKey});
   system.service=createVouchService(system);
+  system.sms=createSmsHandler(system);
   return system;
 }
 

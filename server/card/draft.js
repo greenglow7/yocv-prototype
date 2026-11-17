@@ -495,5 +495,6 @@ async function runDraft({snapshot,trade,description,provider,organisationNames=[
 module.exports={
   evidenceList,selfDeclaredSchema,confirmsSchema,localDraft,validateSelfDeclared,validateConfirms,runDraft,
   buildSelfMessages,buildConfirmsMessages,SELF_SYSTEM_PROMPT,CONFIRMS_SYSTEM_PROMPT,
-  MAX_SERVICES,MAX_LANGUAGES,MAX_CONFIRMS,MAX_DESCRIPTION,LIMITS
+  MAX_SERVICES,MAX_LANGUAGES,MAX_CONFIRMS,MAX_DESCRIPTION,LIMITS,
+  PRICE,AREA,findArea,BANNED_CONFIRM_PHRASE,namesOrganisation
 };

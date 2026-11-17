@@ -218,11 +218,14 @@ const COPY={
   pasteRequestLink:'Or paste the request link you were sent', // plan addition
   beat3Label:'Prepared example: a model output that added "5 years". Not a live call.', // plan addition
   srcCustomerDemo:'(said by a customer, demo, nothing texted)', // plan addition
-  srcWorkerRequest:'(vouched by another worker, by request)' // plan addition
+  srcWorkerRequest:'(vouched by another worker, by request)', // plan addition
+  demoCodeWrong:'That code did not match. Type the code shown on this page.', // plan addition (demo fallback, attempts 1 and 2)
+  demoNumberBad:'Type the whole phone number.', // plan addition (demo fallback)
+  demoOneNumber:"This vouch already has a number. Start again from {first}'s code to use another." // plan addition (demo fallback)
 };
 const PLAN_ADDITIONS=['codeWrongWeb','codeLockedWeb','sessionEnded','sampleNumber','recentNo','visitAdded','demoWithdrawHere','docAskItem','docToldItem',
   'smsVouchMenuWorker','smsQ2','smsQ3','smsQ4','smsQ4Worker','smsCompletionOne','smsCompletions','referralWithdrawnMsg','orgKeyWrong','pasteRequestLink',
-  'beat3Label','srcCustomerDemo','srcWorkerRequest'];
+  'beat3Label','srcCustomerDemo','srcWorkerRequest','demoCodeWrong','demoNumberBad','demoOneNumber'];
 
 let TRANSLATIONS={};
 try{TRANSLATIONS=JSON.parse(fs.readFileSync(path.join(__dirname,'..','..','data','yovouch-copy.json'),'utf8'))||{};}catch{TRANSLATIONS={};}
