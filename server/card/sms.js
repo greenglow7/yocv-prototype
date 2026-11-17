@@ -4,7 +4,10 @@
    outbox it texted first, and passes every reply through outbox.send. Commands bound to the sender: YES <session
    code> (binds a web vouch session, no reply), CODE, REQUEST, VOUCH <ref> <code> (or V), L and REMOVE <vouchId> <secret>.
    The four-message vouch keeps a conversation per sender key in memory for 30 minutes; any other text with no
-   conversation gets no reply. STOP, REPLY and the one-question fallback arrive with later tasks.
+   conversation gets no reply.
+   Plan Task 17: "I did not understand", or a second answer that is not four numbers, starts the one-question
+   fallback (smsQ1 to smsQ4, one digit each). STOP asks smsStopQ for the sender's live vouches and YES withdraws
+   them all. REPLY from the card owner's or linked number sends the one-SMS reply (spec 6.6).
    REQUEST (plan Task 14) from the card owner's number replies with the request text to forward, or requestCap.
    Worker variant (spec 7.4, plan Task 13): a VOUCH from a number in numbers/ whose card is not the target runs
    the worker path, with the worker menu, no name step and the voucher card's label in the read-back. */
@@ -15,6 +18,8 @@ const {chipsFor}=require('./vouch-service.js');
 const {HOW_OFTEN,HIRE_AGAIN}=require('./vouch-lines.js');
 const {isSelfVouch,withdrawnAtOf}=require('./vouches.js');
 const {cardFields}=require('./events.js');
+const {smsReply}=require('./reply.js');
+const {computeFlags,workerEdges}=require('./flags.js');
 
 const STATE_MS=30*60*1000,THREAD_MS=15*60*1000;
 const WHEN=['this month','last month','earlier'],HOW=Object.keys(HOW_OFTEN),HIRE=Object.keys(HIRE_AGAIN);
@@ -23,6 +28,9 @@ const CODE_WRONG=new Set(['not_found','code_wrong','code_expired','code_used','c
 const SENDER_WRONG=new Set(['not_found','code_wrong','card_locked']);
 const NAME=/^\p{L}[\p{L}' -]{0,29}$/u;
 const NO_CHIP='\u0000';
+const NOT_UNDERSTOOD='I DID NOT UNDERSTAND';
+// The one-question fallback: each question's copy key and how many options it has (Q1's is the chip count plus other).
+const FALLBACK=[{step:'q1',key:'smsQ1'},{step:'q2',key:'smsQ2',max:3},{step:'q3',key:'smsQ3',max:4},{step:'q4',key:'smsQ4',max:2}];
 
 // Trim, collapse spaces, upper-case and drop a trailing . ! or , so "yes k7m2px." reads "YES K7M2PX".
 function normaliseText(text){return String(text??'').trim().replace(/\s+/g,' ').toUpperCase().replace(/[.!,]+$/,'').trim();}
@@ -123,6 +131,24 @@ function createSmsHandler(system){
     return [t('smsRemoved',lang)];
   }
 
+  // STOP (spec 7.8): every live vouch by this number, a hidden one too, after one YES.
+  function stop(senderKey){
+    const lang=langOf(stateOf(senderKey)?.lang),nowMs=now();
+    const ids=system.vouchStore.listByVoucherKey(senderKey)
+      .filter(f=>system.vouchStore.isLive({...f,private:{...f.private,hiddenAt:null}},nowMs)).map(f=>f.record.vouchId);
+    if(!ids.length){end(senderKey);return [t('smsNothing',lang)];}
+    const st=begin(senderKey,{step:'stop',lang,stopIds:ids});
+    return [say(st,'smsStopQ',{n:ids.length})];
+  }
+  // REPLY (spec 6.6): the one-SMS reply for the card whose owner's or linked number texted; nothing to anyone else.
+  function reply(senderKey){
+    const cardId=store.indexGet('numbers',senderKey),entry=cardId?store.get(cardId):null;
+    if(!entry?.record||entry.withdrawnAt||!isSelfVouch(entry,senderKey))return [t('smsNoCard','en',{url:system.publicUrl+'/card.html'})];
+    const nowMs=now();
+    return [smsReply({card:entry.record,vouches:system.vouchStore.listForCard(cardId),publicUrl:system.publicUrl,nowMs,
+      flags:computeFlags(workerEdges(system.vouchStore,nowMs),nowMs)})];
+  }
+
   // L, then a digit: the conversation's language, and vouch.lang when the sender owns the card. Resends the last prompt.
   function setLang(raw,senderKey,st,digit){
     const lang=LANGS[digit-1];
@@ -146,17 +172,57 @@ function createSmsHandler(system){
     return null;
   }
 
+  // Question q of the one-question fallback, one SMS each (spec 7.3). A worker voucher gets smsQ4Worker.
+  function question(st,q,first){
+    const f=FALLBACK[q];
+    st.step=f.step;
+    if(q===0)st.fallback={};
+    if(q===0){const [chip1=NO_CHIP,chip2=NO_CHIP,chip3=NO_CHIP]=st.chips.map(c=>c.toLowerCase());return [say(st,'smsQ1',{first,chip1,chip2,chip3})];}
+    return [say(st,q===3&&st.worker?'smsQ4Worker':f.key,{first})];
+  }
+  // The four answers, from one SMS or from the fallback: Q1 other asks for two words, else the chips are set.
+  function answered(senderKey,st,a,first){
+    if(a.q1===4){st.pending=a;st.step='two_words';return [say(st,'smsTwoWords',{first})];}
+    const r=service.setChips(st.vouchToken,{work:st.chips[a.q1-1],when:a.when,howOften:a.howOften,hireAgain:a.hireAgain});
+    if(!r.ok)return failed(senderKey,st,r,first)||[render('smsNotUnderstood',st.lang)];
+    if(st.worker)return readback(senderKey,st,first);   // a worker line shows the card, never a name with digits
+    st.step='name';
+    return [say(st,'smsShowName')];
+  }
+
   function step(raw,senderKey,st,cmd,text){
     const entry=st.cardId?store.get(st.cardId):null,first=firstOf(entry),lang=st.lang;
     if(st.step==='answers'){
       const a=parseAnswers(cmd,st.chips.length);
-      if(!a)return [render('smsNotUnderstood',lang)];
-      if(a.q1===4){st.pending=a;st.step='two_words';return [say(st,'smsTwoWords',{first})];}
-      const r=service.setChips(st.vouchToken,{work:st.chips[a.q1-1],when:a.when,howOften:a.howOften,hireAgain:a.hireAgain});
-      if(!r.ok)return failed(senderKey,st,r,first)||[render('smsNotUnderstood',lang)];
-      if(st.worker)return readback(senderKey,st,first);   // a worker line shows the card, never a name with digits
-      st.step='name';
-      return [say(st,'smsShowName')];
+      if(!a){
+        // Four numbers out of range are an answer, just a wrong one; anything else counts toward the fallback.
+        const fourNumbers=/^\d \d \d \d$/.test(cmd.replace(/,/g,' ').replace(/\s+/g,' '));
+        if(!fourNumbers)st.misses=(st.misses||0)+1;
+        if(cmd===NOT_UNDERSTOOD||st.misses>=2)return question(st,0,first);
+        return [render('smsNotUnderstood',lang)];
+      }
+      return answered(senderKey,st,a,first);
+    }
+    const q=FALLBACK.findIndex(f=>f.step===st.step);
+    if(q>=0){
+      const max=q===0?null:FALLBACK[q].max,n=/^\d$/.test(cmd)?Number(cmd):0;
+      const ok=q===0?n===4||(n>=1&&n<=st.chips.length):n>=1&&n<=max;
+      if(!ok)return [render(st.lastPrompt.key,lang,st.lastPrompt.vars)];
+      st.fallback[st.step]=n;
+      if(q<FALLBACK.length-1)return question(st,q+1,first);
+      const f=st.fallback;
+      return answered(senderKey,st,{q1:f.q1,when:WHEN[f.q2-1],howOften:HOW[f.q3-1],hireAgain:HIRE[f.q4-1]},first);
+    }
+    if(st.step==='stop'){
+      if(cmd==='NO'){end(senderKey);return [];}
+      if(cmd!=='YES')return [render(st.lastPrompt.key,lang,st.lastPrompt.vars)];
+      end(senderKey);
+      for(const vouchId of st.stopIds){
+        const file=system.vouchStore.get(vouchId);
+        if(!file?.record||withdrawnAtOf(file,now())||!system.vouchStore.withdrawAs(vouchId,'now'))continue;
+        system.events.log('vouch_withdrawn',{vouchId,...cardFields(store.get(file.record.cardId)||{cardId:file.record.cardId}),mode:'now',by:'stop'});
+      }
+      return [t('smsRemoved',lang)];
     }
     if(st.step==='two_words'){
       const a=st.pending;
@@ -197,6 +263,8 @@ function createSmsHandler(system){
     if((m=/^YES ([A-Z2-9]{6})$/.exec(cmd))){service.bindBySms(raw,m[1]);return [];}
     if(cmd==='CODE')return code(senderKey);
     if(cmd==='REQUEST')return request(senderKey);
+    if(cmd==='REPLY')return reply(senderKey);
+    if(cmd==='STOP')return stop(senderKey);
     if((m=/^(?:VOUCH|V) (\S+) (.+)$/.exec(cmd)))return vouch(raw,senderKey,m[1],m[2]);
     if((m=/^REMOVE (\S+) (\S+)$/.exec(cmd)))return remove(raw,senderKey,m[1],m[2]);
     const st=stateOf(senderKey);

@@ -390,6 +390,26 @@ function demoPhonePage({from='',thread=null,sampleMode}){
   return flowPage({title:t('simSms'),body,sampleMode,css:FORM_CSS});
 }
 
+// GET and POST /demo/ivr (YOVOUCH_SIM=1 only, plan Task 17): the call-back script as a page, labelled simCall.
+// Without s it asks for the caller ID. Each prompt page carries the hidden session s and keypad buttons 0 to 9
+// (and * and #); a page that plays the tone adds the optional clip file input (multipart), the "other" chip a
+// text box for the two words. An ended call shows its last prompt and a button to call again. Nothing plays.
+const IVR_CSS='.kp{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}.kp button{min-height:52px;font-size:20px}.ivr{font-size:18px}';
+const KEYPAD=['1','2','3','4','5','6','7','8','9','*','0','#'];
+function ivrPage({prompt=null,s=null,keyed='',from='',lang='en',clip=false,words=false,sampleMode}){
+  const call=t('simCall'),head='<h1>'+H(call)+'</h1>';
+  const again='<form method="post" action="/demo/ivr"><label>'+H(t('sampleNumber'))+'<input name="from" type="tel" autocomplete="off" required maxlength="20" value="'+E(from)+'"></label>'+
+    '<button>'+H(call)+'</button></form>';
+  let body;
+  if(!s)body='<section>'+head+(prompt?'<p class="ivr"><b>'+H(prompt)+'</b></p>':'')+again+'</section>';
+  else body='<section>'+head+'<p class="ivr"><b>'+H(prompt)+'</b></p>'+(keyed?'<p class="small">'+H(keyed)+'</p>':'')+
+    '<form method="post" action="/demo/ivr"'+(clip?' enctype="multipart/form-data"':'')+'>'+hidden('s',s)+
+    (words?'<input name="words" autocomplete="off" maxlength="30" aria-label="'+E(prompt)+'"><button name="k" value="#">#</button>':'')+
+    (clip?'<label>'+H(STRINGS.recordedOnCall)+'<input type="file" name="clip" accept="audio/webm,audio/mp4"></label>':'')+
+    '<div class="kp">'+KEYPAD.map(k=>'<button name="k" value="'+k+'">'+k+'</button>').join('')+'</div></form></section>';
+  return flowPage({title:call,body,lang,sampleMode,css:FORM_CSS+IVR_CSS});
+}
+
 // GET /r/:replyId (spec 6.4, 9.5), shown only once the worker confirms: the six confirmed lines, the attached clips that are still live and
 // the footer honesty strings. Until an English translation is confirmed by the speaker, the page shows the
 // own-language lines and "Not translated".
@@ -409,4 +429,4 @@ function replyPage({reply,firstName,clips=[],lang='en',sampleMode}){
 }
 
 module.exports={TIME_ZONES,replyPage,linkCodePage,workerVouchPage,requestLandingPage,requestMadePage,orgKeyPage,orgPage,localTime,flowPage,workerPage,myVouchesPage,scanPage,typedPage,adultsOnlyPage,errorPage,chipsPage,withdrawPage,
-  disclosePage,bindPage,readbackPage,donePage,demoPhonePage};
+  disclosePage,bindPage,readbackPage,donePage,demoPhonePage,ivrPage};

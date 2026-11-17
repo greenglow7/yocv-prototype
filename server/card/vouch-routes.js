@@ -24,6 +24,8 @@
      GET  /my/:cardId/:cardToken/status.json and POST .../hide|show|show-words {vouchId}
      POST /api/sms/webhook                 gateway, only when YOVOUCH_GATEWAY_SECRET is set (constant-time header check)
      POST /api/sim/sms and GET /demo/phone the simulated gateway, only when YOVOUCH_SIM=1 and no gateway secret
+     GET|POST /demo/ivr                    the simulated call-back (plan Task 17), same condition: {from} starts a call,
+                                           {s, k[, words]} presses a key, multipart adds the optional clip
    WhatsApp (plan Task 16):
      POST /my/:cardId/:cardToken/link      issues the one-time link code: vouch.linkCode {hash, expiresAt}, 10 minutes
      POST /api/wa/webhook                  gateway, only when YOVOUCH_GATEWAY_SECRET is set (constant-time header check)
@@ -51,15 +53,17 @@ const path=require('node:path');
 const crypto=require('node:crypto');
 const {validId,secretsMatch,hashSecret,ALPHABET}=require('./store.js');
 const {codeBatch,normaliseCardRef}=require('./vouchcode.js');
+const {normalisePhone,keyedHash}=require('./vouchers.js');
 const {LANGS,t,splitOptions}=require('./copy.js');
 const {STRINGS,fullDate}=require('./render.js');
 const {flowPage,workerPage,myVouchesPage,scanPage,typedPage,adultsOnlyPage,errorPage,chipsPage,withdrawPage,
-  disclosePage,bindPage,readbackPage,donePage,demoPhonePage,workerVouchPage,orgKeyPage,orgPage,requestLandingPage,requestMadePage,linkCodePage}=require('./pages.js');
+  disclosePage,bindPage,readbackPage,donePage,demoPhonePage,ivrPage,workerVouchPage,orgKeyPage,orgPage,requestLandingPage,requestMadePage,linkCodePage}=require('./pages.js');
 const {tierItem}=require('./vouch-lines.js');
 const {withdrawnAtOf}=require('./vouches.js');
 const {signRecord}=require('./sign.js');
 const {cardFields}=require('./events.js');
 const {chipsFor,messageFor,gatewayConfigured,referralOrgs,STATUS}=require('./vouch-service.js');
+const {HOW_OFTEN,HIRE_AGAIN}=require('./vouch-lines.js');
 const {myUrl}=require('./vouch-system.js');
 const {audioType,isAudio,clipSeconds,MAX_AUDIO_BYTES}=require('./transcribe.js');
 
@@ -82,6 +86,13 @@ const ARRIVED_MS=10*60*1000;
 const MAX_FORM_BYTES=64*1024;
 const MAX_CLIP_SECONDS=16;
 const LINK_TTL_MS=10*60*1000;
+// The call-back (plan Task 17): 30-minute calls in memory; the refusals that read as ivrWrong, and those that count
+// against the caller, as on SMS. A clip recorded on the call is the 15 seconds after the tone.
+const IVR_MS=30*60*1000,IVR_CLIP_SECONDS=15;
+const IVR_WRONG=new Set(['not_found','code_wrong','code_expired','code_used','card_locked','card_withdrawn']);
+const IVR_SENDER_WRONG=new Set(['not_found','code_wrong','card_locked']);
+const IVR_WHEN=['this month','last month','earlier'],IVR_HOW=Object.keys(HOW_OFTEN),IVR_HIRE=Object.keys(HIRE_AGAIN);
+const NO_CHIP='\u0000';
 const PRIVATE={'cache-control':'no-store','referrer-policy':'no-referrer','x-content-type-options':'nosniff'};
 
 function send(res,status,body,type,extra={}){
@@ -115,6 +126,31 @@ function readForm(req){
     req.on('error',reject);
     req.on('end',()=>{if(!tooLarge)resolve(Object.fromEntries(new URLSearchParams(Buffer.concat(chunks).toString('utf8'))));});
   });
+}
+// multipart/form-data: text fields and files ({filename, contentType, data}), for the call-back's clip upload only.
+function parseMultipart(body,contentType){
+  const m=/boundary=(?:"([^"]+)"|([^;\s]+))/i.exec(String(contentType||''));
+  const out={fields:{},files:{}};
+  if(!m)return out;
+  const delim=Buffer.from('--'+(m[1]||m[2]));
+  let at=body.indexOf(delim);
+  while(at>=0){
+    const start=at+delim.length;
+    if(body.subarray(start,start+2).toString()==='--')break;
+    const next=body.indexOf(delim,start+2);
+    if(next<0)break;
+    const part=body.subarray(start+2,Math.max(start+2,next-2)),sep=part.indexOf('\r\n\r\n');
+    if(sep>=0){
+      const head=part.subarray(0,sep).toString('utf8'),data=part.subarray(sep+4);
+      const name=/;\s*name="([^"]*)"/i.exec(head)?.[1],filename=/;\s*filename="([^"]*)"/i.exec(head)?.[1];
+      if(name!=null){
+        if(filename!=null)out.files[name]={filename,contentType:(/content-type:\s*([^\r\n]+)/i.exec(head)?.[1]||'').trim(),data};
+        else out.fields[name]=data.toString('utf8');
+      }
+    }
+    at=next;
+  }
+  return out;
 }
 function isPlainObject(v){return v!==null&&typeof v==='object'&&!Array.isArray(v);}
 const field=v=>typeof v==='string'?v:typeof v==='number'&&Number.isFinite(v)?String(v):'';
@@ -768,6 +804,152 @@ function createVouchRouter(system){
     sendPrivateJSON(res,200,await system.wa.handle({from:field(p.from),text:field(p.text)},{sim:true}));
   }
 
+
+  // ---- The simulated call-back (spec 7.3, plan Task 17). The page walks the section 17 call prompts in order and
+  // drives the same open, setChips, setDisclose and confirm a real IVR would. Prompts are in the worker's vouch.lang
+  // once the card is known. A wrong code and an unknown card get the same ivrWrong. 9 at the start reads back the
+  // caller's most recent live vouch; 9 again withdraws it; a further 9 moves to the next one. ----
+  const ivrCalls=new Map();
+  function ivrPrune(){const at=now();for(const [id,c] of ivrCalls)if(at-c.at>IVR_MS)ivrCalls.delete(id);}
+  const yvCountry=()=>system.yv?.smsCountry;
+  const ivrEnd=(res,call,prompt,status=200)=>{ivrCalls.delete(call.id);return sendPage(res,status,ivrPage({prompt,from:call.from,lang:call.lang,sampleMode}));};
+  function ivrShow(res,call){
+    const L=(k,v)=>t(k,call.lang,v),entry=call.cardId?store.get(call.cardId):null,f=firstOf(entry);
+    const P={start:()=>L('ivrStart'),code:()=>L('ivrCode'),
+      intro:()=>L('ivrIntro',{first:f,trade:String(entry.record.trade||'').toLowerCase()}),adult:()=>L('ivrAdult'),
+      chips:()=>{const [chip1=NO_CHIP,chip2=NO_CHIP,chip3=NO_CHIP]=call.chips.map(c=>c.toLowerCase());
+        return L('ivrChips',{first:f,chip1,chip2,chip3}).replace(new RegExp(', \\d for '+NO_CHIP,'g'),'');},
+      two_words:()=>L('smsTwoWords',{first:f}),when:()=>L('ivrWhen'),howOften:()=>L('ivrHowOften'),hireAgain:()=>L('ivrHireAgain',{first:f}),
+      clip:()=>L('ivrClip',{first:f}),name:()=>L('ivrShowName'),
+      readback:()=>L('ivrReadback',{first:f,line:String(service.preview(call.vouchToken)?.line||'').replace(/\.$/,'')}),
+      remove_q:()=>L('ivrRemoveQ',{first:firstOf(store.get(vouchStore.get(call.removeId)?.record?.cardId))}),removed:()=>L('smsRemoved')};
+    sendPage(res,200,ivrPage({prompt:P[call.step](),s:call.id,keyed:call.step==='start'||call.step==='code'?call.buf:'',lang:call.lang,
+      clip:call.step==='clip',words:call.step==='two_words',sampleMode}));
+  }
+  // The caller's live vouches, newest first; a hidden one counts, as on STOP.
+  function ivrVouches(call){
+    const key=keyedHash(system.hashKey,call.e164),nowMs=now();
+    return vouchStore.listByVoucherKey(key).filter(f=>vouchStore.isLive({...f,private:{...f.private,hiddenAt:null}},nowMs))
+      .sort((a,b)=>(Date.parse(b.record.confirmedAt)||0)-(Date.parse(a.record.confirmedAt)||0));
+  }
+  function ivrNextRemoval(res,call){
+    const [file]=ivrVouches(call);
+    if(!file)return ivrEnd(res,call,t('smsNothing',call.lang));
+    call.removeId=file.record.vouchId;call.step='remove_q';
+    ivrShow(res,call);
+  }
+  async function ivrOpen(res,call){
+    const ref=normaliseCardRef(call.cardRef),cardId=ref?codes.resolveCard(ref):null,entry=cardId?store.get(cardId):null;
+    const callerKey=keyedHash(system.hashKey,call.e164);
+    if(codes.senderBlocked(callerKey))return ivrEnd(res,call,t('ivrWrong'));
+    if(!entry?.record){codes.recordSenderWrong(callerKey);return ivrEnd(res,call,t('ivrWrong'));}
+    // A local caller ID is read in the card's country first, as the SMS sender is (Review Focus 2).
+    const e164=normalisePhone(call.from,entry.record.user?.country)||call.e164,lang=LANGS.includes(entry.vouch?.lang)?entry.vouch.lang:'en';
+    const r=await service.open({cardId,proof:{method:'code',code:call.buf.slice(0,6)},voucher:{kind:'customer'},
+      voucherKey:keyedHash(system.hashKey,e164),phoneLast3:e164.slice(-3),channel:'ivr',lang});
+    if(!r.ok){
+      if(IVR_WRONG.has(r.code)){if(IVR_SENDER_WRONG.has(r.code))codes.recordSenderWrong(callerKey);return ivrEnd(res,call,t('ivrWrong',lang));}
+      return ivrEnd(res,call,r.message);
+    }
+    Object.assign(call,{cardId,lang,vouchToken:r.vouchToken,step:'intro',buf:'',chips:chipsFor(entry.record.tradeId).filter(c=>c!=='Other').slice(0,3),answers:{}});
+    ivrShow(res,call);
+  }
+  // One key press (or a run of digits for the card number and the code). Anything a step does not take repeats it.
+  async function ivrKey(res,call,key,{words='',clip=null}={}){
+    const n=/^\d$/.test(key)?Number(key):0,a=call.answers,token=call.vouchToken,L=k=>t(k,call.lang);
+    const stopCall=prompt=>{if(token)sessions.delete(token);return ivrEnd(res,call,prompt);};
+    const sessionOver=r=>stopCall(r.message||t('sessionEnded',call.lang,{first:firstOf(store.get(call.cardId))}));
+    switch(call.step){
+      case 'start':
+        if(!call.buf&&key==='9')return ivrNextRemoval(res,call);
+        call.buf+=key.replace(/\D/g,'');
+        if(call.buf.length>=5){call.cardRef=call.buf.slice(0,5);call.buf=call.buf.slice(5);call.step='code';}
+        if(call.step!=='code'||call.buf.length<6)return ivrShow(res,call);
+        return ivrOpen(res,call);
+      case 'code':
+        call.buf+=key.replace(/\D/g,'');
+        return call.buf.length<6?ivrShow(res,call):ivrOpen(res,call);
+      case 'intro':
+        if(n===2)return stopCall(L('smsCancelled'));
+        if(n===1)call.step='adult';
+        break;
+      case 'adult':
+        if(n===2)return stopCall(L('adultsOnly'));
+        if(n===1)call.step='chips';
+        break;
+      case 'chips':
+        if(n===4)call.step='two_words';
+        else if(n>=1&&n<=call.chips.length){a.work=call.chips[n-1];a.other=undefined;call.step='when';}
+        break;
+      case 'two_words':
+        if(words.trim()){a.work='Other';a.other=words.trim();call.step='when';}
+        break;
+      case 'when':if(n>=1&&n<=3){a.when=IVR_WHEN[n-1];call.step='howOften';}break;
+      case 'howOften':if(n>=1&&n<=4){a.howOften=IVR_HOW[n-1];call.step='hireAgain';}break;
+      case 'hireAgain':{
+        if(!(n>=1&&n<=2))break;
+        const r=service.setChips(token,{...a,hireAgain:IVR_HIRE[n-1]});
+        if(!r.ok&&!r.fields)return sessionOver(r);
+        call.step=r.ok?'clip':'chips';
+        break;
+      }
+      case 'clip':{
+        if(clip){const r=service.setClip(token,clip);if(!r.ok)return sessionOver(r);call.hasClip=true;}
+        call.step='name';
+        break;
+      }
+      case 'name':{
+        if(!(n>=1&&n<=2))break;
+        const r=service.setDisclose(token,{showMe:n===1?'digits':'customer',attachClip:call.hasClip===true});
+        if(!r.ok)return sessionOver(r);
+        call.step='readback';
+        break;
+      }
+      case 'readback':{
+        if(n===2)return stopCall(L('smsCancelled'));
+        if(n!==1)break;
+        const r=service.confirm(token,{adult:true,consent:true});
+        return r.ok&&r.vouchId?ivrEnd(res,call,L('ivrPublished')):sessionOver(r);
+      }
+      case 'remove_q':{
+        if(key!=='9')break;
+        const file=vouchStore.get(call.removeId);
+        if(file?.record&&!withdrawnAtOf(file,now())&&vouchStore.withdrawAs(call.removeId,'now'))
+          events.log('vouch_withdrawn',{vouchId:call.removeId,...cardFields(store.get(file.record.cardId)||{cardId:file.record.cardId}),mode:'now',by:'ivr'});
+        call.step='removed';
+        break;
+      }
+      case 'removed':
+        if(key==='9')return ivrNextRemoval(res,call);
+        break;
+    }
+    ivrShow(res,call);
+  }
+  async function ivrPost(req,res){
+    let p,clip=null;
+    if(/^multipart\/form-data\b/i.test(String(req.headers['content-type']||''))){
+      let body;
+      try{body=await readRawBody(req,MAX_AUDIO_BYTES+16384);}
+      catch(err){if(err?.code==='invalid_input'||err?.name==='InputError')return sendPage(res,400,ivrPage({sampleMode}));throw err;}
+      const mp=parseMultipart(body,req.headers['content-type']),f=mp.files.clip,type=f?audioType(f.contentType):null;
+      p=mp.fields;
+      if(f&&type&&f.data.length)clip={audio:Buffer.from(f.data),contentType:type,seconds:IVR_CLIP_SECONDS};
+    }else{
+      p=await readBody(req,res);
+      if(p===undefined)return;
+      if(!isPlainObject(p))p={};
+    }
+    ivrPrune();
+    const call=ivrCalls.get(field(p.s));
+    if(call){call.at=now();return ivrKey(res,call,field(p.k).trim(),{words:field(p.words),clip});}
+    const from=field(p.from).trim(),e164=normalisePhone(from,yvCountry());
+    if(!e164)return sendPage(res,400,ivrPage({from,sampleMode}));
+    const id=system.random(12).toString('hex');
+    const fresh={id,at:now(),from,e164,lang:'en',step:'start',buf:'',cardId:null,vouchToken:null};
+    ivrCalls.set(id,fresh);
+    ivrShow(res,fresh);
+  }
+
   function handle(req,res,url){
     const pathname=url.pathname,method=req.method;
     const wrap=p=>Promise.resolve(p).then(()=>true);
@@ -813,6 +995,7 @@ function createVouchRouter(system){
     if(pathname==='/api/sim/sms'&&simOn)return method==='POST'?wrap(simSms(req,res)):notAllowed();
     if(pathname==='/api/wa/webhook'&&gatewaySecret)return method==='POST'?wrap(waWebhook(req,res)):notAllowed();
     if(pathname==='/api/sim/wa'&&simOn)return method==='POST'?wrap(simWa(req,res)):notAllowed();
+    if(pathname==='/demo/ivr'&&simOn)return method==='GET'||method==='HEAD'?wrap(sendPage(res,200,ivrPage({sampleMode}))):method==='POST'?wrap(ivrPost(req,res)):notAllowed();
     if(pathname==='/demo/phone'&&simOn)return method==='GET'||method==='HEAD'?wrap(sendPage(res,200,demoPhonePage({sampleMode}))):notAllowed();
     const sp=SESSION_PAGE.exec(pathname);
     if(sp){

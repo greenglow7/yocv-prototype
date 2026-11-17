@@ -12,7 +12,7 @@ const {cardFields}=require('./events.js');
 const {ALPHABET,validId,secretsMatch,hashSecret}=require('./store.js');
 const {normalisePhone,keyedHash}=require('./vouchers.js');
 const {capFor,recentFor,isSelfVouch,capMessage,workerCapReached,withdrawnAtOf}=require('./vouches.js');
-const {parseChips,checkWords,buildLine}=require('./vouch-lines.js');
+const {parseChips,checkWords,buildLine,voucherLabel}=require('./vouch-lines.js');
 const {flagsAtConfirm,cardCreatedMs,eligibility,PAIR_MS}=require('./flags.js');
 const {noBannedClaims,noInventedNumbers}=require('../validate.js');
 const {BANNED_CONFIRM_PHRASE}=require('./draft.js');
@@ -130,8 +130,9 @@ function createVouchService(system){
     const onWorkerPhone=input.onWorkerPhone===true;
     const {vouchToken,session}=sessions.open({cardId:entry.cardId,proof:{method:proof.method,step:r.step,provedAt:r.provedAt,channel,onWorkerPhone},
       voucher,onWorkerPhone,channel,lang,adult:true,formNonce:input.formNonce});
-    // The SMS sender is the voucher: the number is taken from the sender, phoneConfirmedBy 'sms_origin' (spec 7.3).
-    if(voucherKey)session.smsOrigin={key:voucherKey,last3:/^\d{3}$/.test(String(input.phoneLast3??''))?String(input.phoneLast3):null};
+    // The SMS sender or the caller is the voucher: the number is taken from the sender, phoneConfirmedBy 'sms_origin',
+    // or from the caller ID on the call-back, 'caller_id' (spec 7.3).
+    if(voucherKey)session.smsOrigin={key:voucherKey,last3:/^\d{3}$/.test(String(input.phoneLast3??''))?String(input.phoneLast3):null,method:channel==='ivr'?'caller_id':'sms_origin'};
     events.log('vouch_opened',{channel,method:proof.method,...cardFields(entry)});
     return opened(vouchToken,session,entry);
   }
@@ -231,14 +232,22 @@ function createVouchService(system){
     session.transcript={text:r.text,lang:r.lang,confidence:r.confidence,unclear:r.unclear||[]};
     return {ok:true,body:{transcript:r.text,unclear:r.unclear||[],confidence:r.confidence}};
   }
+  // A clip recorded on the call-back: kept in the session as recorded, never transcribed, held like every clip.
+  function setClip(token,{audio,contentType,seconds}={}){
+    const c=ctx(token);if(!c.ok)return c;
+    c.session.clip={data:audio,contentType,seconds,bytes:audio.length,sha256:sha256(audio)};
+    return {ok:true};
+  }
   function setDisclose(token,{showMe,firstName,attachClip,showCard}={}){
     const c=ctx(token);if(!c.ok)return c;
     const {session,entry,first,lang}=c;
     const name=String(firstName??'').trim(),asName=showMe==='name';
+    // A keypad cannot spell a name: on a call, "1 yes" shows the last 3 digits with "a customer" (plan Task 17).
+    const asDigits=showMe==='digits'&&session.channel==='ivr';
     const nameOk=[...name].length>=1&&[...name].length<=MAX_FIRST_NAME&&/^\p{L}[\p{L}' -]*$/u.test(name)&&checkWords(name,{organisationNames:orgsOf(entry)}).ok;
     if(asName&&!nameOk)return {ok:false,status:400,code:'invalid_input',message:splitOptionsStem(t('showMeAs',lang,{first,name:'',digits:''}))};
     const yes=v=>v===true||v==='yes'||v==='on'||v==='1';
-    session.disclose={showMe:asName?'name':'customer',firstName:asName?name:null,attachClip:yes(attachClip),showCard:yes(showCard)};
+    session.disclose={showMe:asName?'name':asDigits?'digits':'customer',firstName:asName?name:null,attachClip:yes(attachClip),showCard:yes(showCard)};
     session.step='bind';
     return {ok:true};
   }
@@ -311,7 +320,7 @@ function createVouchService(system){
   function draftRecord(session,{method,last3}){
     const ch=session.chips,d=session.disclose||{showMe:'customer'};
     const fields={work:ch.work,words:null,wordsSource:null,when:ch.when,howOften:ch.howOften,hireAgain:ch.hireAgain};
-    const named=d.showMe==='name'&&d.firstName&&last3;
+    const named=d.showMe==='name'&&d.firstName&&last3,digits=d.showMe==='digits'&&last3;
     const p=session.proof||{};
     const transcription=session.words?(session.words.source==='clip'&&session.words.fromModel?'model':'typed'):'none';
     const w=session.voucher?.kind==='worker'?session.voucher:null;
@@ -327,7 +336,8 @@ function createVouchService(system){
       generation:{mode:transcription==='model'?'live':'sample',transcription}};
     return {vouchId:null,cardId:session.cardId,kind:'customer',
       proof:{method:p.method,...rq,step:p.step,provedAt:p.provedAt,channel:p.channel||session.channel,onWorkerPhone:session.onWorkerPhone===true},
-      voucher:{label:named?STRINGS.voucherShown(d.firstName,last3):STRINGS.aCustomer,firstName:named?d.firstName:null,phoneLast3:named?last3:null,
+      voucher:{label:named?STRINGS.voucherShown(d.firstName,last3):digits?voucherLabel({voucher:{firstName:null,phoneLast3:last3}}):STRINGS.aCustomer,
+        firstName:named?d.firstName:null,phoneLast3:named||digits?last3:null,
         phoneConfirmedBy:method,cardId:null,showCard:false,orgName:null,orgId:null,adultSelfDeclared:true},
       fields,line:buildLine('customer',fields),lang:session.lang,wordsShownAt:null,clip:null,restsOn:null,statement:null,acceptedAt:null,
       jobPostId:null,flags:[],visits:1,confirmedAt:iso(nowMs()),expiresAt:null,
@@ -336,7 +346,7 @@ function createVouchService(system){
   // The voucher as far as the session knows it: the bound phone, or the demo code's number.
   function voucherOf(session){
     if(session.voucher?.kind==='worker'&&!session.smsOrigin)return {method:'card',key:null,last3:null};
-    if(session.smsOrigin)return {method:'sms_origin',key:session.smsOrigin.key,last3:session.smsOrigin.last3};
+    if(session.smsOrigin)return {method:session.smsOrigin.method||'sms_origin',key:session.smsOrigin.key,last3:session.smsOrigin.last3};
     if(!gatewayConfigured(yv))return session.demo?{method:'demo',key:session.demo.key,last3:session.demo.phoneLast3}:null;
     return session.bind?.at?{method:'sms_bind',key:session.bind.voucherKey,last3:session.bind.phoneLast3}:null;
   }
@@ -413,8 +423,8 @@ function createVouchService(system){
     if(bySms)system.outbox.send(session.bind.replyTo,t('withdrawSms',lang,{first,link:withdrawUrl}));
     if(session.bind)session.bind.replyTo=null;
     system.sessions.delete(token);
-    // The SMS voucher types the 6-character secret back in REMOVE; no link is sent.
-    if(voucher.method==='sms_origin')return {ok:true,vouchId,line:record.line,withdrawUrl:null,withdrawSecret,visitAdded:false};
+    // The SMS voucher types the 6-character secret back in REMOVE; no link is sent. A caller removes by pressing 9.
+    if(voucher.method==='sms_origin'||voucher.method==='caller_id')return {ok:true,vouchId,line:record.line,withdrawUrl:null,withdrawSecret,visitAdded:false};
     return {ok:true,vouchId,line:record.line,withdrawUrl:bySms?null:withdrawUrl,visitAdded:false,withdrawSent:bySms,demo:voucher.method==='demo'};
   }
 
@@ -460,7 +470,7 @@ function createVouchService(system){
     return {ok:true,vouchId};
   }
 
-  return {open,setChips,setWords,clipWords,setDisclose,issueBind,bindBySms,bindStatus,demoOtp,confirm,preview,addVisit,reciprocal,...createReferrals(system)};
+  return {open,setChips,setWords,clipWords,setClip,setDisclose,issueBind,bindBySms,bindStatus,demoOtp,confirm,preview,addVisit,reciprocal,...createReferrals(system)};
 }
 // ---- Organisation referral (spec 7.5, plan Task 13) ----
 // Each disclosed completion organisation once, with its newest completion by dateCompleted: the worker page's

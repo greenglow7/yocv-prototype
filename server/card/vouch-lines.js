@@ -35,7 +35,9 @@ function voucherLabel(record){
   const v=record?.voucher||{};
   if(record?.kind==='organisation')return str(v.orgName||v.label);
   if(record?.kind==='worker')return str(v.firstName)+"'s card";
-  return v.firstName&&v.phoneLast3?STRINGS.voucherShown(v.firstName,v.phoneLast3):STRINGS.aCustomer;
+  if(v.firstName&&v.phoneLast3)return STRINGS.voucherShown(v.firstName,v.phoneLast3);
+  // A call vouch with "1 yes" to the name: no name from a keypad, so "a customer ···191" (plan Task 17).
+  return v.phoneLast3?STRINGS.voucherShown(STRINGS.aCustomer,v.phoneLast3):STRINGS.aCustomer;
 }
 
 function numberLabel(phoneConfirmedBy){
@@ -75,16 +77,18 @@ function finePrint(record,firstName){
   return [lead,...(number?[number]:[])];
 }
 
-function clipOf(clip){
+// A clip from the call-back is labelled "Recorded on a call" (spec 7.3).
+function clipOf(clip,channel){
   if(clip?.expired)return {href:null,text:STRINGS.clipExpired};
   if(!clip?.url)return null;
-  return {href:clip.url,text:STRINGS.playClip(clip.seconds,Math.round(Number(clip.bytes||0)/1024))};
+  const play=STRINGS.playClip(clip.seconds,Math.round(Number(clip.bytes||0)/1024));
+  return {href:clip.url,text:channel==='ivr'?STRINGS.recordedOnCall+' · '+play:play};
 }
 
 function tierItem(record,firstName,{flags,nowMs}={}){
   const visits=Number(record?.visits)||1,referral=record?.kind==='organisation';
   return {vouchId:record?.vouchId??null,label:tierLabel(record,firstName,flags===undefined?record?.flags:flags,{nowMs:nowMs??Date.now()}),
-    line:str(record?.line)+(visits>1?' '+STRINGS.visits(visits)+'.':''),clip:clipOf(record?.clip),finePrint:finePrint(record,firstName),
+    line:str(record?.line)+(visits>1?' '+STRINGS.visits(visits)+'.':''),clip:clipOf(record?.clip,record?.proof?.channel),finePrint:finePrint(record,firstName),
     window:SLOW.has(record?.proof?.channel)?'sms':'web',referral,demoKey:referral};
 }
 
