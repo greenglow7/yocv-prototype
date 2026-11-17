@@ -72,6 +72,13 @@ test('shell without fonts and the new tokens',()=>{
  assert.ok(page.includes('fonts.googleapis.com'),'the card page keeps its fonts by default');
 });
 
+// Testing log (Task 21): the done page prints the withdraw link as text, and at 360 px the unbroken URL pushed the
+// page to 376 px. Flow pages break a long word or link inside main, within the 900-byte budget.
+test('a long printed link wraps on a 360 px flow page',()=>{
+ assert.match(FLOW_CSS,/main\{[^}]*overflow-wrap:anywhere/);
+ assert.ok(Buffer.byteLength(FLOW_CSS)<=900);
+});
+
 test('the honesty helper passes a flow page and catches a bad one',()=>{
  const good=shell({title:'x',body:'<p>Hi</p>'+footer(null),fonts:false,css:FLOW_CSS});
  assertHonestPage(good);

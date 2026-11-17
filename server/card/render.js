@@ -213,12 +213,12 @@ const SCRIPT=[
 // Small pages under /my/, /s/, /v/, /a/, /o/ and /r/ (spec §4.3, §7.2): system fonts only, 16px gutter,
 // 44px targets. Used with shell({fonts:false}) so no third-party asset loads.
 const FLOW_CSS=[
-  ':root{--ink:#020304;--muted:#545859;--bg:#f3f6fa;--accent:#41204b;--tint:#e7d4ed;--bad:#b3261e}',
+  ':root{--ink:#020304;--muted:#545859;--bg:#f3f6fa;--accent:#41204b;--tint:#e7d4ed}',
   '*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,sans-serif;line-height:1.5}',
-  'main{max-width:480px;margin:0 auto;padding:16px}h1{font-size:22px;margin:0 0 8px}section{background:#fff;border-radius:16px;padding:16px;margin:16px 0}',
+  'main{max-width:480px;margin:0 auto;padding:16px;overflow-wrap:anywhere}h1{font-size:22px;margin:0 0 8px}section{background:#fff;border-radius:16px;padding:16px;margin:16px 0}',
   'button,.btn{font:inherit;min-height:44px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:9999px;padding:8px 20px;font-weight:600;text-decoration:none;display:inline-block}',
   '.alt{background:#fff;color:var(--accent)}input,textarea{font:inherit;min-height:44px;width:100%;padding:8px;border:1px solid var(--muted);border-radius:8px}',
-  '.small,footer{font-size:14px;color:var(--muted)}.bad{color:var(--bad)}.notice{background:var(--tint);border-radius:16px;padding:16px}a{color:var(--accent)}'
+  '.small,footer{font-size:14px;color:var(--muted)}.bad{color:#b3261e}.notice{background:var(--tint);border-radius:16px;padding:16px}a{color:var(--accent)}'
 ].join('');
 
 function shell({title,description,ogImage,ogUrl,body,fonts=true,css=CSS}){
