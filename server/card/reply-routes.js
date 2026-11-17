@@ -4,16 +4,22 @@
    response is sent.
      POST /api/reply/parse                {text} -> {jobPostId, parsed, flags, refusal, warning, documents, messages}
      POST /api/reply/draft                {cardId, cardToken, jobPostId, text, lang, documentAnswer, clipIds} -> {replyId, lines, messages, rejected}
+                                          or a voice note (audio/webm or audio/mp4, headers x-card-id, x-card-token,
+                                          x-job-post-id, x-lang, x-clip-seconds at most 20) -> the same plus {transcript}
+     POST /api/reply/:replyId/self-clip   audio, x-card-id, x-card-token, x-clip-seconds at most 16 -> {clipIds, lines}
      POST /api/reply/:replyId/edit        {cardId, cardToken, line, text} -> {ok, lines} | {ok:false, reason}
      POST /api/reply/:replyId/confirm     {cardId, cardToken, lines, lang} -> {forward} | {forward:null, lines, notTranslated:true}
      POST /api/reply/:replyId/forwarded   {cardId, cardToken} -> {forwardedAt}, set once
      GET  /r/:replyId                     the reply page: the lines, clip links, private headers, honest footer;
                                           404 until the worker confirms, and line 2 turns neutral once its vouch is gone
+     GET  /r/:replyId/clip                the self clip in its stored type, linked on /r/ as "Said by <first>" (plan
+                                          addition); 404 until the worker confirms, 410 once the card is withdrawn
    The routes are thin: they read the body, check the card token and call createReplyService, so the WhatsApp
    handler (Task 16) calls the same functions. A model call goes through system.withSlot, the router's in-flight
    guard, and a full guard answers 503 busy. A refusal stores no post and logs parser_refused with its reason.
    Every reply route answers 404 "No card with this code" unless the card token matches. */
-const {parsePost,docMessages,isMediaOnly,extractAnswers,postOrganisations,answersText,chooseExperience,buildReplyLines,fitReply,smsReply,editLine,detectDocuments,MAX_CLIPS}=require('./reply.js');
+const {parsePost,docMessages,isMediaOnly,extractAnswers,postOrganisations,answersText,chooseExperience,buildReplyLines,line6,fitReply,smsReply,editLine,detectDocuments,MAX_CLIPS}=require('./reply.js');
+const {audioType,isAudio,clipSeconds,CONFIDENCE_FLOOR,MAX_AUDIO_BYTES}=require('./transcribe.js');
 const {t,LANGS}=require('./copy.js');
 const {STRINGS}=require('./render.js');
 const {validId,secretsMatch}=require('./store.js');
@@ -22,8 +28,9 @@ const {computeFlags,burstHeld,workerEdges,cardCreatedMs}=require('./flags.js');
 const {replyPage,errorPage}=require('./pages.js');
 const {sendPrivateJSON,sendPage}=require('./vouch-routes.js');
 
-const REPLY_API=/^\/api\/reply\/([A-Z2-9]{10})\/(edit|confirm|forwarded)$/;
-const REPLY_PAGE=/^\/r\/([A-Z2-9]{10})$/;
+const REPLY_API=/^\/api\/reply\/([A-Z2-9]{10})\/(edit|confirm|forwarded|self-clip)$/;
+const REPLY_PAGE=/^\/r\/([A-Z2-9]{10})(\/clip)?$/;
+const MAX_NOTE_SECONDS=20,MAX_SELF_SECONDS=16;
 const isPlainObject=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 const str=v=>typeof v==='string'?v:'';
 const list=v=>Array.isArray(v)?v:[];
@@ -80,8 +87,7 @@ function createReplyService(system){
     return org?t('replyMenu',lang,{org}):t('replyMenuNoOrg',lang);
   }
 
-  async function draft({cardId,jobPostId,text,audio,lang,documentAnswer,clipIds,channel='web'}={}){
-    void audio; // a voice note arrives with Task 11; this task drafts from typed text
+  async function draft({cardId,jobPostId,text,lang,documentAnswer,clipIds,channel='web',transcription=null}={}){
     const entry=liveCard(cardId),record=entry.record,first=firstOf(entry),language=langOf(lang),nowMs=system.now();
     const post=validId(jobPostId)?system.postStore.get(jobPostId):null;
     if(!post)throw fail(404,'not_found','No post with this id. Paste the post again.');
@@ -108,12 +114,47 @@ function createReplyService(system){
       sources:['card+transcript',experience.sourceTag,'record','transcript',documents.length?'tap':'record','record'],
       lang:language,confirmedLang:null,translation:{by:'none',from:language,backTranslation:null,confirmedBySpeaker:false,confirmedAt:null},
       clipIds:clips,warnings,edits:[],sms:null,createdAt:iso(nowMs),confirmedAt:null,forwardedAt:null,
-      generation:{mode:ex.mode,rejected:ex.rejected}});
+      generation:{mode:ex.mode,rejected:ex.rejected,...(transcription?{transcription}:{})}});
     events.log('reply_drafted',{...cardFields(entry),replyId,jobPostId:post.jobPostId,channel});
     const L=(key,vars)=>t(key,language,vars);
     const messages=[...(down?[L('voiceDown')]:[]),L('hereIsReply'),...lines,
       ...(documents.length>2?[L('tooManyDocs',{item1:items[0],item2:items[1]})]:[]),menuFor(record,language),...(system.liveModel?[]:[L('sampleMode')])];
     return {replyId,lines,messages,rejected:ex.rejected};
+  }
+
+  // A voice note: transcribed inside the in-flight guard, then drafted from the transcript. Its raw audio is kept
+  // as <replyId>.raw.<ext> until the worker confirms (spec 9.7). Template mode or a failure asks for typed answers;
+  // a confidence under 0.6 asks again (spec 8). At 20 seconds the recorder stopped, so messages start with cutAt20.
+  async function draftAudio({cardId,jobPostId,audio,contentType,seconds,lang,channel='web'}={}){
+    const entry=liveCard(cardId),language=langOf(lang);
+    if(!(validId(jobPostId)&&system.postStore.get(jobPostId)))throw fail(404,'not_found','No post with this id. Paste the post again.');
+    const tr=system.transcriber;
+    if(!tr||tr.template)return {replyId:null,transcript:null,typed:true,messages:[t('sampleMode',language)]};
+    let r;
+    try{r=await system.withSlot(()=>tr.transcribe({audio,contentType,lang:language}));}
+    catch(err){
+      if(err?.code==='busy')throw err;
+      events.log('transcription_failed',{lang:language,channel,...cardFields(entry)});
+      return {replyId:null,transcript:null,typed:true};
+    }
+    const said=str(r?.text).trim();
+    if(!said||(r.confidence!=null&&r.confidence<CONFIDENCE_FLOOR))return {message:t('hearBadly',language)};
+    const d=await draft({cardId,jobPostId,text:said,lang:language,channel,transcription:'model'});
+    system.replyStore.saveClip(d.replyId,{data:audio,contentType},{raw:true});
+    return {...d,transcript:said,unclear:list(r.unclear),confidence:r.confidence??null,
+      messages:[...(seconds>=MAX_NOTE_SECONDS?[t('cutAt20',language)]:[]),...d.messages]};
+  }
+  // The worker's own clip (spec 6.1 line 6): replaces any earlier one, joins clipIds as self:<replyId> on top of
+  // the vouch clips, and rebuilds line 6's count. Line 6 changed, so the confirmation reopens.
+  function selfClip(replyId,{cardId,audio,contentType,seconds}={}){
+    const entry=liveCard(cardId),reply=ownReply(replyId,entry.cardId);
+    const saved=system.replyStore.saveClip(replyId,{data:audio,contentType});
+    const self='self:'+replyId,clipIds=[...list(reply.clipIds).filter(id=>id!==self),self];
+    const six=line6(clipIds.length,system.publicUrl+'/c/'+entry.cardId,firstOf(entry));
+    const swap=v=>Array.isArray(v)&&v.length===6?v.map((l,i)=>i===5?six:l):v;
+    const next=system.replyStore.update(replyId,r=>({...r,clipIds,lines:swap(r.lines),linesInSourceLang:swap(r.linesInSourceLang),
+      selfClip:{url:'/r/'+replyId+'/clip',contentType:saved.contentType,seconds,bytes:saved.bytes,sha256:saved.sha256},confirmedAt:null,confirmedLang:null}));
+    return {clipIds:next.clipIds,lines:next.linesInSourceLang};
   }
 
   function ownReply(replyId,cardId){
@@ -137,6 +178,7 @@ function createReplyService(system){
     const {files,flags}=vouchContext(entry.cardId,nowMs);
     const sms=smsReply({card:entry.record,vouches:files,publicUrl:system.publicUrl,nowMs,flags});
     system.replyStore.update(replyId,r=>{r.confirmedLang=LANGS.includes(lang)?lang:r.lang;r.confirmedAt=iso(nowMs);r.sms=sms;});
+    system.replyStore.deleteRaw(replyId); // raw voice-note audio goes once the reply is confirmed (spec 9.7)
     events.log('reply_confirmed',{...cardFields(entry),replyId,channel});
     if(reply.lang==='en'&&Array.isArray(reply.lines))return {forward:t('forwardThis')+'\n'+reply.lines.join('\n')};
     return {forward:null,lines:own,notTranslated:true};
@@ -148,9 +190,12 @@ function createReplyService(system){
     return {forwardedAt:r.forwardedAt};
   }
   // The reply page's clips: only lines still live with a released clip (a withdrawal holds at read time).
-  function pageClips(reply,nowMs){
-    return list(reply.clipIds).map(id=>system.vouchStore.get(id)).filter(f=>f?.record&&system.vouchStore.isLive(f,nowMs)&&f.record.clip?.url&&!f.record.clip.expired)
-      .map(f=>({href:'/v/'+f.record.vouchId+'/clip',text:STRINGS.playClip(f.record.clip.seconds,Math.round(Number(f.record.clip.bytes||0)/1024))}));
+  // The worker's own clip follows, labelled "Said by <first>".
+  function pageClips(reply,nowMs,firstName=''){
+    const self='self:'+reply.replyId;
+    return [...list(reply.clipIds).filter(id=>id!==self).map(id=>system.vouchStore.get(id)).filter(f=>f?.record&&system.vouchStore.isLive(f,nowMs)&&f.record.clip?.url&&!f.record.clip.expired)
+      .map(f=>({href:'/v/'+f.record.vouchId+'/clip',text:STRINGS.playClip(f.record.clip.seconds,Math.round(Number(f.record.clip.bytes||0)/1024))})),
+      ...(list(reply.clipIds).includes(self)&&reply.selfClip?[{href:'/r/'+reply.replyId+'/clip',text:t('saidBy','en',{first:str(firstName)})}]:[])];
   }
   // The reply page's line 2: when it rests on a vouch or referral that is no longer live (withdrawn, withdrawn
   // quietly past withdrawAfter, or hidden), the line turns neutral at read time (spec 5.6, Review Focus 4).
@@ -163,11 +208,12 @@ function createReplyService(system){
     const swap=v=>Array.isArray(v)&&v.length>1?v.map((l,i)=>i===1?neutral:l):v;
     return {...reply,lines:swap(reply.lines),linesInSourceLang:swap(reply.linesInSourceLang)};
   }
-  return {parse,draft,edit,confirm,forwarded,pageClips,pageReply,organisationsOf};
+  return {parse,draft,draftAudio,selfClip,edit,confirm,forwarded,pageClips,pageReply,organisationsOf};
 }
 
 function createReplyRouter(system){
   const readJSONBody=req=>require('../../server.js').readJSONBody(req);
+  const readRawBody=(req,maxBytes)=>require('../../server.js').readRawBody(req,maxBytes);
   const sampleMode=!system.liveModel;
   async function body(req,res){
     let payload;
@@ -203,9 +249,25 @@ function createReplyRouter(system){
     if(!tokenOk(payload))return sendError(res,404,'not_found',STRINGS.notFound);
     await run(res,()=>fn(payload));
   }
+  // An audio body: the card comes in headers, since the body is the clip. Answers undefined once it has replied.
+  async function withAudio(req,res,maxSeconds,fn){
+    let audio;
+    try{audio=await readRawBody(req,MAX_AUDIO_BYTES);}
+    catch(err){if(err?.code==='invalid_input')return sendError(res,400,'invalid_input',err.message);throw err;}
+    const h=req.headers,cardId=str(h['x-card-id']);
+    if(!tokenOk({cardId,cardToken:str(h['x-card-token'])}))return sendError(res,404,'not_found',STRINGS.notFound);
+    const contentType=audioType(h['content-type']),seconds=clipSeconds(h['x-clip-seconds'],maxSeconds);
+    if(!contentType)return sendError(res,400,'invalid_input','Send audio/webm or audio/mp4.');
+    if(!seconds)return sendError(res,400,'invalid_input','x-clip-seconds must be a whole number from 1 to '+maxSeconds+'.');
+    if(!audio.length)return sendError(res,400,'invalid_input','The clip is empty.');
+    await run(res,()=>fn({cardId,audio,contentType,seconds,headers:h}));
+  }
   const svc=()=>system.replyService;
+  const apiDraftAudio=(req,res)=>withAudio(req,res,MAX_NOTE_SECONDS,a=>svc().draftAudio({cardId:a.cardId,jobPostId:str(a.headers['x-job-post-id']),
+    audio:a.audio,contentType:a.contentType,seconds:a.seconds,lang:str(a.headers['x-lang'])}));
   const apiDraft=(req,res)=>withCard(req,res,p=>svc().draft({cardId:p.cardId,jobPostId:str(p.jobPostId),text:p.text,lang:p.lang,documentAnswer:p.documentAnswer,clipIds:p.clipIds}));
   function apiReply(req,res,replyId,action){
+    if(action==='self-clip')return withAudio(req,res,MAX_SELF_SECONDS,a=>svc().selfClip(replyId,a));
     if(action==='edit')return withCard(req,res,p=>svc().edit(replyId,p.line,str(p.text),{cardId:p.cardId}));
     if(action==='confirm')return withCard(req,res,p=>svc().confirm(replyId,p.lines,p.lang,{cardId:p.cardId}));
     return withCard(req,res,p=>svc().forwarded(replyId,{cardId:p.cardId}));
@@ -217,18 +279,28 @@ function createReplyRouter(system){
     // No line is published before the worker confirms it; an edit clears confirmedAt, so the page closes again.
     if(!reply.confirmedAt)return sendPage(res,404,errorPage({message:'This reply is not confirmed yet.',sampleMode}));
     const first=entry.record.user?.firstName||'',nowMs=system.now();
-    sendPage(res,200,replyPage({reply:svc().pageReply(reply,first,nowMs),firstName:first,clips:svc().pageClips(reply,nowMs),sampleMode}));
+    sendPage(res,200,replyPage({reply:svc().pageReply(reply,first,nowMs),firstName:first,clips:svc().pageClips(reply,nowMs,first),sampleMode}));
+  }
+  // The self clip, served as recorded; the same gates as the page, and only while it is still in clipIds.
+  function selfClipFile(res,replyId){
+    const reply=system.replyStore.get(replyId),entry=reply?system.store.get(reply.cardId):null;
+    if(!reply||!entry?.record)return sendError(res,404,'not_found','No reply with this id.');
+    if(entry.withdrawnAt)return sendError(res,410,'card_withdrawn',t('cardWithdrawn'));
+    const clip=reply.confirmedAt&&list(reply.clipIds).includes('self:'+replyId)?system.replyStore.readClip(replyId):null;
+    if(!clip)return sendError(res,404,'not_found','No clip for this reply.');
+    res.writeHead(200,{'content-type':clip.contentType,'content-length':clip.data.length,'cache-control':'no-store','referrer-policy':'no-referrer','x-content-type-options':'nosniff'});
+    res.end(clip.data);
   }
   function handle(req,res,url){
     const pathname=url.pathname,method=req.method;
     const wrap=p=>Promise.resolve(p).then(()=>true);
     const notAllowed=()=>wrap(sendError(res,405,'method_not_allowed','Method not allowed.'));
     if(pathname==='/api/reply/parse')return method==='POST'?wrap(apiParse(req,res)):notAllowed();
-    if(pathname==='/api/reply/draft')return method==='POST'?wrap(apiDraft(req,res)):notAllowed();
+    if(pathname==='/api/reply/draft')return method==='POST'?wrap(isAudio(req.headers['content-type'])?apiDraftAudio(req,res):apiDraft(req,res)):notAllowed();
     const api=REPLY_API.exec(pathname);
     if(api)return method==='POST'?wrap(apiReply(req,res,api[1],api[2])):notAllowed();
     const r=REPLY_PAGE.exec(pathname);
-    if(r)return method==='GET'||method==='HEAD'?wrap(page(res,r[1])):notAllowed();
+    if(r)return method==='GET'||method==='HEAD'?wrap(r[2]?selfClipFile(res,r[1]):page(res,r[1])):notAllowed();
     if(pathname.startsWith('/r/'))return wrap(sendPage(res,404,errorPage({message:'No reply with this id.',sampleMode})));
     return false;
   }

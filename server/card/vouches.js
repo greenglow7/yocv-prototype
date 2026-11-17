@@ -80,8 +80,24 @@ function createVouchStore(dir,{now=Date.now,random=crypto.randomBytes,cardStore=
     for(let j=0;j<6;j++)out+=ALPHABET[bytes[j]%ALPHABET.length];
     return out;
   }
-  function create({record,held=null,private:priv={},channel='web'}={}){
+  // clip = {data, contentType, seconds}: written in the browser's own container and held with the words (spec 6.3, 9.6).
+  function writeClip(vouchId,{data,contentType,seconds}){
+    const ext=contentType==='audio/mp4'?'m4a':'webm';
+    fs.mkdirSync(clips,{recursive:true});
+    fs.writeFileSync(path.join(clips,vouchId+'.'+ext),data);
+    return {url:'/v/'+vouchId+'/clip',contentType:ext==='m4a'?'audio/mp4':'audio/webm',seconds,bytes:data.length,sha256:crypto.createHash('sha256').update(data).digest('hex')};
+  }
+  function readClip(vouchId){
+    if(!validId(vouchId))return null;
+    for(const ext of CLIP_EXTS){
+      try{return fs.readFileSync(path.join(clips,vouchId+'.'+ext));}
+      catch(err){if(err?.code!=='ENOENT')throw err;}
+    }
+    return null;
+  }
+  function create({record,held=null,private:priv={},channel='web',clip=null}={}){
     const vouchId=newId(),withdrawSecret=newSecret(channel);
+    if(clip?.data&&held)held={...held,clip:writeClip(vouchId,clip)};
     const file={record:{...record,vouchId},held:held||null,
       private:{voucherKey:null,withdrawnAt:null,withdrawAfter:null,hiddenAt:null,editedFields:[],rawTranscript:null,rejected:[],
         ...(priv&&typeof priv==='object'?priv:{}),withdrawSecretHash:hashSecret(withdrawSecret)}};
@@ -179,7 +195,7 @@ function createVouchStore(dir,{now=Date.now,random=crypto.randomBytes,cardStore=
 
   return {dir:root,create,get,update,listAll,listForCard,listByVoucherCard,listByVoucherKey,withdraw,withdrawAs,
     hide:(vouchId,cardId)=>setHidden(vouchId,cardId,true),show:(vouchId,cardId)=>setHidden(vouchId,cardId,false),
-    showWords,deleteClip,tombstone,publicPart,isLive};
+    showWords,deleteClip,readClip,tombstone,publicPart,isLive};
 }
 
 // ---- Caps (spec 5.4). They count sessions that reached confirm, never refusals. ----

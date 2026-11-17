@@ -10,10 +10,12 @@
      POST /s/:cardId | POST /s             the 18-or-older answer: consumes the step, opens the session, chips page
      POST /api/vouch/open                  the JSON form of the same step (spec 4.3)
      GET  /v/:vouchId.json                 {record, jwt, jwksUrl, held}, signed with sub: vouchId; 410 unless live
-     GET  /v/:vouchId/clip                 410 unless live (clip storage arrives with Task 11)
+     GET  /v/:vouchId/clip                 the released clip in its stored type; 404 while held, 410 unless live
      GET  /v/:vouchId/withdraw?w=          the withdraw question; POST (w, mode now|quiet) withdraws
      POST /api/vouch/:vouchToken/chips     chips (and, from the no-JS form, words); JSON or form
-     POST /api/vouch/:vouchToken/words     {text, lang}
+     POST /api/vouch/:vouchToken/words     {text, lang, fromClip}, or a clip (audio/webm or audio/mp4, x-clip-seconds
+                                           at most 16, 400 KB) -> {transcript, unclear, confidence}
+     GET  /mic.js                          the chips page recorder (progressive), its labels in every language
      POST|GET /api/vouch/:vouchToken/bind  issue the YES session code | {bound, phoneLast3, error}
      POST /api/vouch/:vouchToken/otp       demo fallback, mounted only when no gateway is configured
      POST /api/vouch/:vouchToken/confirm   publish; the form gets the done page
@@ -39,6 +41,7 @@ const {signRecord}=require('./sign.js');
 const {cardFields}=require('./events.js');
 const {chipsFor,messageFor,gatewayConfigured,STATUS}=require('./vouch-service.js');
 const {myUrl}=require('./vouch-system.js');
+const {audioType,isAudio,clipSeconds,MAX_AUDIO_BYTES}=require('./transcribe.js');
 
 const MY_PATH=/^\/my\/([A-Z2-9]{10})\/([0-9a-f]{16})(\/[a-z-]+(?:\.json)?)?$/;
 const SCAN_PATH=/^\/s(?:\/([A-Z2-9]{10}))?$/;
@@ -48,6 +51,7 @@ const SESSION_PAGE=/^\/s\/t\/([0-9a-f]{24})$/;
 const API_SESSION=/^\/api\/vouch\/([0-9a-f]{24})\/(chips|words|bind|otp|confirm)$/;
 const ARRIVED_MS=10*60*1000;
 const MAX_FORM_BYTES=64*1024;
+const MAX_CLIP_SECONDS=16;
 const PRIVATE={'cache-control':'no-store','referrer-policy':'no-referrer','x-content-type-options':'nosniff'};
 
 function send(res,status,body,type,extra={}){
@@ -98,12 +102,39 @@ function qrBrowser(){
   return qrBrowserSource;
 }
 
+// The chips page recorder (spec 7.2 steps 2 and 3): MediaRecorder at a 16 kbit/s hint in the browser's own
+// container, stopped at 15 seconds, posted to /words; then "We heard" with the unclear spans shown as the marker
+// and "Use these words", which fills the words box and marks the form fromClip. Without it the box is all there is.
+let micSource=null;
+function micScript(){
+  if(micSource)return micSource;
+  const labels=Object.fromEntries(LANGS.map(l=>[l,{r:t('record',l),s:t('stop',l),l:t('listen',l),a:t('recordAgain',l),h:t('weHeard',l,{transcript:'%s'}),u:t('useWords',l),x:t('unclear',l)}]));
+  micSource=['(function(){var m=document.getElementById("mic");if(!m||!window.MediaRecorder||!window.fetch||!navigator.mediaDevices)return;',
+    'var T=',JSON.stringify(labels).replace(/</g,'\\u003c'),',D=document,lang=D.documentElement.lang,L=T[lang]||T.en,tk=m.getAttribute("data-t"),f=m.closest("form"),w=f&&f.querySelector("textarea[name=words]");',
+    'function el(n,x){var e=D.createElement(n);if(x)e.textContent=x;return e}',
+    'var b=el("button",L.r),p=el("button",L.l),o=el("p"),u=el("button",L.u),r,ch,s0,tm,url,said="";b.type=p.type=u.type="button";p.hidden=u.hidden=true;',
+    '[b,p,o,u].forEach(function(e){m.appendChild(e)});m.hidden=false;',
+    'function stop(){clearTimeout(tm);if(r&&r.state!=="inactive")r.stop()}',
+    'function post(h,body){return fetch("/api/vouch/"+tk+"/words",{method:"POST",headers:h,body:body}).then(function(x){return x.json()})}',
+    'function heard(j){if(j&&typeof j.transcript==="string"){var s=j.transcript,c=s;(j.unclear||[]).forEach(function(x){s=s.split(x).join(L.x);c=c.split(x).join(" ")});',
+    'said=c.replace(/\\s+/g," ").trim();o.textContent=L.h.replace("%s",s);u.hidden=!said}else o.textContent=j&&(j.message||(j.messages||[]).join(" ")||(j.error&&j.error.message))||""}',
+    'b.onclick=function(){if(r&&r.state==="recording")return stop();navigator.mediaDevices.getUserMedia({audio:true}).then(function(st){ch=[];',
+    'try{r=new MediaRecorder(st,{audioBitsPerSecond:16000})}catch(e){r=new MediaRecorder(st)}r.ondataavailable=function(e){if(e.data&&e.data.size)ch.push(e.data)};',
+    'r.onstop=function(){st.getTracks().forEach(function(x){x.stop()});var bl=new Blob(ch,{type:r.mimeType||"audio/webm"}),sec=Math.max(1,Math.min(',MAX_CLIP_SECONDS,',Math.ceil((Date.now()-s0)/1000)));',
+    'if(url)URL.revokeObjectURL(url);url=URL.createObjectURL(bl);b.textContent=L.a;p.hidden=false;u.hidden=true;o.textContent="";',
+    'post({"content-type":(bl.type||"audio/webm").split(";")[0],"x-clip-seconds":String(sec)},bl).then(heard).catch(function(){})};',
+    's0=Date.now();r.start();b.textContent=L.s;tm=setTimeout(stop,15000)}).catch(function(){})};',
+    'p.onclick=function(){if(url)new Audio(url).play()};',
+    'u.onclick=function(){post({"content-type":"application/json"},JSON.stringify({text:said,lang:lang,fromClip:true})).then(function(j){if(j&&typeof j.text==="string"){if(w)w.value=j.text;',
+    'if(!f.querySelector("input[name=fromClip]")){var h=el("input");h.type="hidden";h.name="fromClip";h.value="1";f.appendChild(h)}u.hidden=true}else heard(j)}).catch(function(){})}})();\n'].join('');
+  return micSource;
+}
+
 function createVouchRouter(system){
   const {store,codes,now,sessions,service,vouchStore,events,key}=system;
   const readJSONBody=req=>require('../../server.js').readJSONBody(req);
-  // Raw bodies (audio uploads, Task 11) go through server.js too, loaded lazily for the same reason.
+  // Raw bodies (audio uploads) go through server.js too, loaded lazily for the same reason.
   const readRawBody=(req,maxBytes)=>require('../../server.js').readRawBody(req,maxBytes);
-  void readRawBody;
   const sampleMode=!system.liveModel;
   const notFound=()=>flowPage({title:STRINGS.notFound,body:'<section class="notice"><h1>'+STRINGS.notFound+'</h1></section>',sampleMode});
 
@@ -277,11 +308,14 @@ function createVouchRouter(system){
     const jwt=signRecord(key,record,{sub:vouchId,now:()=>Date.parse(record.wordsShownAt||record.confirmedAt)});
     sendPrivateJSON(res,200,{record,jwt,jwksUrl:system.publicUrl+'/.well-known/jwks.json',held:file.held&&!record.wordsShownAt?['words','clip']:[]});
   }
+  // Served exactly as recorded, with the stored type; a held clip is in file.held, never in the record.
   function vouchClip(res,vouchId){
     const file=vouchStore.get(vouchId);
     if(!file)return sendError(res,404,'not_found','No vouch with this id.');
     if(!vouchStore.isLive(file,now()))return sendError(res,410,'withdrawn','This vouch was withdrawn.');
-    sendError(res,404,'not_found','No clip for this vouch.');
+    const clip=file.record.clip,data=clip?.url&&!clip.expired?vouchStore.readClip(vouchId):null;
+    if(!data)return sendError(res,404,'not_found','No clip for this vouch.');
+    send(res,200,data,clip.contentType==='audio/mp4'?'audio/mp4':'audio/webm');
   }
   const workerFirst=file=>firstOf(store.get(file.record.cardId));
   const secretField=v=>/^[0-9A-Za-z]{6,16}$/.test(field(v))?field(v):'';
@@ -370,7 +404,7 @@ function createVouchRouter(system){
       return sendPrivateJSON(res,400,{error:{code:'invalid_input',message:fieldMessage(r.fields,first,lang),retryable:false,fields:r.fields}});
     }
     if(p.words!==undefined){
-      const w=service.setWords(token,{text:field(p.words),lang:p.lang});
+      const w=service.setWords(token,{text:field(p.words),lang:p.lang,fromClip:p.fromClip===true||field(p.fromClip)==='1'});
       if(!w.ok){
         if(form){session.step='chips';return sessionPage(res,token,{status:400,error:w.message});}
         return sendPrivateJSON(res,400,{error:{code:w.reason,message:w.message,retryable:false,fields:['words']}});
@@ -380,14 +414,30 @@ function createVouchRouter(system){
     sendPrivateJSON(res,200,{ok:true,chips:r.chips});
   }
   async function apiWords(req,res,token){
+    if(isAudio(req.headers['content-type']))return clipWords(req,res,token);
     const form=isForm(req),payload=await readBody(req,res);
     if(payload===undefined)return;
     const p=isPlainObject(payload)?payload:{};
-    const r=service.setWords(token,{text:field(p.text),lang:p.lang});
+    const r=service.setWords(token,{text:field(p.text),lang:p.lang,fromClip:p.fromClip===true});
     if(!r.ok&&!r.reason)return ended(res,form,r);
     if(form)return r.ok?redirect(res,'/s/t/'+token):sessionPage(res,token,{status:400,error:r.message});
     if(!r.ok)return sendPrivateJSON(res,400,{error:{code:r.reason,message:r.message,retryable:false}});
     sendPrivateJSON(res,200,{text:r.text});
+  }
+  // A clip upload: audio/webm or audio/mp4, at most 400 KB and 16 seconds.
+  async function clipWords(req,res,token){
+    const type=audioType(req.headers['content-type']),seconds=clipSeconds(req.headers['x-clip-seconds'],MAX_CLIP_SECONDS);
+    let audio;
+    try{audio=await readRawBody(req,MAX_AUDIO_BYTES);}
+    catch(err){if(err?.code==='invalid_input')return sendError(res,400,'invalid_input',err.message);throw err;}
+    if(!type)return sendError(res,400,'invalid_input','Send audio/webm or audio/mp4.');
+    if(!seconds)return sendError(res,400,'invalid_input','x-clip-seconds must be a whole number from 1 to '+MAX_CLIP_SECONDS+'.');
+    if(!audio.length)return sendError(res,400,'invalid_input','The clip is empty.');
+    let r;
+    try{r=await service.clipWords(token,{audio,contentType:type,seconds});}
+    catch(err){if(err?.code==='busy')return sendError(res,503,'busy',err.message,true);throw err;}
+    if(!r.ok)return ended(res,false,r);
+    sendPrivateJSON(res,200,r.body);
   }
   async function apiBind(req,res,token,method){
     if(method==='GET'||method==='HEAD'){
@@ -468,6 +518,10 @@ function createVouchRouter(system){
     if(pathname==='/qr-browser.js'){
       if(method!=='GET'&&method!=='HEAD')return notAllowed();
       return wrap(send(res,200,qrBrowser(),'text/javascript; charset=utf-8',{'cache-control':'max-age=86400'}));
+    }
+    if(pathname==='/mic.js'){
+      if(method!=='GET'&&method!=='HEAD')return notAllowed();
+      return wrap(send(res,200,micScript(),'text/javascript; charset=utf-8',{'cache-control':'max-age=86400'}));
     }
     if(pathname==='/api/vouch/codes')return method==='POST'?wrap(apiCodes(req,res)):notAllowed();
     if(pathname==='/api/vouch/open')return method==='POST'?wrap(apiOpen(req,res)):notAllowed();

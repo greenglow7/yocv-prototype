@@ -12,6 +12,7 @@ const {normalisePhone,keyedHash}=require('./vouchers.js');
 const {capFor,recentFor,isSelfVouch,capMessage}=require('./vouches.js');
 const {parseChips,checkWords,buildLine}=require('./vouch-lines.js');
 const {flagsAtConfirm,cardCreatedMs}=require('./flags.js');
+const {CONFIDENCE_FLOOR,sha256}=require('./transcribe.js');
 
 const CHIPS=JSON.parse(fs.readFileSync(path.join(__dirname,'..','..','data','vouch-chips.json'),'utf8'));
 const EXPIRES_IN_MS=30*60*1000;
@@ -122,19 +123,43 @@ function createVouchService(system){
     session.step='disclose';
     return {ok:true,chips:r.chips};
   }
-  function setWords(token,{text,lang}={}){
+  // fromClip (the "Use these words" tap): the words came from this session's model transcript, so its numbers
+  // are checked against that transcript and the record says wordsSource 'clip', transcription 'model'.
+  function setWords(token,{text,lang,fromClip=false}={}){
     const c=ctx(token);if(!c.ok)return c;
     const {session,entry}=c,s=String(text??'').trim();
     const before=session.words?.text??null;
     if(!s){if(before!==null)noteEdit(session,'words');session.words=null;return {ok:true,text:''};}
-    const r=checkWords(s,{organisationNames:orgsOf(entry),lang:LANGS.includes(lang)?lang:session.lang});
+    const transcript=fromClip===true&&session.transcript?.text?session.transcript.text:null;
+    const r=checkWords(s,{organisationNames:orgsOf(entry),lang:LANGS.includes(lang)?lang:session.lang,transcript});
     if(!r.ok){
       session.rejected=[...(session.rejected||[]),{text:s,reason:r.reason}];
       return {ok:false,status:400,reason:r.reason,message:t('cannotKeep',session.lang)};
     }
     if(before!==r.text)noteEdit(session,'words');
-    session.words={text:r.text,source:r.source};
+    session.words={text:r.text,source:r.source,fromModel:transcript!=null};
     return {ok:true,text:r.text};
+  }
+  // A recorded clip (spec 7.2 step 3): kept in the session, held until the worker taps Show, and transcribed
+  // inside the in-flight guard. Returns the route's JSON body. A failure logs transcription_failed {lang}.
+  async function clipWords(token,{audio,contentType,seconds}={}){
+    const c=ctx(token);if(!c.ok)return c;
+    const {session,entry,lang}=c;
+    session.clip={data:audio,contentType,seconds,bytes:audio.length,sha256:sha256(audio)};
+    session.transcript=null;
+    const tr=system.transcriber;
+    if(!tr||tr.template)return {ok:true,body:{transcript:null,typed:true,messages:[t('sampleMode',lang)]}};
+    const slot=system.withSlot||(fn=>fn());
+    let r;
+    try{r=await slot(()=>tr.transcribe({audio,contentType,lang}));}
+    catch(err){
+      if(err?.code==='busy')throw err;
+      events.log('transcription_failed',{lang,channel:session.channel,...cardFields(entry)});
+      return {ok:true,body:{transcript:null,typed:true}};
+    }
+    if(!String(r?.text??'').trim()||(r.confidence!=null&&r.confidence<CONFIDENCE_FLOOR))return {ok:true,body:{message:t('hearBadly',lang)}};
+    session.transcript={text:r.text,lang:r.lang,confidence:r.confidence,unclear:r.unclear||[]};
+    return {ok:true,body:{transcript:r.text,unclear:r.unclear||[],confidence:r.confidence}};
   }
   function setDisclose(token,{showMe,firstName,attachClip,showCard}={}){
     const c=ctx(token);if(!c.ok)return c;
@@ -290,10 +315,11 @@ function createVouchService(system){
     }
     const record=draftRecord(session,voucher);
     record.flags=flagsAtConfirm(system.vouchStore,record,cardCreatedMs(entry),nowMs());
-    const held=session.words||session.clip?{words:session.words?.text??null,wordsSource:session.words?.source??null,
-      clip:session.disclose?.attachClip?session.clip??null:null}:null;
-    const {vouchId,withdrawSecret}=system.vouchStore.create({record,held,channel:session.channel,
-      private:{voucherKey:voucher.key,editedFields:session.editedFields||[],rawTranscript:null,rejected:session.rejected||[]}});
+    // The clip is stored only when the voucher ticked Attach; vouchStore.create writes it and holds it with the words.
+    const clip=session.disclose?.attachClip&&session.clip?.data?session.clip:null;
+    const held=session.words||clip?{words:session.words?.text??null,wordsSource:session.words?.source??null,clip:null}:null;
+    const {vouchId,withdrawSecret}=system.vouchStore.create({record,held,channel:session.channel,clip,
+      private:{voucherKey:voucher.key,editedFields:session.editedFields||[],rawTranscript:session.transcript?.text??null,rejected:session.rejected||[]}});
     counted();
     events.log('vouch_confirmed',{vouchId,...cardFields(entry),channel:session.channel,method:record.proof.method,kind:'customer',onWorkerPhone:record.proof.onWorkerPhone});
     const withdrawUrl=system.publicUrl+'/v/'+vouchId+'/withdraw?w='+withdrawSecret;
@@ -304,7 +330,7 @@ function createVouchService(system){
     return {ok:true,vouchId,line:record.line,withdrawUrl:bySms?null:withdrawUrl,visitAdded:false,withdrawSent:bySms,demo:voucher.method==='demo'};
   }
 
-  return {open,setChips,setWords,setDisclose,issueBind,bindBySms,bindStatus,demoOtp,confirm,preview};
+  return {open,setChips,setWords,clipWords,setDisclose,issueBind,bindBySms,bindStatus,demoOtp,confirm,preview};
 }
 const splitOptionsStem=s=>{const i=String(s).search(/[?:]/);return i<0?String(s):String(s).slice(0,i+1);};
 

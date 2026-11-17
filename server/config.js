@@ -25,6 +25,7 @@ function loadConfig({env=process.env,cwd=process.cwd()}={}){
   };
   const azureEndpoint=get('AZURE_OPENAI_ENDPOINT'),azureKey=get('AZURE_OPENAI_API_KEY'),azureDeployment=get('AZURE_OPENAI_DEPLOYMENT');
   const openaiKey=get('OPENAI_API_KEY');
+  const transcribeDeployment=get('AZURE_OPENAI_TRANSCRIBE_DEPLOYMENT'),transcribeModel=get('TRANSCRIBE_MODEL');
   const portRaw=Number.parseInt(get('PORT'),10);
   const publicUrlRaw=get('YOCARD_PUBLIC_URL');
   const base={
@@ -44,7 +45,12 @@ function loadConfig({env=process.env,cwd=process.cwd()}={}){
       callbackNumber:get('YOVOUCH_CALLBACK_NUMBER')||'0800 000 000',
       smsCountry:get('YOVOUCH_SMS_COUNTRY')||'South Africa',
       orgKeys:{}
-    }
+    },
+    // YoVouch transcription (spec 8), read directly so the chat deployment is not needed: an Azure deployment,
+    // else an OpenAI-compatible model, else null (template: the typed text box).
+    transcribe:azureEndpoint&&azureKey&&transcribeDeployment
+      ?{kind:'azure',endpoint:stripSlashes(azureEndpoint),apiKey:azureKey,deployment:transcribeDeployment,apiVersion:get('AZURE_OPENAI_API_VERSION')||DEFAULTS.azureApiVersion}
+      :openaiKey&&transcribeModel?{kind:'openai',baseUrl:stripSlashes(get('OPENAI_BASE_URL')||DEFAULTS.openaiBaseUrl),apiKey:openaiKey,model:transcribeModel}:null
   };
   if(azureEndpoint&&azureKey&&azureDeployment){
     const azure={endpoint:stripSlashes(azureEndpoint),apiKey:azureKey,deployment:azureDeployment,apiVersion:get('AZURE_OPENAI_API_VERSION')||DEFAULTS.azureApiVersion};

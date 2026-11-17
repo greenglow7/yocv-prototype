@@ -29,7 +29,7 @@ function fakeYoma(){
   async reachable(){return true;},async skillByName(){return {item:null,source:'live'};},async searchLearningOpportunities(){return {items:[],totalCount:0,source:'live'};}};
 }
 
-async function bootVouch({env={},provider=null,clock={t:NOW},outbox,maxInFlight}={}){
+async function bootVouch({env={},provider=null,clock={t:NOW},outbox,maxInFlight,transcriber}={}){
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'yovouch-'));
  const now=()=>clock.t;
  const config={...loadConfig({env,cwd:dir}),provider:'local',model:null,azure:null,openai:null,port:0,host:'127.0.0.1',yomaAccessToken:'',publicUrl:PUBLIC_URL};
@@ -38,7 +38,7 @@ async function bootVouch({env={},provider=null,clock={t:NOW},outbox,maxInFlight}
  const yoma=fakeYoma();
  const store=createCardStore(dir,{now});
  const key=loadOrCreateKey(dir);
- const card={accountSource:createAccountSource({config,yoma,now}),store,key,outbox};
+ const card={accountSource:createAccountSource({config,yoma,now}),store,key,outbox,transcriber};
  const server=createApp({config,provider,yoma,roleSkills,core,rootDir,card,publicUrl:PUBLIC_URL,now,...(maxInFlight===undefined?{}:{maxInFlight})});
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  servers.push(server);

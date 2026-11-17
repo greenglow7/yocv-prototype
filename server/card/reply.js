@@ -542,6 +542,8 @@ function line5(items,documentAnswer,first){
   if(items.length===1)return t('line5One','en',{item:items[0],answer:answerOf(documentAnswer,items[0]),first});
   return t('line5Two','en',{item1:items[0],answer1:answerOf(documentAnswer,items[0]),item2:items[1],answer2:answerOf(documentAnswer,items[1]),first});
 }
+// Line 6: the card link and the clip count (vouch clips plus the worker's own); a zero is never sent.
+const line6=(n,link,first)=>n===0?t('line6None','en',{link,first}):n===1?t('line6One','en',{link,first}):t('line6','en',{n,link,first});
 function buildReplyLines({card,firstName,answers={},experience,documents=[],documentAnswer={},clipCount=0,cardUrl}={}){
   const first=str(firstName)||str(card?.user?.firstName),ns=t('notStated'),a=answersText(answers);
   const area=str(card?.selfDeclared?.area).trim()||str(card?.user?.city).trim();
@@ -552,7 +554,7 @@ function buildReplyLines({card,firstName,answers={},experience,documents=[],docu
     line3(card),
     t('line4','en',{text:a.available||ns,first}),
     line5(list(documents).slice(0,2),documentAnswer,first),
-    n===0?t('line6None','en',{link,first}):n===1?t('line6One','en',{link,first}):t('line6','en',{n,link,first})
+    line6(n,link,first)
   ];
 }
 // Cut at a word boundary to at most max code points, marked with an ellipsis.
@@ -678,11 +680,35 @@ function createReplyStore(dir,{now=Date.now,random=crypto.randomBytes}={}){
     for(const n of mine)fs.rmSync(path.join(clips,n),{force:true});
     return mine.length;
   }
+  // The self clip is <id>.<webm|m4a>; a voice note's raw audio is <id>.raw.<ext> until the reply is confirmed (spec 9.7).
+  const CLIP_EXT={'audio/webm':'webm','audio/mp4':'m4a'};
+  function dropFiles(id,raw){
+    let names=[];
+    try{names=fs.readdirSync(clips);}catch{return;}
+    const re=new RegExp('^'+id+(raw?'\\.raw':'')+'\\.(webm|m4a)$');
+    for(const n of names)if(re.test(n))fs.rmSync(path.join(clips,n),{force:true});
+  }
+  function saveClip(id,{data,contentType},{raw=false}={}){
+    if(!validId(id)||!CLIP_EXT[contentType])throw new Error('bad reply clip');
+    dropFiles(id,raw);
+    fs.mkdirSync(clips,{recursive:true});
+    fs.writeFileSync(path.join(clips,id+(raw?'.raw.':'.')+CLIP_EXT[contentType]),data);
+    return {contentType,bytes:data.length,sha256:crypto.createHash('sha256').update(data).digest('hex')};
+  }
+  function readClip(id){
+    if(!validId(id))return null;
+    for(const [type,ext] of Object.entries(CLIP_EXT)){
+      try{return {data:fs.readFileSync(path.join(clips,id+'.'+ext)),contentType:type};}
+      catch(err){if(err?.code!=='ENOENT')throw err;}
+    }
+    return null;
+  }
+  const deleteRaw=id=>{if(validId(id))dropFiles(id,true);};
   function remove(id){if(!validId(id))return false;deleteClips(id);try{fs.rmSync(fileOf(id));return true;}catch{return false;}}
-  return {create,get,update,listAll,remove,deleteClips,dir:root};
+  return {create,get,update,listAll,remove,deleteClips,saveClip,readClip,deleteRaw,dir:root};
 }
 
-module.exports={extractAnswers,ruleAnswers,answersText,chooseExperience,buildReplyLines,fitReply,smsReply,editLine,createReplyStore,
+module.exports={extractAnswers,ruleAnswers,answersText,chooseExperience,buildReplyLines,line6,fitReply,smsReply,editLine,createReplyStore,
   replySchema,postOrganisations,REPLY_SYSTEM_PROMPT,REPLY_SCHEMA_NAME,MAX_CLIPS,
   listingSchema,detectFees,detectDocuments,asksForIdByMessage,hasContact,ruleParse,parsePost,docMessages,createPostStore,
   validateParsed,isMediaOnly,maskPhones,LISTING_SYSTEM_PROMPT,SCHEMA_NAME,MAX_POST,POST_TTL_MS};

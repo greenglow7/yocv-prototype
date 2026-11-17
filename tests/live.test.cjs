@@ -11,12 +11,15 @@ const {createYomaClient}=require('../server/yoma.js');
 const {runGeneration}=require('../server/generation.js');
 const {createAccountSource}=require('../server/card/account.js');
 const {runDraft,validateSelfDeclared,evidenceList}=require('../server/card/draft.js');
+const {createTranscriber}=require('../server/card/transcribe.js');
+const fs=require('node:fs');
 const core=require('../core.js');
 const roleSkills=require('../data/role-skills.json');
 
 const config=loadConfig({cwd:path.join(__dirname,'..')});
 const hasModel=config.provider!=='local';
 const skipModel=hasModel?false:'no AZURE_OPENAI_* or OPENAI_API_KEY configured';
+const hasTranscribe=Boolean(config.transcribe);
 const liveYoma=process.env.YOCV_LIVE_YOMA==='0'?'YOCV_LIVE_YOMA=0':false;
 const AMINA='I helped customers find products at my aunt’s shop.\nI packed orders and kept the shelves organised.';
 const normalise=s=>String(s).toLowerCase().replace(/[’‘]/g,"'").replace(/[“”]/g,'"').replace(/\s+/g,' ').trim();
@@ -37,7 +40,7 @@ test('live model: Amina’s text yields grounded claims with a Yoma skill',{skip
  console.log('live provider exercised:',provider.name,provider.model,'| claims',claims.length,'| rejected',generation.rejected.length);
 });
 
-test('live model: Thandi’s YoCard draft cites only her evidence and keeps the self-declared fields valid',{skip:skipModel},async()=>{
+test('live model: Thandi’s YoCard draft cites only her evidence and keeps the self-declared fields valid',{skip:skipModel},async(t)=>{
  const provider=createProvider(config,core);
  const yoma=createYomaClient({baseUrl:config.yomaBase});
  const accountSource=createAccountSource({config:{...config,yomaAccessToken:''},yoma});
@@ -54,6 +57,14 @@ test('live model: Thandi’s YoCard draft cites only her evidence and keeps the 
  assert.deepEqual(check.rejected,[],'the returned self-declared fields pass the validator unchanged');
  assert.deepEqual(check.value,selfDeclared);
  console.log('live provider exercised (YoCard):',provider.name,provider.model,'| confirms',confirms.length,'| rejected',generation.rejected.length);
+ // A subtest, so a run without a key still reports 2 skipped (plan Task 11).
+ await t.test('live transcription: a short clip returns text',{skip:hasTranscribe?false:'no transcription deployment configured'},async()=>{
+  const tr=createTranscriber(config.transcribe);
+  const r=await tr.transcribe({audio:fs.readFileSync(path.join(__dirname,'fixtures','hello.webm')),contentType:'audio/webm',lang:'en'});
+  assert.equal(tr.template,false); assert.ok(r.text.trim().length>0,'some text came back'); assert.equal(r.lang,'en');
+  assert.ok(r.confidence===null||(r.confidence>0&&r.confidence<=1)); assert.ok(Array.isArray(r.unclear));
+  console.log('live transcription exercised:',tr.name,'| chars',r.text.length,'| confidence',r.confidence);
+ });
 });
 
 test('live Yoma: skill lookup resolves Customer Service to its known id',{skip:liveYoma},async()=>{

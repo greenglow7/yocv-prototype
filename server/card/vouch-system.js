@@ -13,6 +13,7 @@ const {createVouchService}=require('./vouch-service.js');
 const {createOutbox}=require('./outbox.js');
 const {createSmsHandler}=require('./sms.js');
 const {createPostStore,createReplyStore}=require('./reply.js');
+const {createTranscriber}=require('./transcribe.js');
 
 const YV_DEFAULTS={sim:false,gatewaySecret:'',shortcode:'12345',callbackNumber:'0800 000 000',smsCountry:'South Africa',orgKeys:{}};
 const SMS_ID_ATTEMPTS=20;
@@ -24,7 +25,6 @@ function buildVouchSystem({config,store,key,accountSource,provider,publicUrl,now
   const hashKey=loadOrCreateHashKey(store.dir,{random});
   const voucherFiles=createVoucherFiles(store.dir,{now});
   const codes=createCodeService({store,voucherFiles,now});
-  void transcriber; // wired in by the task that transcribes clips
   const events=createEventLog(store.dir,{now});
   const sessions=createVouchSessions({now,random});
   const vouchStore=createVouchStore(store.dir,{now,random,cardStore:store});
@@ -34,6 +34,8 @@ function buildVouchSystem({config,store,key,accountSource,provider,publicUrl,now
   system.sms=createSmsHandler(system);
   system.postStore=createPostStore(store.dir,{now,random});
   system.replyStore=createReplyStore(store.dir,{now,random});
+  // The injected transcriber (tests), else one from config.transcribe; with none, the template transcriber.
+  system.transcriber=transcriber||createTranscriber(config?.transcribe??null);
   return system;
 }
 

@@ -197,7 +197,9 @@ function chipsPage({session,card,chips,lang='en',sampleMode,error}){
     group('howOften',L('howOften'),HOW_OFTEN_VALUES)+
     group('hireAgain',L(again,{first:f}),AGAIN_VALUES)+
     '<label>'+H(L('ownWords'))+'<textarea name="words" maxlength="120" rows="3">'+H(session?.words?.text||'')+'</textarea></label>'+
-    '<button>'+H(L('vouchButton',{first:f}))+'</button></form></section>';
+    // The microphone needs JavaScript: /mic.js unhides this block; without it the words box is all there is.
+    '<div id="mic" hidden data-t="'+E(session.vouchToken)+'"><p>'+H(L('sayIt'))+'</p></div>'+
+    '<button>'+H(L('vouchButton',{first:f}))+'</button></form></section><script src="/mic.js" defer></script>';
   return flowPage({title:titleFor(card,lang),body,lang,sampleMode,css:FORM_CSS});
 }
 
