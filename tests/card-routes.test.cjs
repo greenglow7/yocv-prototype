@@ -541,3 +541,119 @@ test('createCardRouter.handle returns false for routes it does not own',async()=
  assert.equal(await router.handle({method:'GET',url:'/api/status',headers:{}},res,new URL('http://localhost/api/status')),false);
  assert.equal(await router.handle({method:'GET',url:'/index.html',headers:{}},res,new URL('http://localhost/index.html')),false);
 });
+
+// ---- YoVouch: the tier on the served card, the list page and JSON, Check now signals (plan Task 7) ----
+const vb=require('./helpers/vouch-boot.cjs');
+function vrec(cardId,over={}){
+ const base={vouchId:null,cardId,kind:'customer',proof:{method:'qr',step:19942666,provedAt:'2026-11-16T14:41:02Z',channel:'web',onWorkerPhone:false},
+  voucher:{label:'a customer',firstName:null,phoneLast3:null,phoneConfirmedBy:'sms_bind',cardId:null,showCard:false,orgName:null,orgId:null,adultSelfDeclared:true},
+  fields:{work:'Braids',words:null,wordsSource:null,when:'2026-11',howOften:'a few times',hireAgain:'yes'},
+  line:'Braids, November 2026, a few times. Would hire again: yes.',lang:'en',wordsShownAt:null,clip:null,restsOn:null,statement:null,acceptedAt:null,
+  jobPostId:null,flags:[],visits:1,confirmedAt:'2026-11-16T14:46:30Z',expiresAt:null,generation:{mode:'sample',transcription:'none'}};
+ return {...base,...over,fields:{...base.fields,...over.fields}};
+}
+async function vouchedCard(){
+ const b=await vb.bootVouch(),p=await vb.publishPersona(b.base,'thandi');
+ const add=(over={},held=null)=>b.vouch.vouchStore.create({record:vrec(p.cardId,over),held,private:{voucherKey:'c'.repeat(64)},channel:'web'});
+ return {...b,id:p.cardId,p,add};
+}
+test('the served card shows the tier, the hidden id field and the share strip',async()=>{
+ const {base,id,add}=await vouchedCard();
+ const {vouchId:vid}=add({line:'Cornrows, November 2026, once. Would hire again: yes.'});
+ const html=await vb.page(base,'/c/'+id);
+ assert.ok(html.includes('Vouched for Thandi')&&html.includes('Cornrows, November 2026, once. Would hire again: yes.'));
+ assert.ok(html.includes('<input type="hidden" name="v" value="'+vid+'">'));
+ const svg=await vb.page(base,'/c/'+id+'.svg');
+ assert.ok(svg.includes('Vouched for Thandi · confirmed by them, not by Yoma'));
+});
+test('Review Focus 4: Check now re-checks rendered lines; a quiet withdrawal is gone at read time',async()=>{
+ const {base,id,add,vouch,clock}=await vouchedCard();
+ const {vouchId:vid,withdrawSecret}=add({line:'Twists, November 2026, regularly. Would hire again: yes.'});
+ const {vouchId:other}=add({line:'Braids, November 2026, once. Would hire again: yes.'});
+ assert.ok((await vb.page(base,'/c/'+id)).includes('Twists, November 2026'));
+ const q=vouch.vouchStore.withdraw(vid,withdrawSecret,'quiet').file;
+ clock.t=Date.parse(q.private.withdrawAfter)+1000;               // no sweep runs
+ const html=await vb.form(base,'/c/'+id+'/check',{v:vid+','+other});
+ assert.ok(html.includes('Vouch withdrawn')&&html.includes('Vouch still live'));
+ const api=await vb.post(base,'/api/card/'+id+'/check',{vouchIds:[vid,other,'ZZZZZZZZZZ','bad']});
+ assert.ok(api.signals.some(s=>s.key==='vouch:'+vid&&s.ok===false&&s.label==='Vouch withdrawn'));
+ assert.ok(api.signals.some(s=>s.key==='vouch:'+other&&s.ok===true&&s.label==='Vouch still live'));
+ assert.ok(!api.signals.some(s=>s.key==='vouch:ZZZZZZZZZZ'||s.key==='vouch:bad'));
+ const line=vouch.vouchStore.get(vid).record.line;
+ for(const path of ['/c/'+id,'/c/'+id+'/vouches'])assert.ok(!(await vb.page(base,path)).includes(line),path);
+ assert.ok(!(await vb.get(base,'/c/'+id+'/vouches.json')).vouches.some(x=>x.vouchId===vid));
+ assert.ok(!(await vb.page(base,'/c/'+id)).includes('Vouch withdrawn'));         // a fresh load shows nothing
+});
+test('Check now ignores the ids of another card',async()=>{
+ const b=await vouchedCard(),p2=await vb.publishPersona(b.base,'amara');
+ const {vouchId:foreign}=b.vouch.vouchStore.create({record:vrec(p2.cardId),channel:'web'});
+ const api=await vb.post(b.base,'/api/card/'+b.id+'/check',{vouchIds:[foreign]});
+ assert.ok(!api.signals.some(s=>s.key.startsWith('vouch:')));
+ const none=await vb.post(b.base,'/api/card/'+b.id+'/check',{});
+ assert.ok(Array.isArray(none.signals)&&!none.signals.some(s=>s.key.startsWith('vouch:')));
+});
+test('Review Focus 5: held words leak nowhere before Show',async()=>{
+ const {base,id,add,key}=await vouchedCard();
+ const W='She did my braids three times this year.';
+ const {vouchId:held}=add({},{words:W,wordsSource:'typed',clip:null});
+ const v=await vb.get(base,'/v/'+held+'.json');
+ assert.equal(verifyJwt(key,v.jwt).record.fields.words,null);
+ const list=(await vb.get(base,'/c/'+id+'/vouches.json')).vouches;
+ assert.equal(list.length,1);
+ for(const x of list)assert.ok(!JSON.stringify(verifyJwt(key,x.jwt)).includes(W));
+ for(const path of ['/c/'+id,'/c/'+id+'/vouches'])assert.ok(!(await vb.page(base,path)).includes(W),path);
+ assert.ok(!(await vb.form(base,'/c/'+id+'/check',{v:held})).includes(W));
+});
+test('list page and JSON',async()=>{
+ const {base,id,add,key,clock}=await vouchedCard();
+ const ids=[];
+ for(let i=0;i<22;i++)ids.push(add({confirmedAt:new Date(clock.t-i*60000).toISOString(),line:'Braids '+String.fromCharCode(65+i)+', November 2026, once. Would hire again: yes.'}).vouchId);
+ const old=add({confirmedAt:'2024-09-01T10:00:00Z',proof:{method:'qr',provedAt:'2024-09-01T10:00:00Z',channel:'web',onWorkerPhone:false},line:'Cut, September 2024, once. Would hire again: yes.'}).vouchId;
+ const res=await fetch(base+'/c/'+id+'/vouches');
+ assert.equal(res.status,200);
+ const p1=await res.text();
+ assert.ok(Buffer.byteLength(p1)<=10240,'bytes '+Buffer.byteLength(p1));
+ assert.equal((p1.match(/class="vline"/g)||[]).length,20);
+ assert.ok(!/vouches\D{0,3}\d/.test(p1.replace(/vouches\?page=\d+/g,'')));
+ assert.ok(p1.includes('Braids A,')&&!p1.includes('Braids U,'),'newest first');
+ assert.ok(p1.includes('/c/'+id+'/vouches?page=2'));
+ const p2=await vb.page(base,'/c/'+id+'/vouches?page=2');
+ assert.equal((p2.match(/class="vline"/g)||[]).length,3);
+ assert.ok(p2.includes('<h2>Older</h2>')&&p2.indexOf('<h2>Older</h2>')<p2.indexOf('Cut, September 2024'));
+ assert.equal((await fetch(base+'/c/'+id+'/vouches?page=9')).status,404);
+ const json=await vb.get(base,'/c/'+id+'/vouches.json');
+ assert.equal(json.cardId,id); assert.ok(!Number.isNaN(Date.parse(json.generatedAt)));
+ assert.equal(json.vouches.length,23);
+ for(const x of json.vouches){const pl=verifyJwt(key,x.jwt);assert.equal(pl.sub,x.vouchId);assert.equal(pl.record.vouchId,x.vouchId);}
+ assert.ok(json.vouches.some(x=>x.vouchId===old));
+ const card=await vb.page(base,'/c/'+id);
+ assert.ok(card.includes('<a href="/c/'+id+'/vouches">All vouches</a>'));
+ assert.equal((card.match(/class="vline"/g)||[]).length<=6,true);
+});
+test('a withdrawn card answers 410 on the list page and its JSON',async()=>{
+ const {base,id,p,add}=await vouchedCard();
+ add();
+ await vb.post(base,'/api/card/'+id+'/withdraw',{ownerSecret:p.ownerSecret});
+ assert.equal((await fetch(base+'/c/'+id+'/vouches')).status,410);
+ assert.equal((await fetch(base+'/c/'+id+'/vouches.json')).status,410);
+});
+test('Save-Data drops the fonts',async()=>{
+ const {base,id}=await vouchedCard();
+ assert.ok((await vb.page(base,'/c/'+id)).includes('fonts.googleapis.com'));
+ const lite=await (await fetch(base+'/c/'+id,{headers:{'save-data':'on'}})).text();
+ assert.ok(!lite.includes('fonts.googleapis.com'));
+ assert.ok(!(await vb.page(base,'/c/'+id+'/vouches')).includes('fonts.googleapis.com'));
+});
+test('a list page of long multi-byte lines holds fewer than 20 and stays within 10240 bytes',async()=>{
+ const {base,id,add,clock}=await vouchedCard();
+ const W='ẹ'.repeat(120);
+ for(let i=0;i<25;i++)add({confirmedAt:new Date(clock.t-i*60000).toISOString(),line:'Braids, November 2026, once. Would hire again: yes. "'+W+'"'});
+ let seen=0;
+ for(let p=1;seen<25&&p<10;p++){
+  const html=await vb.page(base,'/c/'+id+'/vouches?page='+p);
+  assert.ok(Buffer.byteLength(html)<=10240,'page '+p+' bytes '+Buffer.byteLength(html));
+  const n=(html.match(/class="vline"/g)||[]).length;
+  assert.ok(n>=1&&n<20); seen+=n;
+ }
+ assert.equal(seen,25,'every line reachable through the pager');
+});

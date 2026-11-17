@@ -83,8 +83,10 @@ const STRINGS={
   orgStillOn:'Organisation still on Yoma',
   // plan additions
   fictionalOrg:'Fictional organisation, not on Yoma',
+  backToCard:(first)=>'Back to '+first+"'s card",
   sampleAccountFictional:'Fictional sample account: this card was built from a sample persona, not a real Yoma user. Sample Skills Trust is a fictional organisation; the other completions reference real Yoma opportunities.'
 };
+const {t}=require('./copy.js');
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const E164=/^\+[1-9]\d{6,14}$/;
 const FONT='"Open Sans",system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif';
@@ -170,6 +172,10 @@ function evidenceLabel(completion){
 
 // ---------- HTML ----------
 
+// Print (spec 10.4): no Check now, no WhatsApp button, no script; clip links print their URL; the footer prints
+// the card code and link so a printed page can be checked online.
+const PRINT_CSS='.print-only{display:none}@media print{#check-form,.wa,script{display:none}.vline a[href]::after{content:" " attr(href);font-size:12px}.print-only{display:block}}';
+
 const CSS=[
   ':root{--ink:#020304;--muted:#545859;--line:#dce0e5;--ok:#2b6a57;--bad:#b3261e;--grey:#545859;--bg:#f3f6fa;--card:#fff;--accent:#41204b;--tint:#e7d4ed;--stated:#f3f6fa;--orange:#f9ab3e;--awaiting-tint:#fdeed8;--awaiting:#8a5a00}',
   '*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:'+FONT+';line-height:1.5;-webkit-text-size-adjust:100%}',
@@ -177,29 +183,31 @@ const CSS=[
   'header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;font-size:14px;color:var(--muted)}',
   'header form{margin:0}button,.btn{font:inherit;min-height:44px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:9999px;padding:8px 24px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-block}',
   '#check-form button{background:var(--card);color:var(--ok);border-color:#387f6a}',
-  'section{background:var(--card);border:0;border-radius:16px;padding:24px;margin:16px 0}',
-  'h1{font-family:'+HEAD_FONT+';font-size:28px;font-weight:800;line-height:1.2;margin:0 0 4px}h2{font-family:'+HEAD_FONT+';font-size:18px;font-weight:700;margin:0 0 8px;color:var(--ink)}',
+  'section{background:var(--card);border-radius:16px;padding:24px;margin:16px 0}',
+  'h1,h2{font-family:'+HEAD_FONT+'}h1{font-size:28px;font-weight:800;line-height:1.2;margin:0 0 4px}h2{font-size:18px;font-weight:700;margin:0 0 8px;color:var(--ink)}',
   '.identity{display:flex;gap:16px;align-items:center}.identity img{width:72px;height:72px;border-radius:50%;object-fit:cover;background:var(--line)}',
   '.trade{font-size:16px;margin:0}.meta{font-size:14px;color:var(--muted);margin:4px 0 0}',
   'ul{list-style:none;margin:0;padding:0}li{padding:8px 0;border-top:1px solid var(--line)}li:first-child{border-top:0}',
-  '.small{font-size:14px;color:var(--muted)}.small.sample{margin:8px 0 0;padding:8px 16px;border:0;border-left:6px solid var(--accent);border-radius:0;background:var(--stated)}.chip{display:inline-block;background:var(--stated);border:0;border-radius:9999px;padding:4px 12px;margin:4px 4px 0 0;font-size:14px;font-weight:600}',
+  '.small{font-size:14px;color:var(--muted)}.small.sample{margin:8px 0 0;padding:8px 16px;border-left:6px solid var(--accent);background:var(--stated)}.chip{display:inline-block;background:var(--stated);border-radius:9999px;padding:4px 12px;margin:4px 4px 0 0;font-size:14px;font-weight:600}',
   '.stated{border-left:6px solid var(--grey)}.stated h2{color:var(--grey)}.price{float:right;color:var(--muted)}',
   '.wa{display:block;text-align:center;background:var(--accent);border-color:var(--accent);margin-top:8px}',
   '.safety{font-weight:600;margin:16px 0;padding:16px 24px;border-radius:16px;background:var(--tint)}',
   '.ok{color:var(--ok)}.bad{color:var(--bad)}.grey{color:var(--grey)}.check li{font-size:14px}',
   'footer{font-size:14px;color:var(--muted);padding:16px 0 32px}footer a{color:var(--accent)}',
-  '.notice{background:var(--tint);border-radius:16px;padding:16px 24px}a{color:var(--accent)}.empty{color:var(--grey);font-style:italic}'
+  '.notice{background:var(--tint);border-radius:16px;padding:16px 24px}a{color:var(--accent)}.empty{color:var(--grey);font-style:italic}',
+  '.vouched{border-left:6px solid var(--orange)}.vouched h2{background:var(--awaiting-tint);margin:-24px -24px 8px;padding:12px 24px;border-radius:0 16px 0 0}',
+  PRINT_CSS
 ].join('');
 
 const SCRIPT=[
-  '(function(){var f=document.getElementById("check-form");if(!f||!window.fetch)return;',
-  'f.addEventListener("submit",function(e){e.preventDefault();var b=f.querySelector("button");b.disabled=true;b.textContent="Checking…";',
-  'fetch(f.getAttribute("data-api"),{method:"POST",headers:{"content-type":"application/json"},body:"{}"}).then(function(r){return r.text();}).then(function(t){',
-  'var j=null;try{j=JSON.parse(t);}catch(x){}var box=document.getElementById("check-result");if(!box||!j){location.reload();return;}',
-  'if(j.unavailable){box.innerHTML="<p class=grey>'+STRINGS.checkUnavailable+'</p>";}else{var h="<ul class=check>";(j.signals||[]).forEach(function(s){',
-  'var d=document.createElement("div");d.textContent=s.label+(s.detail?" · "+s.detail:"");h+="<li class="+(s.ok?"ok":"bad")+">"+d.innerHTML+"</li>";});',
-  'h+="</ul><p class=small>Checked "+new Date(j.checkedAt).toUTCString()+(j.simulated?" · simulated re-read of a sample account":"")+"</p>";box.innerHTML=h;}',
-  'box.hidden=false;b.disabled=false;b.textContent="'+STRINGS.checkNow+'";}).catch(function(){b.disabled=false;b.textContent="'+STRINGS.checkNow+'";});});})();'
+  '(function(){var D=document,f=D.getElementById("check-form");if(!f||!window.fetch)return;',
+  'f.addEventListener("submit",function(e){e.preventDefault();var b=f.querySelector("button"),v=f.elements.v,done=function(){b.disabled=false;b.textContent="'+STRINGS.checkNow+'"};b.disabled=true;b.textContent="Checking…";',
+  'fetch(f.dataset.api,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({vouchIds:(v?v.value:"").split(",").filter(Boolean)})}).then(function(r){return r.text()}).then(function(t){',
+  'var j=null;try{j=JSON.parse(t)}catch(x){}var box=D.getElementById("check-result");if(!box||!j){location.reload();return}',
+  'if(j.unavailable)box.innerHTML="<p class=grey>'+STRINGS.checkUnavailable+'</p>";else{var h="<ul class=check>";(j.signals||[]).forEach(function(s){',
+  'var d=D.createElement("div");d.textContent=s.label+(s.detail?" · "+s.detail:"");h+="<li class="+(s.ok?"ok":"bad")+">"+d.innerHTML+"</li>"});',
+  'h+="</ul><p class=small>Checked "+new Date(j.checkedAt).toUTCString()+(j.simulated?" · simulated re-read of a sample account":"")+"</p>";box.innerHTML=h}',
+  'box.hidden=false;done()}).catch(done)})})();'
 ].join('');
 
 // Small pages under /my/, /s/, /v/, /a/, /o/ and /r/ (spec §4.3, §7.2): system fonts only, 16px gutter,
@@ -226,9 +234,10 @@ function shell({title,description,ogImage,ogUrl,body,fonts=true,css=CSS}){
     '<style>'+css+'</style></head><body><main>'+body+'</main></body></html>';
 }
 
-function footer(record){
+function footer(record,publicUrl=''){
   const json=record?.cardId?'<a href="/c/'+escapeHtml(record.cardId)+'.json">Signed record (JSON)</a> · <a href="/.well-known/jwks.json">Signing key</a>':'';
-  return '<footer><p>'+escapeHtml(STRINGS.whoCanSee)+'</p><p>'+escapeHtml(STRINGS.footer)+'</p>'+(json?'<p>'+json+'</p>':'')+'</footer>';
+  const printed=record?.cardId&&str(record.code)?'<p class="print-only">Card '+escapeHtml(record.code)+' · '+escapeHtml(cardUrl(record,publicUrl))+'</p>':'';
+  return '<footer><p>'+escapeHtml(STRINGS.whoCanSee)+'</p><p>'+escapeHtml(STRINGS.footer)+'</p>'+(json?'<p>'+json+'</p>':'')+printed+'</footer>';
 }
 
 function completionItem(c){
@@ -296,6 +305,34 @@ function statedSection(record){
   return html+'</section>';
 }
 
+// ---- The vouched tier (spec 10.1). Items are tierItem() objects in display order; the label, line and fine
+// print are fixed strings and code-built lines, escaped here. A held line arrives without words or clip. ----
+const CLIP_HREF=/^\/v\/[A-Z2-9]{10}\/clip$/;
+const text=v=>str(v).replace(/[&<>]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;'})[ch]); // text content only, never an attribute
+function vouchLine(item){
+  const c=item?.clip,href=c&&(CLIP_HREF.test(str(c.href))?str(c.href):safeUrl(c.href));
+  const clipHtml=!c?'':href?'<br><a href="'+escapeHtml(href)+'">'+text(c.text)+'</a>':'<br><span class="small">'+text(c.text)+'</span>';
+  return '<li class="vline"><span class="small">'+text(item?.label)+'</span><br>'+text(item?.line)+clipHtml+'</li>';
+}
+// Fine print deduplicated across the items; the long limits statement renders once per window present, as a
+// <details> titled "What a matched code shows". Never dropped to meet the size budget.
+function tierFinePrint(items,first){
+  const limits=new Set(['web','sms'].map(w=>STRINGS.limitsLong(first,w)));
+  const fine=[...new Set(list(items).flatMap(i=>list(i?.finePrint).map(str)).filter(Boolean))];
+  const plain=fine.filter(f=>!limits.has(f)),long=fine.filter(f=>limits.has(f));
+  return (plain.length?'<p class="small">'+plain.map(text).join('<br>')+'</p>':'')+
+    long.map(f=>'<details><summary>'+escapeHtml(STRINGS.whatMatched)+'</summary><p class="small">'+text(f)+'</p></details>').join('');
+}
+// No empty state: no items, no tier. No number anywhere.
+function vouchedSection(items,{firstName,burstHeld=false,allLink=null}={}){
+  const shown=list(items);
+  if(!shown.length)return '';
+  const first=str(firstName)||'the worker';
+  return '<section class="vouched"><h2>'+escapeHtml(STRINGS.vouchedTitle(first))+'</h2><p class="small">'+escapeHtml(STRINGS.vouchedSub)+'</p>'+
+    '<ul>'+shown.map(vouchLine).join('')+'</ul>'+(burstHeld?'<p class="small">'+escapeHtml(STRINGS.burstNotice)+'</p>':'')+
+    tierFinePrint(shown,first)+(allLink?'<p><a href="'+escapeHtml(allLink)+'">'+escapeHtml(STRINGS.allVouches)+'</a></p>':'')+'</section>';
+}
+
 // `notice` is a short grey line shown in place of a check result (the busy answer to the no-JS form).
 function checkSection(check,notice=''){
   if(!check&&str(notice).trim())return '<section id="check-result"><p class="grey">'+escapeHtml(notice)+'</p></section>';
@@ -310,7 +347,8 @@ function checkSection(check,notice=''){
   return '<section id="check-result">'+inner+'</section>';
 }
 
-function publicPage({record,status='ok',check=null,withdrawn=null,publicUrl='',notice=''}={}){
+const PAGE_BUDGET=10240,MAX_LINES=6;
+function publicPage({record,status='ok',check=null,withdrawn=null,publicUrl='',notice='',vouches=[],burstHeld=false,fonts=true}={}){
   if(status==='withdrawn')return withdrawnPage(record,withdrawn||{});
   const user=record?.user||{};
   const first=firstNameOf(record);
@@ -324,24 +362,53 @@ function publicPage({record,status='ok',check=null,withdrawn=null,publicUrl='',n
   if(monthYear(user.dateYoIDOnboarded))metaBits.push('Yo-ID since '+monthYear(user.dateYoIDOnboarded));
   if(year(user.dateCreated))metaBits.push('On Yoma since '+year(user.dateCreated));
   const completed=Number.isInteger(user.opportunityCountCompleted)?user.opportunityCountCompleted:list(record?.disclosed?.completions).length;
-  metaBits.push(completed+' verified completion'+(completed===1?'':'s'));
+  if(completed>0)metaBits.push(completed+' verified completion'+(completed===1?'':'s')); // no zero (spec 10.1)
   const wa=waLink(record);
   const firstConfirm=str(list(record?.confirms)[0]?.text).trim();
 
-  let body='<header><span>'+escapeHtml(STRINGS.readFrom(first,fullDate(record?.snapshotReadAt),timeOfDay(record?.snapshotReadAt)))+'</span>'+
-    '<form method="post" action="/c/'+escapeHtml(id)+'/check" id="check-form" data-api="/api/card/'+escapeHtml(id)+'/check"><button type="submit">'+escapeHtml(STRINGS.checkNow)+'</button></form></header>';
-  if(record?.accountSource==='sample')body+='<p class="small sample">'+escapeHtml(STRINGS.sampleAccount)+'</p>';
-  body+=checkSection(check,notice);
-  body+='<section><div class="identity">'+(photo?'<img src="'+escapeHtml(photo)+'" alt="" loading="lazy">':'')+
+  const items=list(vouches);
+  // The check form carries the shown ids (hidden v), so Check now re-checks only the rendered lines (spec 5.6).
+  const head=shown=>'<header><span>'+escapeHtml(STRINGS.readFrom(first,fullDate(record?.snapshotReadAt),timeOfDay(record?.snapshotReadAt)))+'</span>'+
+    '<form method="post" action="/c/'+escapeHtml(id)+'/check" id="check-form" data-api="/api/card/'+escapeHtml(id)+'/check">'+
+    (shown.length?'<input type="hidden" name="v" value="'+escapeHtml(shown.map(i=>str(i?.vouchId)).join(','))+'">':'')+
+    '<button type="submit">'+escapeHtml(STRINGS.checkNow)+'</button></form></header>';
+  let top=record?.accountSource==='sample'?'<p class="small sample">'+escapeHtml(STRINGS.sampleAccount)+'</p>':'';
+  top+=checkSection(check,notice);
+  top+='<section><div class="identity">'+(photo?'<img src="'+escapeHtml(photo)+'" alt="" loading="lazy">':'')+
     '<div><h1>'+escapeHtml(name)+'</h1>'+(trade?'<p class="trade">'+escapeHtml(trade)+(area?' · '+escapeHtml(area):'')+'</p>':(area?'<p class="trade">'+escapeHtml(area)+'</p>':''))+
     '<p class="meta">'+escapeHtml(metaBits.join('. '))+'</p></div></div></section>';
-  body+=confirmedSection(record);
-  body+=statedSection(record);
-  if(wa)body+='<a class="btn wa" href="'+escapeHtml(wa)+'" rel="noopener">'+escapeHtml(STRINGS.whatsapp)+'</a>';
-  body+='<p class="safety">'+escapeHtml(STRINGS.neverPay)+'</p>';
-  body+=footer(record);
-  body+='<script>'+SCRIPT+'</script>';
-  return shell({title:name+(trade?' · '+trade:'')+' · YoCard',description:firstConfirm||(trade?trade+' on YoCard':'YoCard'),ogImage:url+'.svg',ogUrl:url,body});
+  top+=confirmedSection(record);
+  let tail=statedSection(record);
+  if(wa)tail+='<a class="btn wa" href="'+escapeHtml(wa)+'" rel="noopener">'+escapeHtml(STRINGS.whatsapp)+'</a>';
+  tail+='<p class="safety">'+escapeHtml(STRINGS.neverPay)+'</p>';
+  tail+=footer(record,publicUrl);
+  tail+='<script>'+SCRIPT+'</script>';
+  const render=n=>{
+    const shown=items.slice(0,n);
+    const tier=vouchedSection(shown,{firstName:first,burstHeld,allLink:n<items.length?'/c/'+id+'/vouches':null});
+    return shell({title:name+(trade?' · '+trade:'')+' · YoCard',description:firstConfirm||(trade?trade+' on YoCard':'YoCard'),ogImage:url+'.svg',ogUrl:url,fonts,body:head(shown)+top+tier+tail});
+  };
+  // Size fallback (spec 10.3): 6 lines, then one fewer until the page fits, always keeping at least one line.
+  let html=render(0);
+  for(let n=Math.min(items.length,MAX_LINES);n>=1;n--){html=render(n);if(Buffer.byteLength(html)<=PAGE_BUDGET)break;}
+  return html;
+}
+
+// GET /c/:id/vouches?page=N (spec 5.8, 9.5): every visible line, 20 a page, lines over 24 months under Older,
+// no totals. System fonts only, so the page loads nothing from a third party.
+const LIST_CSS='.vouched{border-left:6px solid #f9ab3e}ul{list-style:none;margin:0;padding:0}li{padding:8px 0;border-top:1px solid #dce0e5}li:first-child{border-top:0}h2{font-size:18px;margin:16px 0 0}'+
+  '@media print{.vline a[href]::after{content:" " attr(href);font-size:12px}}';
+function vouchListPage({record,items=[],older=[],page=1,hasNext=false,publicUrl=''}={}){
+  const first=firstNameOf(record),id=str(record?.cardId),p=Math.max(1,Number(page)|0);
+  const link=(n,key)=>'<a href="/c/'+escapeHtml(id)+'/vouches?page='+n+'">'+escapeHtml(t(key))+'</a>';
+  const nav=(p>1?link(p-1,'prevPage'):'')+(p>1&&hasNext?' · ':'')+(hasNext?link(p+1,'nextPage'):'');
+  const all=[...list(items),...list(older)];
+  const body='<section class="vouched"><h1>'+escapeHtml(STRINGS.vouchedTitle(first))+'</h1><p class="small">'+escapeHtml(STRINGS.vouchedSub)+'</p>'+
+    (list(items).length?'<ul>'+list(items).map(vouchLine).join('')+'</ul>':'')+
+    (list(older).length?'<h2>'+escapeHtml(STRINGS.older)+'</h2><ul>'+list(older).map(vouchLine).join('')+'</ul>':'')+
+    tierFinePrint(all,first)+'</section>'+(nav?'<p>'+nav+'</p>':'')+
+    '<p><a href="/c/'+escapeHtml(id)+'">'+escapeHtml(STRINGS.backToCard(first))+'</a></p>'+footer(record,publicUrl);
+  return shell({title:STRINGS.vouchedTitle(first)+' · YoCard',body,fonts:false,css:FLOW_CSS+LIST_CSS});
 }
 
 function withdrawnPage(record,{withdrawnAt=null}={}){
@@ -374,7 +441,9 @@ function placeQr(qr,x,y,box){
   return '<g transform="translate('+x+' '+y+') scale('+k+')">'+str(qr)+'</g>';
 }
 
-function cardSvg({record,publicUrl='',qrSvgFn,withdrawn=false}={}){
+// vouchStrip (spec 10.5): the confirmed strip shrinks to 280 px (4 lines) and the stated block to 200 px (2 services)
+// to make room for one 90 px strip above the QR row, with no name, no line and no number.
+function cardSvg({record,publicUrl='',qrSvgFn,withdrawn=false,vouchStrip=false}={}){
   const W=1080,H=1350;
   const user=record?.user||{};
   const first=firstNameOf(record);
@@ -407,7 +476,7 @@ function cardSvg({record,publicUrl='',qrSvgFn,withdrawn=false}={}){
 
   // Confirmed strip
   let y=470;
-  parts.push('<rect x="60" y="'+(y-40)+'" width="960" height="330" rx="16" fill="#e6f5f3"/>');
+  parts.push('<rect x="60" y="'+(y-40)+'" width="960" height="'+(vouchStrip?280:330)+'" rx="16" fill="#e6f5f3"/>');
   parts.push(svgText(90,y,STRINGS.confirmedTitle,{size:24,weight:700,fill:'#2b6a57'}));
   y+=50;
   const lines=[];
@@ -417,18 +486,18 @@ function cardSvg({record,publicUrl='',qrSvgFn,withdrawn=false}={}){
   const completions=list(record?.disclosed?.completions);
   const count=Number.isInteger(user.opportunityCountCompleted)?user.opportunityCountCompleted:completions.length;
   const orgs=[...new Set(completions.map(c=>str(c?.organizationName).trim()).filter(Boolean))].slice(0,3);
-  lines.push(count+' completion'+(count===1?'':'s')+(orgs.length?' · '+orgs.join(', '):''));
+  if(count>0)lines.push(count+' completion'+(count===1?'':'s')+(orgs.length?' · '+orgs.join(', '):'')); // no zero (spec 10.1)
   const skills=list(record?.disclosed?.skills);
   lines.push(skills.length+' skill'+(skills.length===1?'':'s')+(skills.length?' · '+clip(skills.map(s=>str(s?.name).trim()).filter(Boolean).join(', '),50):''));
-  for(const line of lines.slice(0,5)){parts.push(svgText(90,y,clip(line,62),{size:28}));y+=46;}
+  for(const line of lines.slice(0,vouchStrip?4:5)){parts.push(svgText(90,y,clip(line,62),{size:28}));y+=46;}
 
   // Stated block
-  y=830;
-  parts.push('<rect x="60" y="'+(y-40)+'" width="960" height="250" rx="16" fill="#f3f6fa"/>');
+  y=vouchStrip?790:830;
+  parts.push('<rect x="60" y="'+(y-40)+'" width="960" height="'+(vouchStrip?200:250)+'" rx="16" fill="#f3f6fa"/>');
   // The fixed string stays verbatim (as on the HTML page); only the name is clipped.
   parts.push(svgText(90,y,STRINGS.statedBy(clip(first,18)),{size:24,weight:700,fill:'#545859'}));
   y+=50;
-  const services=list(record?.selfDeclared?.services).slice(0,3);
+  const services=list(record?.selfDeclared?.services).slice(0,vouchStrip?2:3);
   if(services.length){
     for(const s of services){
       const price=priceText(s);
@@ -438,6 +507,11 @@ function cardSvg({record,publicUrl='',qrSvgFn,withdrawn=false}={}){
     }
   }else parts.push(svgText(90,y,STRINGS.noServices,{size:28,fill:'#545859'}));
 
+  if(vouchStrip){
+    parts.push('<rect x="60" y="960" width="960" height="90" rx="16" fill="#fdeed8"/>');
+    // The fixed string stays whole; only the name is clipped, so the line fits the 960 px strip.
+    parts.push(svgText(90,1015,STRINGS.svgStrip(clip(first,16)),{size:30}));
+  }
   // QR, link, code
   const qr=typeof qrSvgFn==='function'?qrSvgFn(url,{cellSize:4,margin:2}):'';
   if(qr)parts.push(placeQr(qr,60,1070,220));
@@ -451,4 +525,4 @@ function cardSvg({record,publicUrl='',qrSvgFn,withdrawn=false}={}){
   return parts.join('');
 }
 
-module.exports={publicPage,notFoundPage,withdrawnPage,cardSvg,maskPhone,waLink,escapeHtml,safeUrl,fullDate,timeOfDay,monthYear,shell,footer,CSS,FLOW_CSS,STRINGS};
+module.exports={publicPage,vouchedSection,vouchListPage,notFoundPage,withdrawnPage,cardSvg,maskPhone,waLink,escapeHtml,safeUrl,fullDate,timeOfDay,monthYear,firstNameOf,shell,footer,CSS,FLOW_CSS,STRINGS};

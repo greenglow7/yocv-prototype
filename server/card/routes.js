@@ -9,7 +9,10 @@
      POST /api/card/:id/withdraw           owner secret, marks the card withdrawn
      POST /api/card/:id/rotate-token       owner secret, a new card token (and the YoVouch block for an older card)
      GET  /c/:id | /c/:id.svg | /c/:id.json  public page, image, signed record
+     GET  /c/:id/vouches?page=N            every visible vouch line, 20 a page, no totals
+     GET  /c/:id/vouches.json              {cardId, vouches:[{vouchId, jwt}], generatedAt}, live lines only
      POST /c/:id/check                     the no-JavaScript check form, renders the page with the result
+   Both check routes take the rendered vouch ids (form field v, or JSON {vouchIds}) and re-check only those.
      GET  /.well-known/jwks.json           the signing key
    Draft sessions live in memory for 30 minutes keyed by a 24-hex draftToken; they hold the full snapshot
    (with the real phone number and date of birth) so the browser only ever sees the masked copy.
@@ -24,7 +27,8 @@ const {validId,secretsMatch,hashSecret}=require('./store.js');
 const {buildVouchSystem,issueVouchFields,indexCard,phoneHashOf,newCardToken,myUrl}=require('./vouch-system.js');
 const {createVouchRouter}=require('./vouch-routes.js');
 const {runSweep}=require('./sweep.js');
-const {publicPage,notFoundPage,withdrawnPage,cardSvg,maskPhone}=require('./render.js');
+const {publicPage,vouchListPage,notFoundPage,withdrawnPage,cardSvg,maskPhone,firstNameOf,STRINGS}=require('./render.js');
+const {tierItem}=require('./vouch-lines.js');
 const {qrSvg}=require('../qr.js');
 const {ProviderError}=require('../providers/errors.js');
 const {noBannedClaims}=require('../validate.js');
@@ -39,7 +43,12 @@ const MAX_IN_FLIGHT=4;
 const SWEEP_EVERY_MS=60*60*1000;
 const E164=/^\+[1-9]\d{6,14}$/;
 const NO_REFERRER={'referrer-policy':'no-referrer'}; // with send()'s no-store: a response that carries a card token
-const CARD_PATH=/^\/c\/([A-Z2-9]{10})(\.svg|\.json|\/check)?$/;
+const CARD_PATH=/^\/c\/([A-Z2-9]{10})(\.svg|\.json|\/check|\/vouches|\/vouches\.json)?$/;
+const VOUCH_ID=/^[A-Z2-9]{10}$/;
+const MAX_CHECK_BODY=64*1024;
+const MAX_CHECK_IDS=20; // the card page shows at most 6 lines; this bounds the file reads per check
+const LIST_PAGE=20,LIST_BUDGET=10240;
+const OLDER_MONTHS=24;
 const API_CARD_PATH=/^\/api\/card\/([A-Z2-9]{10})\/(check|withdraw|rotate-token)$/;
 
 // Trade grid from spec §3.7: id -> label shown on the card.
@@ -94,7 +103,17 @@ function sendSvg(res,status,svg){send(res,status,svg,'image/svg+xml; charset=utf
 // The same body reader server.js uses, loaded lazily so the two modules can require each other.
 function defaultReadJSONBody(req){return require('../../server.js').readJSONBody(req);}
 
-function drain(req){return new Promise(resolve=>{req.on('end',resolve);req.on('error',resolve);req.resume();});}
+// The check body (spec 5.6): empty gives []; JSON {vouchIds}; or the form's field v, comma-separated. Only ids in
+// the store alphabet are kept. A body over 64 KB rejects with the server's InputError.
+async function readCheckBody(req,readRaw=(r,max)=>require('../../server.js').readRawBody(r,max)){
+  const raw=(await readRaw(req,MAX_CHECK_BODY)).toString('utf8').trim();
+  let ids=[];
+  if(raw&&(/^application\/json\b/i.test(str(req.headers?.['content-type']))||raw.startsWith('{'))){
+    try{const j=JSON.parse(raw);ids=Array.isArray(j?.vouchIds)?j.vouchIds:[];}catch{ids=[];}
+  }else if(raw)ids=str(new URLSearchParams(raw).get('v')).split(',');
+  return {vouchIds:[...new Set(ids.filter(v=>typeof v==='string'&&VOUCH_ID.test(v)))].slice(0,MAX_CHECK_IDS)};
+}
+const saveData=req=>str(req.headers?.['save-data']).trim().toLowerCase()==='on';
 
 function tradeLabel(trade){
   const raw=str(trade).trim();
@@ -210,6 +229,26 @@ function createCardRouter({config,accountSource,provider,store,key,yoma,publicUr
     return sessions.get(token)||null;
   }
   function cardUrl(cardId){return base+'/c/'+cardId;}
+
+  // ---- the vouched tier (spec 5.8, 10.1) ----
+  // Live files only, checked at read time (a quiet withdrawal past withdrawAfter is gone before any sweep):
+  // organisation referrals first, then confirmedAt newest first.
+  function liveFiles(cardId,nowMs){
+    const at=f=>Date.parse(f.record.confirmedAt)||0,ref=f=>f.record.kind==='organisation'?0:1;
+    return system.vouchStore.listForCard(cardId).filter(f=>system.vouchStore.isLive(f,nowMs)).sort((a,b)=>ref(a)-ref(b)||at(b)-at(a));
+  }
+  function visibleItems(cardId,firstName,nowMs){return liveFiles(cardId,nowMs).map(f=>tierItem(system.vouchStore.publicPart(f),firstName,{nowMs}));}
+  // Check now: one signal per rendered id of this card; ids of other cards are ignored.
+  function vouchSignals(cardId,vouchIds,nowMs){
+    const out=[];
+    for(const id of list(vouchIds)){
+      const f=system.vouchStore.get(id);
+      if(!f||(f.record?f.record.cardId:f.cardId)!==cardId)continue;
+      const live=Boolean(f.record)&&system.vouchStore.isLive(f,nowMs);
+      out.push({key:'vouch:'+id,label:live?STRINGS.vouchStillLive:STRINGS.vouchWithdrawn,ok:live,detail:''});
+    }
+    return out;
+  }
 
   async function readBody(req,res){
     try{return await readJSONBody(req);}
@@ -362,7 +401,7 @@ function createCardRouter({config,accountSource,provider,store,key,yoma,publicUr
     return signals;
   }
 
-  async function runCheck(entry){
+  async function runCheck(entry,vouchIds=[]){
     const record=entry.record;
     const checkedAt=new Date(now()).toISOString();
     const selector=record.accountSource==='sample'?{persona:record.personaId}:{};
@@ -376,13 +415,13 @@ function createCardRouter({config,accountSource,provider,store,key,yoma,publicUr
       }
       throw err;
     }
-    const result={checkedAt,signals:signalsFor(record,fresh),simulated:record.accountSource==='sample',unavailable:false};
+    const result={checkedAt,signals:[...signalsFor(record,fresh),...vouchSignals(record.cardId,vouchIds,now())],simulated:record.accountSource==='sample',unavailable:false};
     store.touchCheck(record.cardId,result);
     return result;
   }
 
   // ---- public card routes ----
-  async function publicCard(req,res,cardId,suffix){
+  async function publicCard(req,res,cardId,suffix,url){
     const entry=store.get(cardId);
     if(!entry||!entry.record){
       if(suffix==='.json')return sendError(res,404,'not_found',MESSAGES.noCard,false);
@@ -391,21 +430,54 @@ function createCardRouter({config,accountSource,provider,store,key,yoma,publicUr
     }
     const record={...entry.record,cardId};
     const withdrawn=entry.withdrawnAt?{withdrawnAt:entry.withdrawnAt}:null;
+    const first=firstNameOf(record),fonts=!saveData(req);
+    const page=extra=>publicPage({record,status:'ok',publicUrl:base,vouches:visibleItems(cardId,first,now()),fonts,...extra});
     if(suffix==='/check'){
       if(req.method!=='POST')return sendError(res,405,'method_not_allowed',MESSAGES.methodNotAllowed,false);
-      await drain(req);
+      const body=await checkBody(req,res);
+      if(!body)return;
       if(withdrawn)return sendHtml(res,410,withdrawnPage(record,withdrawn));
       // Same concurrency guard as the draft route (spec §3.4): a check re-reads the account.
-      if(inFlight>=maxInFlight)return sendHtml(res,503,publicPage({record,status:'ok',notice:MESSAGES.busy,publicUrl:base}));
+      if(inFlight>=maxInFlight)return sendHtml(res,503,page({notice:MESSAGES.busy}));
       inFlight++;
       try{
-        const check=await runCheck(entry);
-        return sendHtml(res,200,publicPage({record,status:'ok',check,publicUrl:base}));
+        const check=await runCheck(entry,body.vouchIds);
+        return sendHtml(res,200,page({check}));
       }finally{inFlight--;}
     }
     if(req.method!=='GET'&&req.method!=='HEAD')return sendError(res,405,'method_not_allowed',MESSAGES.methodNotAllowed,false);
     if(suffix==='.svg'){
-      return sendSvg(res,withdrawn?410:200,cardSvg({record,publicUrl:base,qrSvgFn:qrSvg,withdrawn:Boolean(withdrawn)}));
+      // The strip stands for a customer or worker line; a referral alone does not draw it (spec 10.5).
+      const vouchStrip=!withdrawn&&visibleItems(cardId,first,now()).some(i=>!i.referral);
+      return sendSvg(res,withdrawn?410:200,cardSvg({record,publicUrl:base,qrSvgFn:qrSvg,withdrawn:Boolean(withdrawn),vouchStrip}));
+    }
+    if(suffix==='/vouches.json'){
+      if(withdrawn)return sendJSON(res,410,{error:{code:'withdrawn',message:MESSAGES.withdrawn,retryable:false},withdrawnAt:entry.withdrawnAt});
+      const vouches=liveFiles(cardId,now()).map(f=>{
+        const r=system.vouchStore.publicPart(f);
+        return {vouchId:r.vouchId,jwt:signRecord(key,r,{sub:r.vouchId,now:()=>Date.parse(r.wordsShownAt||r.confirmedAt)||now()})};
+      });
+      return sendJSON(res,200,{cardId,vouches,generatedAt:new Date(now()).toISOString()});
+    }
+    if(suffix==='/vouches'){
+      if(withdrawn)return sendHtml(res,410,withdrawnPage(record,withdrawn));
+      const nowMs=now(),cut=new Date(nowMs);
+      cut.setUTCMonth(cut.getUTCMonth()-OLDER_MONTHS);
+      const files=liveFiles(cardId,nowMs),isOld=f=>(Date.parse(f.record.confirmedAt)||0)<cut.getTime();
+      const ordered=[...files.filter(f=>!isOld(f)),...files.filter(isOld)];
+      const q=url.searchParams.get('page')||'',n=/^[1-9]\d{0,5}$/.test(q)?Number(q):1;
+      const item=f=>tierItem(system.vouchStore.publicPart(f),first,{nowMs});
+      const render=(from,to,p)=>{const slice=ordered.slice(from,to);
+        return vouchListPage({record,items:slice.filter(f=>!isOld(f)).map(item),older:slice.filter(isOld).map(item),page:p,hasNext:to<ordered.length,publicUrl:base});};
+      // Pages of 20 lines; a page of long multi-byte lines holds fewer, so every page stays within 10240 bytes.
+      let from=0,html=render(0,0,1);
+      for(let p=1;p<=n;p++){
+        if(from>=ordered.length&&p>1)return sendHtml(res,404,notFoundPage());
+        let to=Math.min(from+LIST_PAGE,ordered.length);
+        for(html=render(from,to,p);to>from+1&&Buffer.byteLength(html)>LIST_BUDGET;)html=render(from,--to,p);
+        from=to;
+      }
+      return sendHtml(res,200,html);
     }
     if(suffix==='.json'){
       if(withdrawn)return sendJSON(res,410,{error:{code:'withdrawn',message:MESSAGES.withdrawn,retryable:false},withdrawnAt:entry.withdrawnAt});
@@ -413,17 +485,26 @@ function createCardRouter({config,accountSource,provider,store,key,yoma,publicUr
       return sendJSON(res,200,{record,jwt,jwksUrl:base+'/.well-known/jwks.json'});
     }
     if(withdrawn)return sendHtml(res,410,withdrawnPage(record,withdrawn));
-    return sendHtml(res,200,publicPage({record,status:'ok',publicUrl:base}));
+    return sendHtml(res,200,page({}));
+  }
+
+  async function checkBody(req,res){
+    try{return await readCheckBody(req);}
+    catch(err){
+      if(err?.code==='invalid_input'||err?.name==='InputError'){sendError(res,400,'invalid_input',MESSAGES.bodyTooLarge,false);return null;}
+      throw err;
+    }
   }
 
   async function apiCheck(req,res,cardId){
     const entry=store.get(cardId);
     if(!entry||!entry.record)return sendError(res,404,'not_found',MESSAGES.noCard,false);
-    await drain(req);
+    const body=await checkBody(req,res);
+    if(!body)return;
     if(entry.withdrawnAt)return sendError(res,410,'withdrawn',MESSAGES.withdrawn,false);
     if(inFlight>=maxInFlight)return sendError(res,503,'busy',MESSAGES.busy,true);
     inFlight++;
-    try{sendJSON(res,200,await runCheck({...entry,record:{...entry.record,cardId}}));}
+    try{sendJSON(res,200,await runCheck({...entry,record:{...entry.record,cardId}},body.vouchIds));}
     finally{inFlight--;}
   }
 
@@ -492,12 +573,12 @@ function createCardRouter({config,accountSource,provider,store,key,yoma,publicUr
     if(pathname.startsWith('/c/')){
       const m=CARD_PATH.exec(pathname);
       if(!m||!validId(m[1]))return wrap(sendHtml(res,404,notFoundPage()));
-      return wrap(publicCard(req,res,m[1],m[2]||''));
+      return wrap(publicCard(req,res,m[1],m[2]||'',url));
     }
     return vouchRouter.handle(req,res,url);
   }
 
-  return {handle,sessions,buildRecord,TRADES,vouch:system};
+  return {handle,sessions,buildRecord,TRADES,vouch:system,visibleItems};
 }
 
-module.exports={createCardRouter,buildRecord,tradeLabel,tradeIdOf,maskSnapshot,TRADES,SESSION_TTL_MS,MESSAGES};
+module.exports={createCardRouter,buildRecord,readCheckBody,tradeLabel,tradeIdOf,maskSnapshot,TRADES,SESSION_TTL_MS,MESSAGES,CARD_PATH};
