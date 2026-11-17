@@ -1,0 +1,22 @@
+[
+ {"text":"Pay R250 for training before you start, call 0821234567","expect":"fee_refusal"},
+ {"text":"Send R300 registration fee to apply, then start Monday. WhatsApp 0739876543","expect":"fee_refusal"},
+ {"text":"Uniform R150, pay first, call 0821234567","expect":"fee_refusal"},
+ {"text":"KSh 500 processing fee, send to secure your place 0712345678","expect":"fee_refusal"},
+ {"text":"Airtime first R50 then we call you 0601234567","expect":"fee_refusal"},
+ {"text":"Need 2 general labourers, Pinetown site, R250/day, training provided, call 0821234567","expect":"fee_warning"},
+ {"text":"Cleaner needed urgently, good pay","expect":"no_contact"},
+ {"text":"Driver needed, send ID photo and bank details on WhatsApp 0821234567","expect":"id_by_message"},
+ {"text":"Hair salon in Soweto looking for a braider, weekends, R300/day. Call 0721234567","expect":"reply"},
+ {"text":"Construction company hiring general workers in Midrand, must have own boots, R280/day, call 0114567890","expect":"reply"},
+ {"text":"Domestic cleaner wanted in Westlands, 3 days a week, KSh 800 per day. Call 0722123456","expect":"reply"},
+ {"text":"Security company needs a driver in Durban, valid driver's licence, start 1 December, call 0315551234","expect":"reply"},
+ {"text":"Supermarket in Ikeja needs a cashier, N60,000 monthly, apply at Shoprite Ikeja City Mall","expect":"reply"},
+ {"text":"Tailor needed in Gikomba market, must know how to use an industrial machine, call 0733456789","expect":"reply"},
+ {"text":"Cleaner needed for an office in Sandton, Monday to Friday, police clearance required, call 0827654321","expect":"reply"},
+ {"text":"Looking for a hairdresser in Lekki who can do braids and wigs, come to Glamour Hair, Admiralty Way","expect":"reply"},
+ {"text":"Delivery driver needed in Nairobi CBD, KSh 1,200 per day, call 0711222333","expect":"reply"},
+ {"text":"Tiling labourers needed in Umlazi, start tomorrow, R350 per day, call 0769876543","expect":"reply"},
+ {"text":"Fashion house in Aba needs 2 tailors, sewing experience, call 07061234567","expect":"reply"},
+ {"text":"Shop assistant wanted at a phone shop in Khayelitsha, start Monday, WhatsApp 0845556677","expect":"reply"}
+]

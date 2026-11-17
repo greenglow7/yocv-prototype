@@ -17,7 +17,7 @@
    Draft sessions live in memory for 30 minutes keyed by a 24-hex draftToken; they hold the full snapshot
    (with the real phone number and date of birth) so the browser only ever sees the masked copy.
    The YoVouch routes (/my/, /s/, /v/, /api/vouch/, /qr-browser.js) live in vouch-routes.js and are tried last;
-   the retention sweep (sweep.js) runs every hour. */
+   /api/reply/ goes to reply-routes.js; the retention sweep (sweep.js) runs every hour. */
 
 const crypto=require('node:crypto');
 const {ageAt}=require('./account.js');
@@ -26,6 +26,7 @@ const {signRecord,jwks}=require('./sign.js');
 const {validId,secretsMatch,hashSecret}=require('./store.js');
 const {buildVouchSystem,issueVouchFields,indexCard,phoneHashOf,newCardToken,myUrl}=require('./vouch-system.js');
 const {createVouchRouter}=require('./vouch-routes.js');
+const {createReplyService,createReplyRouter}=require('./reply-routes.js');
 const {runSweep}=require('./sweep.js');
 const {publicPage,vouchListPage,notFoundPage,withdrawnPage,cardSvg,maskPhone,firstNameOf,STRINGS}=require('./render.js');
 const {tierItem}=require('./vouch-lines.js');
@@ -215,6 +216,14 @@ function createCardRouter({config,accountSource,provider,store,key,yoma,publicUr
   setInterval(()=>{try{runSweep(system);}catch(err){console.error('[yovouch] sweep failed:',err?.message||err);}},SWEEP_EVERY_MS).unref();
   const sessions=new Map();
   let inFlight=0;
+  // The one in-flight guard, shared by every model-calling route; a full guard rejects with code busy.
+  system.withSlot=async fn=>{
+    if(inFlight>=maxInFlight){const err=new Error(MESSAGES.busy);err.code='busy';throw err;}
+    inFlight++;
+    try{return await fn();}finally{inFlight--;}
+  };
+  system.replyService=createReplyService(system);
+  system.replyRouter=createReplyRouter(system);
   const liveModel=Boolean(provider)&&typeof provider.complete==='function';
 
   function prune(){
@@ -587,6 +596,7 @@ function createCardRouter({config,accountSource,provider,store,key,yoma,publicUr
       if(!m||!validId(m[1]))return wrap(sendHtml(res,404,notFoundPage()));
       return wrap(publicCard(req,res,m[1],m[2]||'',url));
     }
+    if(pathname.startsWith('/api/reply/'))return system.replyRouter.handle(req,res,url);
     return vouchRouter.handle(req,res,url);
   }
 
