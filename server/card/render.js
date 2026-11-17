@@ -6,6 +6,8 @@
    only inside the wa.me link and only when the record says WhatsApp is enabled. Fixed public copy is
    spelled exactly as the spec fixes it. */
 
+const NOT_BY=' · confirmed by them, not by Yoma';
+const slowChannel=(channel)=>channel==='sms'||channel==='ivr';
 const STRINGS={
   readFrom:(firstName,date,time)=>'Read from '+firstName+"'s Yoma account on "+date+' at '+time,
   phoneConfirmed:'Phone confirmed by Yoma (not an ID check)',
@@ -25,7 +27,63 @@ const STRINGS={
   confirmedTitle:'Confirmed from Yoma',
   whatConfirms:'What Yoma confirms',
   whatsapp:'Message on WhatsApp',
-  checkNow:'Check now'
+  checkNow:'Check now',
+  // YoVouch (spec §17 "Limits statement", "Tier and labels", "Check now additions"). Every tier label ends
+  // with NOT_BY; a flag label is appended after it with ' · ' (spec §4.2).
+  notOperated:'Not operated by Yoma or UNICEF',
+  signedBy:'signed by YoCard, not by Yoma',
+  vouchedTitle:(first)=>'Vouched for '+first,
+  vouchedSub:'Each line below was confirmed by the person who said it, not by Yoma.',
+  labelCustomerCode:(date)=>'Said by a customer · code matched on '+date+NOT_BY,
+  labelCustomerTexted:(date,first)=>'Said by a customer · code texted from their phone on '+date+" · filled in on "+first+"'s phone"+NOT_BY,
+  labelCustomerDemo:(date,first)=>'Said by a customer · demo, nothing texted · filled in on '+first+"'s phone on "+date+NOT_BY,
+  labelCustomerSms:(date)=>'Said by a customer · code matched by SMS on '+date+NOT_BY,
+  labelCustomerCall:(date)=>'Said by a customer · code matched on a call on '+date+NOT_BY,
+  labelCustomerRequest:'Said by a customer · by request, from a link sent later'+NOT_BY,
+  labelWorkerCode:(first,date)=>'Vouched by another worker · '+first+"'s card · code matched on "+date+NOT_BY,
+  labelWorkerSms:(first,date)=>'Vouched by another worker · '+first+"'s card · code matched by SMS on "+date+NOT_BY,
+  labelWorkerRequest:(first)=>'Vouched by another worker · '+first+"'s card · by request, from a link sent later"+NOT_BY,
+  labelReferral:(org,job,date,title)=>'Referred by '+org+' for '+job+' on '+date+' · rests on '+title+NOT_BY,
+  labelReferralClosed:(org,job,monthYear)=>'Referred by '+org+' for a '+job+' post, '+monthYear+' (post closed)',
+  demoOrgKey:'Demo organisation key. A real key needs Yoma.',
+  aCustomer:'a customer',
+  voucherShown:(first,last3)=>first+' ···'+last3,
+  hireAgainYes:'Would hire again: yes',
+  hireAgainNotStated:'Would hire again: not stated',
+  workAgainYes:'Would work together again: yes',
+  workAgainNotStated:'Would work together again: not stated',
+  whenEarlier:(chip,howOften)=>chip+', earlier, '+howOften+'.',
+  visits:(n)=>n+' visits',
+  playClip:(seconds,kb)=>'Play '+seconds+'-second clip ('+kb+' KB)',
+  recordedOnCall:'Recorded on a call',
+  clipExpired:'clip expired',
+  notTranslated:'Not translated',
+  flagReciprocal:'Vouched for each other',
+  flagRing:'Part of a group that vouched for each other',
+  burstNotice:'More lines will appear after 7 days.',
+  allVouches:'All vouches',
+  older:'Older',
+  whatMatched:'What a matched code shows',
+  // channel 'web' is the scan page (three minutes); 'sms' and 'ivr' read about four minutes.
+  limitsShort:(first,channel)=>'A matched code shows you had '+first+"'s code in "+(slowChannel(channel)?'about the last four minutes':'the last three minutes')+'. It does not show the work was done.',
+  limitsLong:(first,channel)=>'A matched code shows one thing: the person vouching had '+first+"'s code "+(slowChannel(channel)?'within about four minutes':'within three minutes')+' of it appearing on '+first+"'s phone. It does not show that the work was done, that the person is a real customer, or anything about quality. A code can be read out over the phone. Codes can be worked out a few minutes ahead on "+first+"'s phone. That is why each vouch also shows who said it and lets them withdraw it.",
+  fineTexted:"The code texted from the customer's own phone shows two phones were involved. It does not show whose hands held them.",
+  fineRequest:(first)=>'A request vouch was made later, from a link '+first+' sent. Nothing shows the two were together.',
+  fineWorker:"Another worker's vouch shows what they say they did together. It is not a check by Yoma.",
+  fineReferral:(first)=>'The organisation checked '+first+"'s completion on Yoma. The referral is the organisation's statement, accepted by "+first+', signed by YoCard, not by Yoma.',
+  numberSmsBind:'Number taken from the phone that texted YES (not by Yoma, not an ID check)',
+  numberDemo:'Number typed by the voucher, not confirmed (demo)',
+  numberSms:'Number taken from the SMS sender (not confirmed by a code, not by Yoma)',
+  numberCall:'Number taken from the caller ID (not confirmed by a code, not by Yoma)',
+  svgStrip:(first)=>'Vouched for '+first+NOT_BY,
+  vouchStillLive:'Vouch still live',
+  vouchWithdrawn:'Vouch withdrawn',
+  voucherCardLive:"Voucher's card still live",
+  completionStillOn:'Completion still on the account',
+  orgStillOn:'Organisation still on Yoma',
+  // plan additions
+  fictionalOrg:'Fictional organisation, not on Yoma',
+  sampleAccountFictional:'Fictional sample account: this card was built from a sample persona, not a real Yoma user. Sample Skills Trust is a fictional organisation; the other completions reference real Yoma opportunities.'
 };
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const E164=/^\+[1-9]\d{6,14}$/;
@@ -113,7 +171,7 @@ function evidenceLabel(completion){
 // ---------- HTML ----------
 
 const CSS=[
-  ':root{--ink:#020304;--muted:#545859;--line:#dce0e5;--ok:#2b6a57;--bad:#b3261e;--grey:#545859;--bg:#f3f6fa;--card:#fff;--accent:#41204b;--tint:#e7d4ed;--stated:#f3f6fa}',
+  ':root{--ink:#020304;--muted:#545859;--line:#dce0e5;--ok:#2b6a57;--bad:#b3261e;--grey:#545859;--bg:#f3f6fa;--card:#fff;--accent:#41204b;--tint:#e7d4ed;--stated:#f3f6fa;--orange:#f9ab3e;--awaiting-tint:#fdeed8;--awaiting:#8a5a00}',
   '*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:'+FONT+';line-height:1.5;-webkit-text-size-adjust:100%}',
   'main{max-width:640px;margin:0 auto;padding:16px}',
   'header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;font-size:14px;color:var(--muted)}',
@@ -144,7 +202,18 @@ const SCRIPT=[
   'box.hidden=false;b.disabled=false;b.textContent="'+STRINGS.checkNow+'";}).catch(function(){b.disabled=false;b.textContent="'+STRINGS.checkNow+'";});});})();'
 ].join('');
 
-function shell({title,description,ogImage,ogUrl,body}){
+// Small pages under /my/, /s/, /v/, /a/, /o/ and /r/ (spec §4.3, §7.2): system fonts only, 16px gutter,
+// 44px targets. Used with shell({fonts:false}) so no third-party asset loads.
+const FLOW_CSS=[
+  ':root{--ink:#020304;--muted:#545859;--bg:#f3f6fa;--accent:#41204b;--tint:#e7d4ed;--bad:#b3261e}',
+  '*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,sans-serif;line-height:1.5}',
+  'main{max-width:480px;margin:0 auto;padding:16px}h1{font-size:22px;margin:0 0 8px}section{background:#fff;border-radius:16px;padding:16px;margin:16px 0}',
+  'button,.btn{font:inherit;min-height:44px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:9999px;padding:8px 20px;font-weight:600;text-decoration:none;display:inline-block}',
+  '.alt{background:#fff;color:var(--accent)}input,textarea{font:inherit;min-height:44px;width:100%;padding:8px;border:1px solid var(--muted);border-radius:8px}',
+  '.small,footer{font-size:14px;color:var(--muted)}.bad{color:var(--bad)}.notice{background:var(--tint);border-radius:16px;padding:16px}a{color:var(--accent)}'
+].join('');
+
+function shell({title,description,ogImage,ogUrl,body,fonts=true,css=CSS}){
   return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
     '<title>'+escapeHtml(title)+'</title>'+
     '<meta name="robots" content="noindex">'+
@@ -153,8 +222,8 @@ function shell({title,description,ogImage,ogUrl,body}){
     (ogImage?'<meta property="og:image" content="'+escapeHtml(ogImage)+'">':'')+
     (ogUrl?'<meta property="og:url" content="'+escapeHtml(ogUrl)+'">':'')+
     '<meta property="og:type" content="profile">'+
-    '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="'+FONT_LINK+'">'+
-    '<style>'+CSS+'</style></head><body><main>'+body+'</main></body></html>';
+    (fonts?'<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="'+FONT_LINK+'">':'')+
+    '<style>'+css+'</style></head><body><main>'+body+'</main></body></html>';
 }
 
 function footer(record){
@@ -382,4 +451,4 @@ function cardSvg({record,publicUrl='',qrSvgFn,withdrawn=false}={}){
   return parts.join('');
 }
 
-module.exports={publicPage,notFoundPage,withdrawnPage,cardSvg,maskPhone,waLink,escapeHtml,safeUrl,fullDate,timeOfDay,monthYear,STRINGS};
+module.exports={publicPage,notFoundPage,withdrawnPage,cardSvg,maskPhone,waLink,escapeHtml,safeUrl,fullDate,timeOfDay,monthYear,shell,footer,CSS,FLOW_CSS,STRINGS};
