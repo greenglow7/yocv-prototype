@@ -31,6 +31,7 @@ const STATIC={
   '/index.html':'index.html',
   '/styles.css':'styles.css',
   '/core.js':'core.js',
+  '/cv-copy.js':'cv-copy.js',
   '/app.js':'app.js',
   '/card.html':'card.html',
   '/card.js':'card.js',
