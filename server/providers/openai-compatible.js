@@ -3,7 +3,7 @@
 // logic (callChatCompletions, completionToOutput, createChatProvider) that the
 // Azure adapter reuses, so retry, timeout and error mapping exist once.
 const {ProviderError,messages}=require('./errors.js');
-const {buildSchema,validateOutput,buildMessages,menuNamesOf}=require('./schema.js');
+const {buildSchema,validateOutput,buildMessages,menuNamesOf,CV_SCHEMA_NAME,buildCvSchema,buildCvMessages}=require('./schema.js');
 const {matchesSchema}=require('./schema-check.js');
 
 const RETRY_DELAY_MS=1500;
@@ -97,7 +97,7 @@ function withSchemaPrompt(chat,schema){
 // Builds a provider around a URL, header set and optional body extras.
 // structuredOutput 'json_object' is for endpoints without json_schema support.
 function createChatProvider({name,model,url,headers,bodyExtra={},structuredOutput='json_schema'},{fetch=globalThis.fetch,sleep=defaultSleep,timeoutMs=20000}={}){
-  return {
+  const provider={
     name,
     model,
     async generate(input,{signal}={}){
@@ -128,8 +128,18 @@ function createChatProvider({name,model,url,headers,bodyExtra={},structuredOutpu
       const output=completionToJson(json);
       if(asObject&&!matchesSchema(output,schema).ok)throw new ProviderError('provider_bad_output',messages.provider_bad_output,{retryable:true,status:200});
       return output;
+    },
+    // CV bullets for one masked entry (spec 8), checked against the CV schema in both modes.
+    // With no menu an empty skills list is tolerated, as validateOutput does for claims.
+    async cvBullets(input,{signal}={}){
+      const schema=buildCvSchema(input?.menuNames);
+      const output=await provider.complete({schemaName:CV_SCHEMA_NAME,schema,messages:buildCvMessages(input),maxTokens:600},{signal});
+      const reply=!schema.properties.skills&&Array.isArray(output?.skills)&&!output.skills.length?{bullets:output.bullets}:output;
+      if(!matchesSchema(reply,schema).ok)throw new ProviderError('provider_bad_output',messages.provider_bad_output,{retryable:true,status:200});
+      return {bullets:reply.bullets,skills:reply.skills||[]};
     }
   };
+  return provider;
 }
 
 function createOpenAICompatibleProvider(openaiConfig,deps={}){
