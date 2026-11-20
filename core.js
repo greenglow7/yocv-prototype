@@ -438,6 +438,38 @@
     const knownWords=[...new Set([...(state.entries||[]).flatMap(e=>words(e.place)),...words(c.name),...words(c.town)])];
     return {sessionId:state.sessionId,role:state.role,include:state.include,entries,knownWords};
   }
-  const api={labels,credential,MONTHS,WEEKDAYS,escapeHTML,shortQuote,setCredential,localExperienceClaims,evidenceClaims,generateClaims,reviewClaim,canExport,buildTextCV,buildEvidence,contactsIn,numbersIn,allowedNumbers,properNouns,maskNames,restoreNames,checkCvText,monthLabel,monthsBetween,templateBullet,profileLine,buildCv,renderCvHtml,buildCvText,buildCvRecord,renderRecordHtml,newCvState,reviewPayload};
+  // Spec 5 Step 3. decide never checks: app.js records an edit only after /api/cv/check or checkCvText answers ok.
+  function decide(state,key,decision,text){
+    return {...state,decisions:{...(state.decisions||{}),[key]:decision==='edited'?{decision,text:String(text??'')}:{decision}}};
+  }
+  const DECIDED=['accepted','edited','left_out'],taken=(state,key)=>['accepted','edited'].includes(decisionOf(state,key).decision);
+  const bulletKeys=state=>(state.review?.entries||[]).flatMap(d=>(d.proposals||[]).map((p,j)=>d.index+':'+j));
+  // Every proposal, skill and the profile (when there is one) decided, and at least one bullet on the CV.
+  function readyForCv(state){
+    const keys=[...bulletKeys(state),...(state.skills||[]).map(s=>'skill:'+s.name),...(state.profile?['profile']:[])];
+    return keys.every(k=>DECIDED.includes(decisionOf(state,k).decision))&&bulletKeys(state).some(k=>taken(state,k));
+  }
+  // EntryFields: what the checks compare against, without the place and the confirm choice.
+  const entryFields=e=>({title:trim(e?.title),what:trim(e?.what),forWhom:trim(e?.forWhom),frequency:trim(e?.frequency),months:{start:trim(e?.months?.start),end:trim(e?.months?.end)},
+    number:e?.number?{value:e.number.value,unit:e.number.unit,hedge:e.number.hedge}:null,outcome:trim(e?.outcome)});
+  // Spec 10: the profile line reads accepted skills and entries with an accepted or edited bullet, nothing else.
+  function profileInput(state){
+    return {role:trim(state.role),
+      skills:(state.skills||[]).filter(s=>decisionOf(state,'skill:'+s.name).decision==='accepted').map(s=>({name:s.name,level:s.level})),
+      entries:(state.entries||[]).filter((e,i)=>(draftFor(state,i)?.proposals||[]).some((p,j)=>taken(state,i+':'+j))).map(entryFields)};
+  }
+  // The review with no server: the template and the core checks per entry, as sample mode, and no skills.
+  function offlineReview(state,rules,nowIso){
+    const role=trim(state.role);
+    const entries=(state.entries||[]).map((e,index)=>{
+      const fields=entryFields(e),t=templateBullet(fields,rules,{nowIso}),proposals=[],rejected=[];
+      const r=t&&checkCvText(t.text,{fields,role,kind:'bullet'},rules);
+      if(r&&r.ok)proposals.push({text:t.text,origin:'template',templateWording:false,sourceQuote:fields.what,sourceFields:[...t.sourceFields],usedNumbers:numbersIn(t.text).map(n=>n.raw),highlight:t.highlight,checks:r.checks});
+      else if(r)rejected.push({kind:'bullet',text:t.text,reason:r.reason});
+      return {index,proposals,rejected,skills:[],needsDetail:!proposals.length};
+    });
+    return {entries,skills:[],generation:{mode:'sample-offline',provider:'browser-local',model:null,durationMs:0}};
+  }
+  const api={labels,credential,MONTHS,WEEKDAYS,escapeHTML,shortQuote,setCredential,localExperienceClaims,evidenceClaims,generateClaims,reviewClaim,canExport,buildTextCV,buildEvidence,contactsIn,numbersIn,allowedNumbers,properNouns,maskNames,restoreNames,checkCvText,monthLabel,monthsBetween,templateBullet,profileLine,buildCv,renderCvHtml,buildCvText,buildCvRecord,renderRecordHtml,newCvState,reviewPayload,decide,readyForCv,profileInput,offlineReview};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.YoCV=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
