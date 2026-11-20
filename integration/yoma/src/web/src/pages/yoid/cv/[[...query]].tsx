@@ -48,7 +48,8 @@ const emptyEntry = (): WorkEntry => ({
   numberValue: null, numberUnit: null, numberHedge: null, outcome: null, confirm: CONFIRM[0]!, completionTitle: null,
 });
 
-/** The request holds the interview answers only: no place, no contact detail, no confirm chip. */
+/** The entry holds the interview answers only: no place, no contact detail, no confirm chip. The place's words travel
+ *  separately as knownWords, for masking only. */
 const toRequestEntry = ({ place: _p, confirm: _c, completionTitle: _t, ...entry }: WorkEntry): CVInterviewEntry => entry;
 
 const learningLine = (item: CVLearningItem) => {
@@ -125,7 +126,15 @@ const MyCV: NextPageWithLayout<{
   });
 
   const draftMutation = useMutation({
-    mutationFn: () => draftCV({ role, entries: entries.map(toRequestEntry) }),
+    mutationFn: () =>
+      draftCV({
+        role,
+        entries: entries.map(toRequestEntry),
+        // Words to mask only: the place typed for each entry and the town. They never reach the model.
+        knownWords: [...new Set([...entries.flatMap((e) => e.place.split(/[\s,]+/)), ...contact.town.split(/[\s,]+/)].filter(Boolean))],
+        // The Step 1 ticks, so the API prompts with the ticked learning only and labels only its skills Confirmed from Yoma.
+        includeTitles: (record?.learning ?? []).filter((item) => include[item.title]).map((item) => item.title),
+      }),
     onSuccess: (result) => {
       setDraft(result);
       setDecisions({});
@@ -162,10 +171,8 @@ const MyCV: NextPageWithLayout<{
 
   // Nothing reaches the CV without an Accept.
   const acceptedBullets = (draft?.bullets ?? []).filter((b, i) => decisions[keyOf(b, i)] === "accepted");
-  const skills: CVSkill[] = [
-    ...(record?.skills ?? []),
-    ...(draft?.skills ?? []).filter((s) => !(record?.skills ?? []).some((r) => r.name === s.name)),
-  ];
+  // Step 1 shows the record's full picker; from the draft on, the skills are the draft's, which respect the ticks.
+  const skills: CVSkill[] = draft ? draft.skills : (record?.skills ?? []);
   const acceptedSkills = [
     ...skills.filter((s) => decisions[`skill:${s.name}`] === "accepted"),
     ...handAdded.map((name) => ({ name, label: "Self-stated" })),

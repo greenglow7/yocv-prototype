@@ -99,6 +99,44 @@ namespace Yoma.Core.Test.CV
     }
 
     [Fact]
+    public async Task DraftMasksATypedPlaceThatDiffersFromTheProfileCity()
+    {
+      var client = new FakeClient("""{"bullets":[],"skills":[]}""");
+      var entry = Entry();
+      entry.What = "Mamelodi is where I sell fruit at the stall by the taxi rank";
+
+      await Service(client).Draft(new CVDraftRequest { Role = Role, Entries = [entry], KnownWords = ["Mamelodi"] });
+
+      var sent = string.Join("\n", client.Requests.SelectMany(o => o.Messages).Select(o => o.Content));
+      Assert.DoesNotContain("Mamelodi", sent);
+      Assert.Contains("[name1] is where", sent);
+    }
+
+    [Fact]
+    public async Task DraftUsesOnlyTheTickedLearningForThePromptAndTheSkillsWhileGetKeepsTheFullPicker()
+    {
+      var completions = new List<MyOpportunityInfo>
+      {
+        new() { OpportunityTitle = "Retail basics", OrganizationName = "Sample Org", DateCompleted = DateTimeOffset.UtcNow, Skills = [new Skill { Id = Guid.NewGuid(), Name = "Stock keeping" }] },
+        new() { OpportunityTitle = "Food handling", OrganizationName = "Sample Org", DateCompleted = DateTimeOffset.UtcNow, Skills = [new Skill { Id = Guid.NewGuid(), Name = "Food safety" }] }
+      };
+      var client = new FakeClient("""{"bullets":[],"skills":[]}""");
+
+      var draft = await Service(client, completions: completions).Draft(new CVDraftRequest { Role = Role, Entries = [Entry()], IncludeTitles = ["Retail basics"] });
+
+      var sent = string.Join("\n", client.Requests.SelectMany(o => o.Messages).Select(o => o.Content));
+      Assert.Contains("Retail basics", sent);
+      Assert.DoesNotContain("Food handling", sent);
+      Assert.Contains(draft.Skills, o => o.Name == "Stock keeping" && o.Label == "Confirmed from Yoma");
+      Assert.DoesNotContain(draft.Skills, o => o.Name == "Food safety");
+
+      var record = await Service(client, completions: completions).Get();
+      Assert.Contains(record.Skills, o => o.Name == "Food safety");
+
+      await Assert.ThrowsAsync<ValidationException>(() => Service(client, completions: completions).Draft(new CVDraftRequest { Role = Role, Entries = [Entry()], IncludeTitles = ["Not in the record"] }));
+    }
+
+    [Fact]
     public async Task DraftKeepsTheCheckedBulletAndRefusesTheInventedOne()
     {
       var client = new FakeClient("""
@@ -245,7 +283,7 @@ namespace Yoma.Core.Test.CV
       Outcome = null
     };
 
-    private static CVService Service(ILanguageModelClient client, ISSIWalletService? wallet = null, string ssiEnvironments = "Local")
+    private static CVService Service(ILanguageModelClient client, ISSIWalletService? wallet = null, string ssiEnvironments = "Local", List<MyOpportunityInfo>? completions = null)
     {
       var environment = new Mock<IEnvironmentProvider>();
       environment.Setup(o => o.Environment).Returns(Domain.Core.Environment.Local);
@@ -257,7 +295,7 @@ namespace Yoma.Core.Test.CV
       profile.Setup(o => o.GetSkills(It.IsAny<UserSkillType?>())).Returns(new List<UserSkillInfo>());
 
       var opportunities = new Mock<IMyOpportunityService>();
-      opportunities.Setup(o => o.Search(It.IsAny<MyOpportunitySearchFilter>(), null)).Returns(new MyOpportunitySearchResults { Items = [] });
+      opportunities.Setup(o => o.Search(It.IsAny<MyOpportunitySearchFilter>(), null)).Returns(new MyOpportunitySearchResults { Items = completions ?? [] });
 
       if (wallet == null)
       {

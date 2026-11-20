@@ -79,6 +79,9 @@ namespace Yoma.Core.Domain.CV.Services
     private const int Entries_Max = 10;
     private const int Number_Max = 100000;
     private const int Learning_PageSize = 100;
+    // The prototype's route bounds the same lists (MAX_WORDS, MAX_WORD in server/cv/routes.js).
+    private const int KnownWords_Max = 40;
+    private const int Word_Max = 60;
     private const string Attribute_Skills = "Opportunity_Skills";
     private const string Schema_Name = "yoma_cv_bullets";
 
@@ -136,13 +139,19 @@ namespace Yoma.Core.Domain.CV.Services
       ArgumentNullException.ThrowIfNull(request, nameof(request));
       Validate(request, DateTimeOffset.UtcNow);
 
-      // The profile gives the words to mask only. It is never passed to the model or returned.
+      // The profile and the request's KnownWords give the words to mask only. Neither is passed to the model or returned.
       var profile = _userProfileService.Get();
       var known = new[] { profile.FirstName, profile.Surname, profile.DisplayName, profile.City, profile.Region }
+        .Concat(request.KnownWords ?? [])
         .Where(o => !string.IsNullOrWhiteSpace(o)).Select(o => o!).ToList();
 
       var (record, evidence) = await Assemble();
-      var learningTitles = record.Learning.Select(o => o.Title).ToList();
+      // The Step 1 ticks: only the ticked learning is prompt context, and only its skills are Confirmed from Yoma here.
+      var ticked = new HashSet<string>(request.IncludeTitles ?? [], StringComparer.InvariantCultureIgnoreCase);
+      if (ticked.Any(t => !record.Learning.Any(o => string.Equals(o.Title, t, StringComparison.InvariantCultureIgnoreCase))))
+        throw new ValidationException([new ValidationFailure(nameof(request.IncludeTitles), "Tick only items from your Yoma record")]);
+      var learningTitles = record.Learning.Where(o => ticked.Contains(o.Title)).Select(o => o.Title).ToList();
+      evidence.RemoveAll(o => o.Unit.StartsWith("learning:") && !ticked.Contains(o.Unit["learning:".Length..]));
       var client = _languageModelClientFactory.CreateClient();
       var result = new CVDraft();
       var now = DateTimeOffset.UtcNow;
@@ -361,6 +370,10 @@ namespace Yoma.Core.Domain.CV.Services
       var failures = new List<ValidationFailure>();
       if (string.IsNullOrWhiteSpace(request.Role)) failures.Add(new(nameof(request.Role), "Choose the role the CV is for"));
       if (request.Entries == null || request.Entries.Count == 0 || request.Entries.Count > Entries_Max) failures.Add(new(nameof(request.Entries), $"Give between 1 and {Entries_Max} entries"));
+      if (request.KnownWords != null && (request.KnownWords.Count > KnownWords_Max || request.KnownWords.Any(w => string.IsNullOrWhiteSpace(w) || w.Length > Word_Max)))
+        failures.Add(new(nameof(request.KnownWords), $"Give up to {KnownWords_Max} words of up to {Word_Max} characters"));
+      if (request.IncludeTitles != null && (request.IncludeTitles.Count > Learning_PageSize || request.IncludeTitles.Any(string.IsNullOrWhiteSpace)))
+        failures.Add(new(nameof(request.IncludeTitles), $"Tick up to {Learning_PageSize} items from your Yoma record"));
 
       var current = now.Year * 12 + now.Month - 1;
       for (var i = 0; i < (request.Entries?.Count ?? 0); i++)

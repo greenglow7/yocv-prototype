@@ -93,3 +93,21 @@ test('README describes the tile change in words, with the path and lines',()=>{
   for(const s of ['SLOW_NETWORK_ABORT_TIMEOUT','src/web/src/lib/axiosClient.ts','CSV_UPLOAD_TIMEOUT','YOM-XXXX','env.mjs','NEXT_PUBLIC_PASSPORT_ENABLED'])assert.ok(md.includes(s),s);
   assert.ok(!md.includes('```diff')&&!/^(\+\+\+|---|@@) /m.test(md),'no diff fence and no diff header lines; Markdown bullets are fine');
 });
+test('final review 11 and 12: the page sends the words to mask and the Step 1 ticks, and Draft respects both',()=>{
+  const req=read(PACK+DOMAIN+'CV/Models/CVDraftRequest.cs'),svc=read(PACK+DOMAIN+'CV/Services/CVService.cs');
+  const page=read(PACK+'src/web/src/pages/yoid/cv/[[...query]].tsx'),model=read(PACK+'src/web/src/api/models/cv.ts');
+  for(const p of ['KnownWords','IncludeTitles'])assert.ok(req.includes('List<string> '+p+' {'),p);
+  assert.ok(model.includes('knownWords: string[]')&&model.includes('includeTitles: string[]'));
+  assert.ok(page.includes('knownWords:')&&page.includes('includeTitles:')&&page.includes('contact.town')&&page.includes('e.place'),'the page fills both from the place, the town and the ticks');
+  assert.ok(/const skills: CVSkill\[\] = draft \? draft\.skills/.test(page),'after a draft the review shows the draft skills, which respect the ticks');
+  const draft=svc.slice(svc.indexOf('public async Task<CVDraft> Draft('),svc.indexOf('public static CVCheckResult CheckBullet('));
+  assert.ok(draft.includes('request.KnownWords')&&draft.includes('request.IncludeTitles')&&draft.includes('evidence.RemoveAll'));
+  const at=svc.indexOf('private static List<LanguageModelMessage> BuildMessages('),messages=svc.slice(at,svc.indexOf('\n    private static',at+10));
+  assert.ok(!/known/i.test(messages),'the mask words never reach the prompt');
+  const validate=svc.slice(svc.indexOf('private static void Validate('),svc.indexOf('private static CVCheckResult CheckText('));
+  assert.ok(validate.includes('request.KnownWords')&&validate.includes('request.IncludeTitles'),'both lists are bounded');
+  const md=read(PACK+'README.md');
+  assert.ok(md.includes('`KnownWords`')&&md.includes('`IncludeTitles`')&&!md.includes("So do the person's own name and town, in any case."));
+  const tests=read(PACK+'src/api/src/test/Yoma.Core.Test/CV/CVServiceTests.cs');
+  assert.ok(tests.includes('KnownWords = [')&&tests.includes('IncludeTitles = ['));
+});

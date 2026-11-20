@@ -2,8 +2,8 @@
 // The CV request and response types, as `CVController` returns them (Yoma.Core.Domain.CV.Models).
 
 /**
- * One interview answer set. The place the person names stays in the browser and is never sent.
- * Months and the number are flat fields, as in `CVInterviewEntry`.
+ * One interview answer set. The place the person names is not part of the entry; its words go in
+ * `CVDraftRequest.knownWords`, for masking only. Months and the number are flat fields, as in `CVInterviewEntry`.
  */
 export interface CVInterviewEntry {
   title: string;
@@ -25,6 +25,10 @@ export interface CVInterviewEntry {
 export interface CVDraftRequest {
   role: string;
   entries: CVInterviewEntry[];
+  /** Words to mask and nothing else: the place typed for each entry and the town. Never sent to the model. */
+  knownWords: string[];
+  /** The titles ticked in Step 1. Only these are prompt context and only their skills are Confirmed from Yoma in the draft. */
+  includeTitles: string[];
 }
 
 export interface CVBullet {

@@ -63,7 +63,7 @@ The prompt holds the role, the masked interview answers and the credential and o
 - From `UserProfile`: `DateOfBirth`, `PhoneNumber`, `Coordinates`, `Email`, `FirstName`, `Surname`, `DisplayName`, `Username`, `City` and `Region`.
 - From credential attributes: `MyOpportunity_UserDisplayName`, `MyOpportunity_Location`, `MyOpportunity_UserDateOfBirth` (kept on credentials issued on an older schema version) and the YoID `User_*` attributes. Only `Opportunity_Skills` is read.
 
-The interview answers can hold a person's or a shop's name, a place, a phone number or an email. Before the call, capitalised words that are not sentence-initial, not the role and not a listed verb become `[name1]`, `[name2]` and so on. So do the person's own name and town, in any case. Phone numbers and emails become `[contact1]` and are never restored. Names are restored after the call. A placeholder the model invents is refused as `invented_name`.
+The interview answers can hold a person's or a shop's name, a place, a phone number or an email. Before the call, capitalised words that are not sentence-initial, not the role and not a listed verb become `[name1]`, `[name2]` and so on. So do the person's own name and town from the profile, in any case, and the request's `KnownWords`: the place typed for each entry and the town on the contact line, so a typed place that differs from the profile city is masked even as the first word of a sentence. `KnownWords` are used for masking only and never go into the prompt. Phone numbers and emails become `[contact1]` and are never restored. Names are restored after the call. A placeholder the model invents is refused as `invented_name`.
 
 Frequency, the number, its unit and its hedge pass to the model unmasked, so `CVService` holds them to fixed values before the call, as the prototype's route does. `Frequency`, `NumberUnit` and `NumberHedge` must be one of `FrequencyChips`, `UnitChips` and `HedgeChips`, which a test here compares with the chips in `cv-copy.js`. `NumberValue` must be a whole number from 0 to 100000 as digits, and needs a unit and a hedge. Any other value is a validation error naming the field, such as `Entries[0].Frequency`, and nothing is sent.
 
@@ -120,6 +120,7 @@ The pack cannot edit existing Yoma files, so these changes are described in word
 - `CVLearningItem` is one extra model file, for the completions and credentials in the record.
 - `CheckBullet` has a second overload that takes a `CVBullet`, so the quote check can run while the pinned signature stays as given.
 - The profile line check from the prototype is not ported. The pack drafts bullets and skills only.
+- `CVDraftRequest` carries two lists beside the entries: `KnownWords` (mask only, above) and `IncludeTitles`, the Step 1 ticks. `GET api/v3/cv` returns the full picker. `POST draft` prompts with the ticked learning only and gives only its skills the `Confirmed from Yoma` label, as the prototype's review does; a title not in the record is a validation error. Both lists are bounded in `Validate`.
 
 ## Web side
 
@@ -154,7 +155,8 @@ Yoma's client aborts a call after 45 seconds. That is `SLOW_NETWORK_ABORT_TIMEOU
 - The role is a plain text field. Yoma has no role skill menus (see the API side).
 - Edit in Review is shown but turned off. An edit must pass `CVService.CheckBullet` before it reaches the CV, and the API has no endpoint for that check yet. The feature doc lists it as a task. Until then the person can Accept or Leave out each line.
 - The evidence record downloads as JSON only. The prototype also writes an HTML copy.
-- The contact details are prefilled from `userProfileAtom` and never sent to the API.
+- The contact details are prefilled from `userProfileAtom` and never sent to the API, except the town's words, which go in `knownWords` so the API can mask them.
+- The page sends `includeTitles` from the Step 1 ticks. Step 1 shows the record's full skill picker; from the draft on, the Review shows the draft's skills, which respect the ticks.
 
 ## The work epic
 
