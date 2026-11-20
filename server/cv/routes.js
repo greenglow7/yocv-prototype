@@ -236,12 +236,15 @@ function createCvRouter({config,provider,core,yoma,roleSkills,accountSource,card
     const u=s.record.user,{completions,credentials}=inc.include;
     const known=[u.firstName,...words(u.displayName),...words(u.city),...knownWords,...body.entries.flatMap(e=>words(e.place))].filter(Boolean);
     const learningTitles=[...new Set([...s.record.completions.filter(c=>completions.includes(c.evidenceId)),...s.record.credentials.filter(c=>credentials.includes(c.id))].map(x=>str(x.title)).filter(Boolean))];
+    // The newest review of a session is the one its check and skills calls read: an older one that answers later
+    // still gets its own reply, but writes nothing (the page has dropped it).
+    const run=s.reviewRun=(s.reviewRun||0)+1;
     return withSlot(res,async()=>{
       try{
         const {menu:items}=await buildSkillMenu(body.role,{yoma,roleSkills});
         const {entries:drafts,generation}=await draftEntries({role:body.role,entries:v.entries.map(fieldsOf),provider:chosen,menu:items,learningTitles,known,now});
         const interview=drafts.flatMap(d=>d.skills.map(k=>({entryIndex:d.index,...k})));
-        Object.assign(s,{role:body.role,include:inc.include,entries:v.entries,interview,menu:items});
+        if(s.reviewRun===run)Object.assign(s,{role:body.role,include:inc.include,entries:v.entries,interview,menu:items});
         const {skills,rejected}=combineSkills({record:s.record,include:inc.include,vouches:vouchesOf(s),interview,menu:items,copy:COPY});
         sendJSON(res,200,{entries:drafts,skills,skillsRejected:rejected,menu:items,generation});
       }catch(err){

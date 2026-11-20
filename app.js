@@ -6,14 +6,14 @@
 const C=window.YoCV,E=C.escapeHTML;
 const fill=(t,v={})=>String(t??'').replace(/\{(\w+)\}/g,(m,k)=>v[k]==null?'':String(v[k]));
 const DOCX_TYPE='application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-const KINDS=['none','person','completion','vouch'],SCREENS=7,MAX_ENTRIES=3,PHOTO_TYPES=['image/png','image/jpeg','image/webp'],PHOTO_MAX=2*1024*1024;
+const KINDS=['none','person','completion','vouch'],SCREENS=7,MAX_ENTRIES=3,PHOTO_TYPES=['image/png','image/jpeg','image/webp'],PHOTO_MAX=2*1024*1024,DEADLINE_MS=30000;
 const len=s=>[...String(s??'')].length,ym=v=>{const m=/^(\d{4})-(0[1-9]|1[0-2])$/.exec(v);return m?+m[1]*12+(+m[2]-1):null;};
 const thisMonth=()=>{const d=new Date();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2);};
 let cfg=null,copy=window.YoCVCopy.en,rules=window.YoCVRules.RULES;
 let state=C.newCvState(),ui=freshUi(),pendingAction=null,toastTimer;
 const view=document.querySelector('#view'),steps=document.querySelector('#steps'),pill=document.querySelector('#mode-pill');
 function freshUi(menus={}){return {persona:'',busy:false,error:'',entry:0,screen:0,forms:[],menus,optionalOpen:false,
- reviewed:null,reviewSession:null,reviewMenu:[],editing:null,editText:'',editError:'',addSkill:'',profileNote:'',profileRun:0,opps:null};}
+ reviewed:null,reviewSession:null,reviewAbort:null,retry:false,reviewMenu:[],editing:null,editText:'',editError:'',addSkill:'',profileNote:'',profileRun:0,opps:null};}
 const blankForm=()=>({title:'',place:'',what:'',forWhomChip:'',forWhomText:'',frequency:'',start:'',end:'',value:'',unit:'',hedge:'',outcome:'',confirm:'',completionId:''});
 // An Entry (plan Shared shapes) from the form: forWhom is the free text when given, else the chip.
 const toEntry=f=>({title:f.title.trim(),place:f.place.trim(),what:f.what.trim(),forWhom:f.forWhomText.trim()||f.forWhomChip,frequency:f.frequency,
@@ -137,11 +137,13 @@ function profileHTML(){
   :`<p class="field-help">${E(ui.profileNote||copy.profileWaiting)}</p>`;
  return `<section class="claim-card" aria-labelledby="profile-title"><h2 id="profile-title">${E(copy.recordProfile)}</h2>${body}</section>`;
 }
+// Offline, the notice says what built the lines on the page: this browser, or the server before the connection went.
 function reviewStep(){
- const ready=C.readyForCv(state);
- return head(3,copy.stepReview,copy.reviewLead)+(state.offline?`<div class="notice">${E(copy.reviewOffline)}</div>`:'')
+ const ready=C.readyForCv(state),fromHere=!state.review||state.generation?.mode==='sample-offline';
+ return head(3,copy.stepReview,copy.reviewLead)+(state.offline?`<div class="notice">${E(fromHere?copy.reviewOffline:copy.checkOffline)}</div>`:'')
   +(ui.busy&&!state.review?`<p class="notice" role="status">${E(copy.reviewing)}</p>`:state.review?state.review.entries.map(entryReviewHTML).join('')+skillsHTML()+profileHTML():'')
-  +errorHTML()+(ready||!state.review?'':`<p class="field-help">${E(copy.reviewPending)}</p>`)+footer(true,'to-cv',copy.continueCv,!ready||ui.busy);
+  +errorHTML()+(ui.retry?`<div class="action-row"><button class="secondary" data-action="retry-review">${E(copy.retry)}</button></div>`:'')
+  +(ready||!state.review?'':`<p class="field-help">${E(copy.reviewPending)}</p>`)+footer(true,'to-cv',copy.continueCv,!ready||ui.busy);
 }
 /* Step 4: the paper (one h1 on the page, in the band), the downloads, and the Yoma learning opportunities for the role. */
 const safeUrl=u=>/^https:\/\//i.test(String(u??''))?String(u):'';
@@ -159,7 +161,7 @@ function cvStep(){
  const paper=C.renderCvHtml(C.buildCv(state,copy),copy,{headingLevel:2});
  return head(4,copy.stepCv,copy.cvLead)+paper
   +`<div class="export-actions"><button class="primary" data-action="print">${E(copy.printCv)}</button><button class="secondary" data-action="download-text">${E(copy.downloadText)}</button>${state.offline?'':`<button class="secondary" data-action="download-docx">${E(copy.downloadDocx)}</button>`}<button class="secondary" data-action="download-record-html">${E(copy.downloadRecordHtml)}</button><button class="secondary" data-action="download-record-json">${E(copy.downloadRecordJson)}</button></div>`
-  +oppsHTML()+footer(true);
+  +(state.offline?'':`<p class="field-help">${E(copy.downloadDocxHelp)}</p>`)+oppsHTML()+footer(true);
 }
 // The first field that would fail the server's checks (server/cv/routes.js validateEntries), with its screen.
 function checkWork(){
@@ -172,7 +174,7 @@ function checkWork(){
   if(e.number&&(!Number.isInteger(e.number.value)||e.number.value<0||e.number.value>100000||!e.number.unit||!e.number.hedge))return bad(4,'e-value','errNumber');
   if(!KINDS.includes(e.confirm.kind)||(e.confirm.kind==='completion'&&!state.include.completions.includes(e.confirm.completionId)))return bad(6,null,'errConfirm');
  }
- if(!state.contact.name.trim())return {id:'c-name',message:copy.errName};
+ if(!String(state.contact.name??'').trim())return {id:'c-name',message:copy.errName};
  if(document.querySelector('#c-email')?.checkValidity()===false)return {id:'c-email',message:copy.errEmail};
  return null;
 }
@@ -188,45 +190,68 @@ function focusSnapshot(){
 function focusRestore(f){if(!f)return;try{const el=view.querySelector(f.sel);if(!el||el.disabled)return;el.focus({preventScroll:true});if(f.range)el.setSelectionRange(...f.range);}catch{}}
 function setBand(){const band=document.querySelector('#page-band');if(!band)return;band.innerHTML='';const line=view.querySelector('.step-line'),h=view.querySelector('h1.step-title');if(line)band.appendChild(line);if(h)band.appendChild(h);}
 function render(){if(!cfg)return;const f=focusSnapshot();renderSteps();view.innerHTML=[recordStep,workStep,reviewStep,cvStep][state.step]();setBand();view.setAttribute('aria-busy',String(ui.busy));focusRestore(f);}
-function go(step){state.step=step;state.maxStep=Math.max(step,state.maxStep);ui.error='';render();window.scrollTo({top:0,behavior:'instant'});document.querySelector('#page-band h1')?.focus({preventScroll:true});}
+function go(step){if(step<2)cancelReview();state.step=step;state.maxStep=Math.max(step,state.maxStep);ui.error='';render();window.scrollTo({top:0,behavior:'instant'});document.querySelector('#page-band h1')?.focus({preventScroll:true});}
 function showError(message,id){ui.error=message;render();(id&&document.getElementById(id)||document.querySelector('#step-error'))?.focus();}
 function rerender(){const y=window.scrollY;render();window.scrollTo({top:y,behavior:'instant'});}
-/* Server access */
-async function post(path,body){
- let res;
- try{res=await fetch(path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});}catch{throw Object.assign(new Error(copy.errServer),{network:true});}
+/* Server access. Every request ends after 30 s (as card.js does): a timeout is a retryable error with its own copy,
+   and a request the page cancelled (signal) is marked cancelled and shows nothing. */
+function deadline(signal){
+ const c=new AbortController(),t=setTimeout(()=>c.abort(),DEADLINE_MS);
+ if(signal){if(signal.aborted)c.abort();else signal.addEventListener('abort',()=>c.abort(),{once:true});}
+ return {signal:c.signal,clear:()=>clearTimeout(t)};
+}
+function fetchError(e,signal){
+ if(signal?.aborted)return Object.assign(new Error(copy.errServer),{cancelled:true});
+ if(e&&e.name==='AbortError')return Object.assign(new Error(copy.errTimeout),{timeout:true,retryable:true});
+ return Object.assign(new Error(copy.errServer),{network:true});
+}
+async function post(path,body,{signal}={}){
+ const d=deadline(signal);let res;
+ try{res=await fetch(path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body),signal:d.signal});}
+ catch(e){throw fetchError(e,signal);}
+ finally{d.clear();}
  const data=await res.json().catch(()=>({}));
- if(!res.ok)throw Object.assign(new Error(data.error?.message||copy.errServer),{code:data.error?.code||'',status:res.status});
+ if(!res.ok)throw Object.assign(new Error(data.error?.message||copy.errServer),{code:data.error?.code||'',status:res.status,retryable:!!data.error?.retryable});
  return data;
 }
 function goOffline(){state.offline=true;updatePill();}
 // A session call. On 410 session_expired: re-open the record with the same selector, keep the entries, the ticks and
 // the decisions, and retry once. check and skills read the entries the last review stored, so those are stored again first.
-async function cvPost(path,body){
- const send=()=>post(path,{...body,sessionId:state.sessionId});
+async function cvPost(path,body,opts={}){
+ const send=()=>post(path,{...body,sessionId:state.sessionId},opts);
  try{return await send();}
  catch(e){
   if(e.code!=='session_expired')throw e;
-  state.sessionId=(await post('/api/cv/record',state.selector||{})).sessionId;
-  if(path!=='/api/cv/review'){await post('/api/cv/review',C.reviewPayload(state));ui.reviewSession=state.sessionId;}
+  state.sessionId=(await post('/api/cv/record',state.selector||{},opts)).sessionId;
+  if(path!=='/api/cv/review'){await post('/api/cv/review',C.reviewPayload(state),opts);ui.reviewSession=state.sessionId;}
   return send();
  }
 }
+// A review in flight is cancelled by a newer review or by leaving Step 2 (Back), so only the review the page shows can
+// answer, and only that one writes the server session.
+function cancelReview(){const ac=ui.reviewAbort;if(!ac)return;ui.reviewAbort=null;ac.abort();if(ui.busy){ui.busy=false;ui.reviewed=null;}}
 const reviewKey=()=>JSON.stringify({...C.reviewPayload(state),sessionId:null});
 const reviewFresh=()=>!!state.review&&ui.reviewed===reviewKey()&&ui.reviewSession===state.sessionId;
 // A new review replaces the proposals, the skills and every decision.
 async function loadReview(){
  const key=reviewKey();
  if(reviewFresh()||ui.busy&&ui.reviewed===key)return;
+ cancelReview();
+ const ac=new AbortController();
  Object.assign(state,{review:null,skills:[],decisions:{},handAdded:[],profile:null,generation:null,maxStep:2});
- Object.assign(ui,{reviewed:key,reviewSession:state.sessionId,reviewMenu:[],editing:null,editError:'',addSkill:'',profileNote:'',busy:true});
+ Object.assign(ui,{reviewed:key,reviewSession:state.sessionId,reviewAbort:ac,retry:false,reviewMenu:[],editing:null,editError:'',addSkill:'',profileNote:'',busy:true});
  render();
  let r=null;
  if(!state.offline){
-  try{r=await cvPost('/api/cv/review',C.reviewPayload(state));ui.reviewSession=state.sessionId;ui.reviewMenu=r.menu||[];}
-  catch(e){if(!e.network){ui.busy=false;ui.reviewed=null;showError(e.message);return;}goOffline();}
+  try{r=await cvPost('/api/cv/review',C.reviewPayload(state),{signal:ac.signal});ui.reviewSession=state.sessionId;ui.reviewMenu=r.menu||[];}
+  catch(e){
+   if(e.cancelled||ui.reviewed!==key)return;
+   if(!e.network){Object.assign(ui,{busy:false,reviewed:null,reviewAbort:null,retry:!!e.retryable});showError(e.message);return;}
+   goOffline();
+  }
  }
  if(ui.reviewed!==key)return;
+ ui.reviewAbort=null;
  if(!r)r=C.offlineReview(state,rules,new Date().toISOString());
  Object.assign(state,{review:{entries:r.entries},skills:r.skills,generation:r.generation});
  ui.busy=false;render();
@@ -278,7 +303,7 @@ async function addSkill(){
  try{
   const handAdded=[...state.handAdded,{name}],r=await cvPost('/api/cv/skills',{include:state.include,handAdded});
   Object.assign(state,{handAdded,skills:r.skills});ui.addSkill='';ui.error='';
- }catch(e){if(e.network)goOffline();ui.error=e.network?copy.reviewOffline:e.message;}
+ }catch(e){if(e.network)goOffline();ui.error=e.network?copy.checkOffline:e.message;}
  ui.busy=false;await refreshProfile();render();
 }
 async function loadOpportunities(){
@@ -298,12 +323,14 @@ function download(name,content,type){
  const url=URL.createObjectURL(new Blob([content],{type})),a=document.createElement('a');
  a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);notify(copy.downloadDone);
 }
-// The Word file comes from POST /api/cv/docx, so its button shows only while the server answers. The photo stays here.
+// The Word file comes from POST /api/cv/docx, so its button shows only while the server answers. The photo and the
+// optional details (date of birth, ID number, state of origin) stay in this browser, as the page promises.
 async function downloadDocx(){
- const cv=C.buildCv(state,copy);cv.optional.photo='';
- let res;
- try{res=await fetch('/api/cv/docx',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({cv})});}
- catch{goOffline();rerender();notify(copy.errServer);return;}
+ const cv={...C.buildCv(state,copy),optional:{photo:'',dateOfBirth:'',idNumber:'',stateOfOrigin:''}};
+ const d=deadline();let res;
+ try{res=await fetch('/api/cv/docx',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({cv}),signal:d.signal});}
+ catch(e){const err=fetchError(e);if(err.network){goOffline();rerender();}notify(err.message);return;}
+ finally{d.clear();}
  if(!res.ok){const data=await res.json().catch(()=>({}));notify(data.error?.message||copy.errServer);return;}
  download('YoCV-CV.docx',await res.blob(),DOCX_TYPE);
 }
@@ -329,7 +356,7 @@ async function readRecord(){
   const {sessionId,record}=await post('/api/cv/record',selector),u=record.user;
   Object.assign(state,{sessionId,selector,record,
    include:{completions:record.completions.map(c=>c.evidenceId),credentials:record.credentials.map(c=>c.id),selfAttested:record.selfAttested.map(a=>a.evidenceId)},
-   contact:{...state.contact,name:u.displayName,phone:u.phoneNumber,town:u.city}});
+   contact:{...state.contact,name:u.displayName??'',phone:u.phoneNumber??'',town:u.city??''}});
   for(const f of ui.forms)if(f.confirm==='completion'&&!state.include.completions.includes(f.completionId))f.completionId='';
   const persona=cfg.accounts.personas.find(p=>p.id===ui.persona),match=cfg.roles.find(r=>r.tradeId&&r.tradeId===persona?.trade);
   if(!state.role&&match)state.role=match.name;
@@ -389,6 +416,7 @@ view.addEventListener('click',async event=>{
  if(action==='to-work'){if(state.offline?!state.role:!state.record||!cfg.roles.some(r=>r.name===state.role)){showError(state.offline?copy.errRoleOffline:copy.errRole,state.offline?'role-offline':'role');return;}go(1);}
  if(action==='to-review')await enter(2);
  if(action==='to-cv'&&C.readyForCv(state)){go(3);loadOpportunities();}
+ if(action==='retry-review'){ui.retry=false;ui.error='';await loadReview();}
  if(action==='cancel-edit'){ui.editing=null;ui.editError='';rerender();}
  if(action==='add-skill')await addSkill();
  if(action==='print')window.print();
@@ -403,7 +431,7 @@ view.addEventListener('click',async event=>{
 });
 steps.addEventListener('click',event=>{const button=event.target.closest('button');if(!button||button.disabled)return;enter(Number(button.dataset.step));});
 document.querySelector('#about-button').onclick=()=>document.querySelector('#about-dialog').showModal();
-document.querySelector('#reset-button').onclick=()=>confirmAction(copy.resetTitle,copy.resetCopy,copy.resetAction,()=>{const offline=state.offline;state=C.newCvState();state.offline=offline;ui=freshUi(ui.menus);render();window.scrollTo({top:0,behavior:'instant'});notify(copy.resetDone);});
+document.querySelector('#reset-button').onclick=()=>confirmAction(copy.resetTitle,copy.resetCopy,copy.resetAction,()=>{cancelReview();const offline=state.offline;state=C.newCvState();state.offline=offline;ui=freshUi(ui.menus);render();window.scrollTo({top:0,behavior:'instant'});notify(copy.resetDone);});
 document.querySelector('.brand').addEventListener('click',event=>{event.preventDefault();if(cfg)go(0);});
 document.querySelectorAll('.close-dialog').forEach(button=>button.onclick=()=>{button.closest('dialog').close();pendingAction=null;});
 document.querySelector('#confirm-action').onclick=()=>{document.querySelector('#confirm-dialog').close();const action=pendingAction;pendingAction=null;action?.();};

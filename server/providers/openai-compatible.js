@@ -94,7 +94,8 @@ function createChatProvider({name,model,url,headers,bodyExtra={},structuredOutpu
     model,
     // Generic structured completion (YoCard draft pipeline): the caller owns
     // the messages and the strict schema; this only transports and parses.
-    async complete({schemaName,schema,messages:chat,maxTokens=900,temperature=0.2}={},{signal}={}){
+    // check:false leaves the json_object schema check to a caller that runs its own, as cvBullets does.
+    async complete({schemaName,schema,messages:chat,maxTokens=900,temperature=0.2}={},{signal,check=true}={}){
       if(typeof schemaName!=='string'||!schemaName||!schema||typeof schema!=='object'||!Array.isArray(chat))throw new TypeError('complete() needs schemaName, schema and messages');
       const asObject=structuredOutput==='json_object';
       const body={
@@ -106,14 +107,14 @@ function createChatProvider({name,model,url,headers,bodyExtra={},structuredOutpu
       };
       const json=await callChatCompletions({url,headers,body,fetch,sleep,timeoutMs,signal});
       const output=completionToJson(json);
-      if(asObject&&!matchesSchema(output,schema).ok)throw new ProviderError('provider_bad_output',messages.provider_bad_output,{retryable:true,status:200});
+      if(asObject&&check&&!matchesSchema(output,schema).ok)throw new ProviderError('provider_bad_output',messages.provider_bad_output,{retryable:true,status:200});
       return output;
     },
-    // CV bullets for one masked entry (spec 8), checked against the CV schema in both modes.
-    // With no menu an empty skills list is tolerated.
+    // CV bullets for one masked entry (spec 8), checked against the CV schema in both modes, here and not in complete(),
+    // so that with no menu an empty skills list is tolerated in json_object mode too (the prompt asks for one).
     async cvBullets(input,{signal}={}){
       const schema=buildCvSchema(input?.menuNames);
-      const output=await provider.complete({schemaName:CV_SCHEMA_NAME,schema,messages:buildCvMessages(input),maxTokens:600},{signal});
+      const output=await provider.complete({schemaName:CV_SCHEMA_NAME,schema,messages:buildCvMessages(input),maxTokens:600},{signal,check:false});
       const reply=!schema.properties.skills&&Array.isArray(output?.skills)&&!output.skills.length?{bullets:output.bullets}:output;
       if(!matchesSchema(reply,schema).ok)throw new ProviderError('provider_bad_output',messages.provider_bad_output,{retryable:true,status:200});
       return {bullets:reply.bullets,skills:reply.skills||[]};

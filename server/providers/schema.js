@@ -58,7 +58,7 @@ function buildCvMessages({role,entry,menuNames,learningTitles}={}){
     '',
     'Learning on Yoma (context only, do not mention): '+(titles.join('; ')||'(none)'),
     '',
-    names.length?'Skill list (choose only from these names):\n'+names.map(name=>'- '+name).join('\n'):'Skill list: none. Leave out the skills field.'
+    names.length?'Skill list (choose only from these names):\n'+names.map(name=>'- '+name).join('\n'):'Skill list: none. Return an empty skills list.'
   ].join('\n');
   return [{role:'system',content:CV_SYSTEM_PROMPT},{role:'user',content:user}];
 }

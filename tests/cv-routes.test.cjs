@@ -147,3 +147,16 @@ test('mode sample uses the local provider when a live one is configured; a provi
   const res=await raw(one.base,'/api/cv/review',{sessionId:one.sessionId,role,include,entries:[entry]});
   assert.equal(res.status,502); assert.equal((await res.json()).error.code,'provider_timeout');
 });
+test('final review 8: a review that answers after a newer one for the same session never overwrites it',async()=>{
+  let release=null;const gate=new Promise(r=>{release=r;});const calls=[];
+  const slow={name:'azure-openai',model:'gpt-4.1-mini',async cvBullets(input){calls.push(input);if(/40 of them/.test(input.entry.what))await gate;return {bullets:[],skills:[]};}};
+  const {base,sessionId}=await thandiSession({provider:slow});
+  const e=n=>({...entry,number:null,what:'I braid hair at home for women in my street, about '+n+' of them a week.'});
+  const a=raw(base,'/api/cv/review',{sessionId,role,include,entries:[e(40)]});
+  while(calls.length<1)await new Promise(r=>setTimeout(r,5));
+  await ok(await raw(base,'/api/cv/review',{sessionId,role,include,entries:[e(30)]}));
+  release();assert.equal((await a).status,200);
+  const check=text=>post(base,'/api/cv/check',{sessionId,entryIndex:0,text,kind:'bullet'});
+  assert.equal((await check('Braided hair at home for about 30 women in my street a week.')).ok,true,'the newer review holds the session');
+  assert.equal((await check('Braided hair at home for about 40 women in my street a week.')).reason,'invented_number');
+});

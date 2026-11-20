@@ -49,7 +49,20 @@ test('cvBullets with no menu asks for no skills and accepts an empty skills list
   const {fetch,calls}=fakeFetch(()=>completion(reply));
   const {cvBullets}=azure.createAzureProvider(azureConfig,{fetch,sleep:fakeSleep().sleep});
   assert.deepEqual(await cvBullets({role:'Hairdresser',entry:masked,menuNames:[],learningTitles:[]}),reply);
-  assert.ok(JSON.parse(calls[0].init.body).messages[1].content.includes('Skill list: none. Leave out the skills field.'));
+  assert.ok(JSON.parse(calls[0].init.body).messages[1].content.includes('Skill list: none. Return an empty skills list.'),'the user message agrees with the system prompt and its examples');
   const {fetch:f2}=fakeFetch(()=>completion({...reply,skills:[{name:'Hairstyling',sourceQuote:'braid hair'}]}));
   await assert.rejects(azure.createAzureProvider(azureConfig,{fetch:f2,sleep:fakeSleep().sleep}).cvBullets({role:'Hairdresser',entry:masked,menuNames:[],learningTitles:[]}),{code:'provider_bad_output'});
+});
+test('cvBullets in json_object mode with no menu accepts an empty skills list and still refuses a filled one (final review 6)',async()=>{
+  const reply={bullets:[{text:'Braided hair at [name1] [name2]\'s salon on Saturdays.',usedNumbers:[],sourceFields:['what'],sourceQuote:'braid hair'}],skills:[]};
+  const {fetch,calls}=fakeFetch(()=>completion(reply));
+  const make=f=>compat.createOpenAICompatibleProvider({...openaiConfig,structuredOutput:'json_object'},{fetch:f,sleep:fakeSleep().sleep});
+  assert.deepEqual(await make(fetch).cvBullets({role:'Hairdresser',entry:masked,menuNames:[],learningTitles:[]}),reply);
+  const messages=JSON.parse(calls[0].init.body).messages;
+  assert.ok(messages[0].content.includes('If none fits, return an empty skills list.')&&messages[1].content.includes('Skill list: none. Return an empty skills list.'));
+  const {fetch:f2}=fakeFetch(()=>completion({...reply,skills:[{name:'Hairstyling',sourceQuote:'braid hair'}]}));
+  await assert.rejects(make(f2).cvBullets({role:'Hairdresser',entry:masked,menuNames:[],learningTitles:[]}),{code:'provider_bad_output'});
+  // complete() itself still checks json_object output for the YoCard pipeline.
+  const {fetch:f3}=fakeFetch(()=>completion({bullets:[],skills:[]}));
+  await assert.rejects(make(f3).complete({schemaName:'x',schema:buildCvSchema([]),messages:[{role:'user',content:'x'}]}),{code:'provider_bad_output'});
 });

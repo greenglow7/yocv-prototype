@@ -87,3 +87,26 @@ test('app.js runs Steps 3 and 4 on the new routes',()=>{
   for(const k of ['copy.accept','copy.edit','copy.leaveOut','copy.templateWording'])assert.ok(s.includes(k),k);
   assert.ok(s.includes('session_expired')&&s.includes('skillNames'),'an expired session re-opens the record; the profile check sends the skill names');
 });
+test('final review 7 and 8: every server request has a 30 s deadline with Retry, and a superseded review is aborted and changes nothing',()=>{
+  const s=read('app.js');
+  assert.ok(s.includes('AbortController')&&s.includes('30000')&&s.includes('copy.errTimeout')&&s.includes('copy.retry')&&s.includes('retry-review'),'a deadline, its copy and a Retry button');
+  assert.ok(s.includes('reviewAbort')&&s.includes('e.cancelled'),'one AbortController per review, aborted by a newer review or Back');
+  assert.ok(/if\(e\.cancelled\|\|ui\.reviewed!==key\)return;/.test(s),'the staleness check runs before any error is shown');
+  for(const k of ['errTimeout','retry'])assert.equal(typeof copy[k],'string',k);
+});
+test('final review 9: the Word download sends no optional detail, and the page says so',()=>{
+  const s=read('app.js');
+  assert.ok(/optional:\{photo:'',dateOfBirth:'',idNumber:'',stateOfOrigin:''\}/.test(s.slice(s.indexOf('async function downloadDocx'))),'the four optional fields are blanked before the POST');
+  assert.ok(s.includes('copy.downloadDocxHelp')&&typeof copy.downloadDocxHelp==='string');
+  assert.ok(copy.optionalHelp.includes('They stay in this browser.')&&read('index.html').includes('A photo and the other optional details stay in this browser.'),'the promise stays and is now true');
+});
+test('final review 10: the offline notice names what built the lines on the page',()=>{
+  const s=read('app.js');
+  assert.ok(/generation\?\.mode==='sample-offline'/.test(s)&&s.includes('copy.checkOffline')&&typeof copy.checkOffline==='string');
+  assert.ok(!/ui\.error=e\.network\?copy\.reviewOffline/.test(s),'addSkill no longer relabels the server lines');
+});
+test('final review 16: a Yoma profile without a name, phone or town prefills empty strings and Continue still checks',()=>{
+  const s=read('app.js');
+  assert.ok(/name:u\.displayName\?\?'',phone:u\.phoneNumber\?\?'',town:u\.city\?\?''/.test(s));
+  assert.ok(!s.includes('state.contact.name.trim()')&&/String\(state\.contact\.name\?\?''\)\.trim\(\)/.test(s));
+});
