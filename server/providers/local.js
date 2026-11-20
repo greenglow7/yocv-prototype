@@ -4,6 +4,7 @@
 // It deliberately has no complete(): the YoCard draft pipeline treats a
 // provider without complete() as sample mode and uses its own local draft.
 const {ProviderError}=require('./errors.js');
+const {RULES}=require('../../cv-rules.js');
 
 // The rule-based generator uses plain-language skill names. Map each to the
 // Yoma (Lightcast) skill names it corresponds to, in preference order; the
@@ -24,7 +25,10 @@ function toYomaName(name,menuNames){
   return hit||name;
 }
 
-function createLocalProvider(core){
+// A menu name counts only as a whole phrase in the answer, any case.
+const namedIn=(name,text)=>new RegExp('(?<![\\p{L}\\p{N}])'+String(name).trim().replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(?![\\p{L}\\p{N}])','iu').test(String(text??''));
+
+function createLocalProvider(core,{rules=RULES}={}){
   if(!core||typeof core.localExperienceClaims!=='function')throw new ProviderError('provider_not_configured','The local provider needs core.localExperienceClaims.',{retryable:false});
   return {
     name:'local',
@@ -41,6 +45,18 @@ function createLocalProvider(core){
         else if(claim.kind==='experience')output.experience.push({text:String(claim.text??''),sourceQuote,reason});
       }
       return {output};
+    },
+    // Spec 7: the template bullet, and a skill only when the person named it in what or outcome.
+    async cvBullets({entry,menuNames,nowIso}={}){
+      const e=entry||{},r=core.templateBullet(e,rules,{nowIso});
+      const bullets=r?[{text:r.text,usedNumbers:core.numbersIn(r.text).map(n=>n.raw),sourceFields:r.sourceFields,sourceQuote:String(e.what??'').trim()}]:[];
+      const skills=[];
+      for(const name of Array.isArray(menuNames)?menuNames:[]){
+        if(!String(name??'').trim())continue;
+        const answer=[e.what,e.outcome].find(t=>namedIn(name,t));
+        if(answer)skills.push({name,sourceQuote:String(answer).trim()});
+      }
+      return {bullets,skills};
     }
   };
 }

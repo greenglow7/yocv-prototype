@@ -248,6 +248,60 @@
     if(s.includes('!'))return fail('exclamation');
     return {ok:true,checks:kind==='profile'?['numbers','names','overstatement','length']:['numbers','names','overstatement','opening','length']};
   }
-  const api={labels,credential,MONTHS,WEEKDAYS,escapeHTML,shortQuote,setCredential,localExperienceClaims,evidenceClaims,generateClaims,reviewClaim,canExport,buildTextCV,buildEvidence,contactsIn,numbersIn,allowedNumbers,properNouns,maskNames,restoreNames,checkCvText};
+  // Spec 7 and 10: the template sentence, the profile line and the months between two 'YYYY-MM' values.
+  const ym=v=>{const m=/^(\d{4})-(\d{2})$/.exec(String(v??''));return m&&+m[2]>=1&&+m[2]<=12?+m[1]*12+(+m[2]-1):null;};
+  function monthLabel(v){const n=ym(v);return n==null?'':MONTHS[n%12]+' '+Math.floor(n/12);}
+  // Both ends count; an empty end counts to the month of nowIso. null for no start, a reversed span or a month after now.
+  function monthsBetween(start,end,nowIso){
+    const d=new Date(nowIso),now=Number.isNaN(d.getTime())?null:d.getUTCFullYear()*12+d.getUTCMonth();
+    const a=ym(start),b=String(end??'')===''?now:ym(end);
+    return a==null||b==null||now==null||a>b||b>now?null:b-a+1;
+  }
+  const len=s=>[...s].length;
+  const OPENERS={'customers':'Worked with customers on','a family business':'Worked in a family business on','a household':'Worked for a household on','a community group':'Volunteered with a community group on','an employer':'Worked for an employer on'};
+  // Lower the first letter, unless the first word is capitalised mid-sentence in the answers, is a month or weekday, or the second word is capitalised.
+  function lowerFirst(s,f){
+    const ws=wordsIn(s),first=ws[0]?.word||'',low=first.toLowerCase();
+    if(!first||NOT_NAMES.has(first)||/^\p{Lu}/u.test(ws[1]?.word||''))return s;
+    const caps=[f.title,f.what,f.forWhom,f.frequency,f.number?.unit,f.outcome].some(t=>wordsIn(t).some(w=>!w.initial&&/^\p{Lu}/u.test(w.word)&&w.word.toLowerCase()===low));
+    return caps?s:s.replace(/^\p{Lu}/u,c=>c.toLowerCase());
+  }
+  const clean=t=>String(t??'').trim().replace(/[\s.!?,;:]+$/,'').replace(/\s*[.!?]+\s+|\s*\n+\s*/g,', ');
+  function templateBullet(fields,rules,{nowIso}={}){
+    const f=fields||{},what=clean(String(f.what??'').replace(/^\s*i(?:\s+was)?\s+/i,''));
+    if(!what)return null;
+    const m=/^(\p{L}[\p{L}\p{M}]*)(?:\s+(\p{L}[\p{L}\p{M}]*))?/u.exec(what),one=m?m[1].toLowerCase():'',two=m&&m[2]?one+' '+m[2].toLowerCase():'';
+    const forms=new Set((rules?.verbs||[]).flatMap(v=>String(v).split('|'))),whom=String(f.forWhom??'').trim();
+    const opener=forms.has(one)||forms.has(two)?'':OPENERS[whom.toLowerCase()]||'Worked on';
+    const head=(opener?opener+' '+lowerFirst(what,f):what.replace(/^\p{Ll}/u,c=>c.toUpperCase()))+(!opener&&whom?' for '+whom:'');
+    const n=monthsBetween(f.months?.start,f.months?.end,nowIso),s=monthLabel(f.months?.start),e=monthLabel(f.months?.end);
+    const span=n==null?'':!e?' since '+s:n===1?' in '+s:' from '+s+' to '+e;
+    const num=f.number,value=num&&num.value!=null&&String(num.value).trim()!==''?String(num.value).trim():'',hedge=num&&num.hedge&&num.hedge!=='exactly'?num.hedge+' ':'';
+    const lead=value?hedge+value:'',numPart=value?', '+lead+(num.unit?' '+String(num.unit).trim():''):'';
+    const freq=String(f.frequency??'').trim(),outcome=clean(f.outcome);
+    for(const [fq,out] of [[freq,outcome],[freq,''],['','']]){
+      const before=head+(fq?' '+fq:'')+span,text=before+numPart+(out?'; '+out:'')+'.';
+      if(len(text)<=180){
+        const used=['what',(opener?OPENERS[whom.toLowerCase()]:whom)&&'forWhom',fq&&'frequency',span&&'months',value&&'number',out&&'outcome'].filter(Boolean);
+        return {text,highlight:value?[before.length+2,before.length+2+lead.length]:null,sourceFields:used};
+      }
+    }
+    return null;
+  }
+  // The two strongest skills (S1 first, then input order) and the longest entry by months, as a natural list after '<Role> with'.
+  function profileLine({role,skills=[],entries=[],nowIso}={}){
+    const top=(skills||[]).map((s,i)=>({...s,i})).sort((a,b)=>String(a.level).localeCompare(String(b.level))||a.i-b.i).slice(0,2);
+    const s1=top.filter(s=>s.level==='S1').map(s=>String(s.name).toLowerCase()),parts=[];
+    if(s1.length)parts.push(s1.join(' and ')+' recorded on Yoma');
+    for(const s of top)if(s.level!=='S1')parts.push(String(s.name).toLowerCase());
+    let best=null,months=null;
+    for(const e of entries||[]){const n=monthsBetween(e?.months?.start,e?.months?.end,nowIso);if(n!=null&&String(e.title??'').trim()&&(months==null||n>months)){best=e;months=n;}}
+    if(best)parts.push(months+' month'+(months===1?'':'s')+' of '+lowerFirst(String(best.title).trim(),best));
+    const r=String(role??'').trim().replace(/^\p{Ll}/u,c=>c.toUpperCase());
+    if(!r||!parts.length)return null;
+    const text=r+' with '+(parts.length>1?parts.slice(0,-1).join(', ')+' and ':'')+parts[parts.length-1]+'.';
+    return len(text)<40?null:{text,months};
+  }
+  const api={labels,credential,MONTHS,WEEKDAYS,escapeHTML,shortQuote,setCredential,localExperienceClaims,evidenceClaims,generateClaims,reviewClaim,canExport,buildTextCV,buildEvidence,contactsIn,numbersIn,allowedNumbers,properNouns,maskNames,restoreNames,checkCvText,monthLabel,monthsBetween,templateBullet,profileLine};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.YoCV=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
