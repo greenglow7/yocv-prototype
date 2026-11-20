@@ -4,6 +4,8 @@ This folder mirrors paths in the Yoma monorepo. Each file sits where it would la
 
 Owners are named by role: the API owner and the web owner on the Yoma team.
 
+The paths and line numbers cited here were read at the Yoma master commit `1e7c9fc`.
+
 ## API side
 
 ### What the pack adds
@@ -118,3 +120,42 @@ The pack cannot edit existing Yoma files, so these changes are described in word
 - `CVLearningItem` is one extra model file, for the completions and credentials in the record.
 - `CheckBullet` has a second overload that takes a `CVBullet`, so the quote check can run while the pinned signature stays as given.
 - The profile line check from the prototype is not ported. The pack drafts bullets and skills only.
+
+## Web side
+
+### What the pack adds
+
+| Yoma path | What it is |
+| --- | --- |
+| `src/web/src/api/models/cv.ts` | The request and response types, camel case, as `CVController` returns them. `CVSkillLevel` is an enum whose name is on the wire. |
+| `src/web/src/api/services/cv.ts` | `getCV()` and `draftCV(request)`, written like `src/web/src/api/services/credentials.ts` with its types in `src/web/src/api/models/credential.ts`. |
+| `src/web/src/pages/yoid/cv/[[...query]].tsx` | The four steps, Your Yoma record, Your work, Review and Your CV, on the YoID layout. |
+
+### The gate
+
+The page is gated the way `src/web/src/pages/yoid/passport/[[...query]].tsx` is. `getServerSideProps` reads `env.NEXT_PUBLIC_CV_ENABLED?.toLowerCase() == "true"`, with `env` imported from `process`, so the flag is a string there. When the flag is off it returns `props: { cv_enabled }` and the page shows a `CV Unavailable` view, as the passport shows `Passport Unavailable`. It does not answer 404.
+
+The pack cannot edit `src/web/src/env.mjs`, where Yoma declares its flags. Add `NEXT_PUBLIC_CV_ENABLED` there beside `NEXT_PUBLIC_PASSPORT_ENABLED`, in both places that flag appears: as a `z.boolean()` in the client schema, and read from `process.env` with the same lower case comparison to `"true"`. The declaration is what makes the flag a known, validated setting.
+
+### The dashboard tile
+
+In `src/web/src/pages/yoid/index.tsx`, lines 370 to 381 hold the CV tile. It is a static `DetailDisclosure` with the note that a CV built from your Yo-ID is coming soon. `DetailDisclosure` has no link prop, so it cannot simply be pointed at the page. The change, in words:
+
+- Keep the `<div className="lg:col-span-2">` wrapper, so the tile keeps its place and its grid span.
+- In place of the `DetailDisclosure` inside it, render a link to `/yoid/cv` with the same icon, tone and title, and a note that says what the CV builder does.
+- Render the link only when the flag is true. The dashboard already reads `NEXT_PUBLIC_PASSPORT_ENABLED` this way: its `getServerSideProps` (lines 83 to 85) turns the string from `process` into `passport_enabled` and passes it as a prop. Read `NEXT_PUBLIC_CV_ENABLED` beside it into a `cv_enabled` prop. When it is false, keep today's static tile.
+
+### The client timeout
+
+Yoma's client aborts a call after 45 seconds. That is `SLOW_NETWORK_ABORT_TIMEOUT = 45000` in `src/web/src/lib/constants.ts`, applied as the instance `timeout` in `src/web/src/lib/axiosClient.ts`. The same file already overrides it per request for CSV uploads, with `CSV_UPLOAD_TIMEOUT`. A CV draft makes one model call per entry, in turn, so it needs the same kind of override. `draftCV` passes `{ timeout: CV_DRAFT_TIMEOUT }`, three minutes, on its own request. The interceptor leaves a per-request timeout alone for any URL that is not a CSV upload, so no change to `axiosClient.ts` is needed. The web owner may prefer to add the draft URL beside the CSV check instead.
+
+### Small departures, for the web owner to confirm
+
+- The role is a plain text field. Yoma has no role skill menus (see the API side).
+- Edit in Review is shown but turned off. An edit must pass `CVService.CheckBullet` before it reaches the CV, and the API has no endpoint for that check yet. The feature doc lists it as a task. Until then the person can Accept or Leave out each line.
+- The evidence record downloads as JSON only. The prototype also writes an HTML copy.
+- The contact details are prefilled from `userProfileAtom` and never sent to the API.
+
+## The work epic
+
+`docs/work/active/YOM-XXXX-yoid-cv-builder/` follows Yoma's `docs/work` shape: the epic `README.md`, a feature folder `YOM-YYYY-cv-draft-service/` with `feature.md`, and a first note in `handoffs/`. `YOM-XXXX` and `YOM-YYYY` are placeholders until the team issues the Linear ids. Rename both folders then. The placeholders are not `<EPIC>` and `<TICKET>`, because `<` and `>` are not valid in Windows file names. The docs take their headings from Yoma's templates and name the owners by role only.

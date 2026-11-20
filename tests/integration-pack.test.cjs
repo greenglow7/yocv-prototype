@@ -63,3 +63,33 @@ test('README names the map, the PII and the owners by role; LICENSE-NOTE states 
   const lic=read(PACK+'LICENSE-NOTE.md'); assert.ok(lic.includes('GPL-3.0')&&lic.includes('MIT'));
   assert.ok(!/verified by Yoma/i.test(md+lic));
 });
+// Plan Task 19: the web side and the work epic (spec 9).
+test('the web files and the epic exist with their headers and placeholders',()=>{
+  const page=read(PACK+'src/web/src/pages/yoid/cv/[[...query]].tsx'),svc=read(PACK+'src/web/src/api/services/cv.ts');
+  assert.ok(page.includes('NEXT_PUBLIC_CV_ENABLED')&&svc.includes('draftCV')&&svc.includes('getCV'));
+  assert.match(page,/env\.NEXT_PUBLIC_CV_ENABLED\?\.toLowerCase\(\) == "true"/);
+  assert.ok(page.includes('cv_enabled')&&page.includes('CV Unavailable')&&!page.includes('notFound'),'the passport gate: props and an unavailable view');
+  for(const s of [page,svc])assert.ok(s.startsWith('// Written to the Yoma repository\'s patterns by the YoCV prototype.'));
+  assert.ok(fs.existsSync(path.join(root,PACK,'src/web/src/api/models/cv.ts'))&&svc.includes("from \"../models/cv\""));
+  const epic=PACK+'docs/work/active/YOM-XXXX-yoid-cv-builder/';
+  for(const f of ['README.md','YOM-YYYY-cv-draft-service/feature.md','YOM-YYYY-cv-draft-service/handoffs/2026-11-19-a.md'])assert.ok(fs.existsSync(path.join(root,epic,f)),f);
+  assert.ok(read(epic+'README.md').includes('the API owner')&&read(epic+'README.md').includes('the web owner'));
+  const feature=read(epic+'YOM-YYYY-cv-draft-service/feature.md');
+  for(const s of ['Flurl','sops','LanguageModelEnabledEnvironments','runtime provider switch'])assert.ok(feature.includes(s),s);
+  assert.match(feature,/^- \*\*Owner\*\*: the API owner \| the web owner$/m,'owners by role only');
+  const epicReadme=read(epic+'README.md');
+  assert.match(epicReadme,/^- \*\*Owners\*\*: the API owner \(api\) · the web owner \(web\)$/m,'epic owners by role only');
+  const handoff=read(epic+'YOM-YYYY-cv-draft-service/handoffs/2026-11-19-a.md');
+  assert.match(handoff,/^- \*\*Session by\*\*: the YoCV prototype/m);
+  assert.ok(page.includes('import { env } from "process"'),'the page reads the flag as a string, as the passport does');
+  const names=[];(function walk(d){for(const e of fs.readdirSync(d,{withFileTypes:true})){names.push(e.name);if(e.isDirectory())walk(path.join(d,e.name));}})(path.join(root,PACK));
+  assert.ok(!names.some(n=>/[<>:"|?*]/.test(n)),'every pack path is a valid Windows file name');
+  const mds=[];(function walk(d){for(const e of fs.readdirSync(d,{withFileTypes:true})){const p=path.join(d,e.name);if(e.isDirectory())walk(p);else if(e.name.endsWith('.md'))mds.push(p);}})(path.join(root,PACK));
+  for(const f of mds)assert.ok(!fs.readFileSync(f,'utf8').includes('—'),'no em dash: '+f);
+});
+test('README describes the tile change in words, with the path and lines',()=>{
+  const md=read(PACK+'README.md');
+  for(const s of ['src/web/src/pages/yoid/index.tsx','lines 370 to 381','DetailDisclosure','src/web/src/api/services/credentials.ts','45 second'])assert.ok(md.includes(s),s);
+  for(const s of ['SLOW_NETWORK_ABORT_TIMEOUT','src/web/src/lib/axiosClient.ts','CSV_UPLOAD_TIMEOUT','YOM-XXXX','env.mjs','NEXT_PUBLIC_PASSPORT_ENABLED'])assert.ok(md.includes(s),s);
+  assert.ok(!md.includes('```diff')&&!/^(\+\+\+|---|@@) /m.test(md),'no diff fence and no diff header lines; Markdown bullets are fine');
+});
