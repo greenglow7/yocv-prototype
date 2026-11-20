@@ -17,6 +17,9 @@ const stripSlashes=(value)=>String(value).replace(/\/+$/,'');
 // YOVOUCH_ORG_KEY_SAMPLE_SKILLS_TRUST -> 'Sample Skills Trust': the name's words split on _, each capitalised.
 const ORG_KEY=/^YOVOUCH_ORG_KEY_([A-Z0-9_]+)$/;
 const orgNameOf=suffix=>suffix.split('_').filter(Boolean).map(w=>w[0]+w.slice(1).toLowerCase()).join(' ');
+// A configuration that cannot start: main() prints the message and exits with code 1.
+const invalid=message=>Object.assign(new Error(message),{code:'config_invalid'});
+const SELECTORS=['azure','openai','local'],STRUCTURED=['json_schema','json_object'];
 
 function loadConfig({env=process.env,cwd=process.cwd()}={}){
   const file=loadEnvFile(path.join(cwd,'.env'));
@@ -28,6 +31,14 @@ function loadConfig({env=process.env,cwd=process.cwd()}={}){
   };
   const azureEndpoint=get('AZURE_OPENAI_ENDPOINT'),azureKey=get('AZURE_OPENAI_API_KEY'),azureDeployment=get('AZURE_OPENAI_DEPLOYMENT');
   const openaiKey=get('OPENAI_API_KEY');
+  // MODEL_PROVIDER wins when set; empty keeps the order Azure, then OpenAI-compatible, then local (spec 8).
+  const selector=get('MODEL_PROVIDER'),structuredOutput=get('OPENAI_STRUCTURED_OUTPUT')||'json_schema';
+  if(selector&&!SELECTORS.includes(selector))throw invalid('MODEL_PROVIDER must be azure, openai or local.');
+  if(!STRUCTURED.includes(structuredOutput))throw invalid('OPENAI_STRUCTURED_OUTPUT must be json_schema or json_object.');
+  const azureReady=Boolean(azureEndpoint&&azureKey&&azureDeployment);
+  const kind=selector||(azureReady?'azure':openaiKey?'openai':'local');
+  if(kind==='azure'&&!azureReady)throw invalid('MODEL_PROVIDER=azure needs AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY and AZURE_OPENAI_DEPLOYMENT.');
+  if(kind==='openai'&&!openaiKey)throw invalid('MODEL_PROVIDER=openai needs OPENAI_API_KEY (any value for a local server, such as ollama).');
   const transcribeDeployment=get('AZURE_OPENAI_TRANSCRIBE_DEPLOYMENT'),transcribeModel=get('TRANSCRIBE_MODEL');
   const portRaw=Number.parseInt(get('PORT'),10);
   const publicUrlRaw=get('YOCARD_PUBLIC_URL');
@@ -55,14 +66,16 @@ function loadConfig({env=process.env,cwd=process.cwd()}={}){
     // else an OpenAI-compatible model, else null (template: the typed text box).
     transcribe:azureEndpoint&&azureKey&&transcribeDeployment
       ?{kind:'azure',endpoint:stripSlashes(azureEndpoint),apiKey:azureKey,deployment:transcribeDeployment,apiVersion:get('AZURE_OPENAI_API_VERSION')||DEFAULTS.azureApiVersion}
-      :openaiKey&&transcribeModel?{kind:'openai',baseUrl:stripSlashes(get('OPENAI_BASE_URL')||DEFAULTS.openaiBaseUrl),apiKey:openaiKey,model:transcribeModel}:null
+      :openaiKey&&transcribeModel?{kind:'openai',baseUrl:stripSlashes(get('OPENAI_BASE_URL')||DEFAULTS.openaiBaseUrl),apiKey:openaiKey,model:transcribeModel}:null,
+    // YoCV: the secret the /api/cv/draft webhook requires in x-yocv-service-secret. Empty: no webhook.
+    yocv:{serviceSecret:get('YOCV_SERVICE_SECRET')}
   };
-  if(azureEndpoint&&azureKey&&azureDeployment){
+  if(kind==='azure'){
     const azure={endpoint:stripSlashes(azureEndpoint),apiKey:azureKey,deployment:azureDeployment,apiVersion:get('AZURE_OPENAI_API_VERSION')||DEFAULTS.azureApiVersion};
     return {provider:'azure-openai',model:azure.deployment,azure,openai:null,...base};
   }
-  if(openaiKey){
-    const openai={baseUrl:stripSlashes(get('OPENAI_BASE_URL')||DEFAULTS.openaiBaseUrl),apiKey:openaiKey,model:get('OPENAI_MODEL')||DEFAULTS.model};
+  if(kind==='openai'){
+    const openai={baseUrl:stripSlashes(get('OPENAI_BASE_URL')||DEFAULTS.openaiBaseUrl),apiKey:openaiKey,model:get('OPENAI_MODEL')||DEFAULTS.model,structuredOutput};
     return {provider:'openai-compatible',model:openai.model,azure:null,openai,...base};
   }
   return {provider:'local',model:null,azure:null,openai:null,...base};

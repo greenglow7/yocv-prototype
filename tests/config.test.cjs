@@ -69,7 +69,7 @@ test('loadConfig picks openai-compatible when only OPENAI_API_KEY is set',()=>{
  const cfg=config.loadConfig({env:{OPENAI_API_KEY:'sk'},cwd:tmpDir()});
  assert.equal(cfg.provider,'openai-compatible');
  assert.equal(cfg.model,'gpt-4.1-mini');
- assert.deepEqual(cfg.openai,{baseUrl:'https://api.openai.com/v1',apiKey:'sk',model:'gpt-4.1-mini'});
+ assert.deepEqual(cfg.openai,{baseUrl:'https://api.openai.com/v1',apiKey:'sk',model:'gpt-4.1-mini',structuredOutput:'json_schema'});
  assert.equal(cfg.azure,null);
 });
 test('loadConfig strips trailing slashes from the openai base url and uses OPENAI_MODEL',()=>{
@@ -109,4 +109,40 @@ test('loadConfig gives the YoVouch defaults and reads YOVOUCH_SIM',()=>{
  assert.equal(config.loadConfig({env:{YOVOUCH_SIM:'true'},cwd:tmpDir()}).yovouch.sim,false);
  const set=config.loadConfig({env:{YOVOUCH_GATEWAY_SECRET:'s3',YOVOUCH_SHORTCODE:'40400',YOVOUCH_CALLBACK_NUMBER:'0800 123 456',YOVOUCH_SMS_COUNTRY:'Kenya'},cwd:tmpDir()});
  assert.deepEqual(set.yovouch,{sim:false,gatewaySecret:'s3',shortcode:'40400',callbackNumber:'0800 123 456',smsCountry:'Kenya',orgKeys:{}});
+});
+
+// tests/config.test.cjs already has fs, path, tmpDir and `config`; add these beside them.
+const {loadConfig}=config;
+const {banner}=require('../server.js');
+const empty=tmpDir();
+const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8');
+const LOCAL={OPENAI_API_KEY:'ollama',OPENAI_BASE_URL:'http://localhost:11434/v1/',OPENAI_MODEL:'qwen2.5:3b-instruct',OPENAI_STRUCTURED_OUTPUT:'json_object'};
+const AZURE={AZURE_OPENAI_ENDPOINT:'https://r.openai.azure.com',AZURE_OPENAI_API_KEY:'k',AZURE_OPENAI_DEPLOYMENT:'d'};
+test('MODEL_PROVIDER wins over the configured order; empty keeps today\'s order',()=>{
+  const c=loadConfig({env:{...AZURE,...LOCAL,MODEL_PROVIDER:'openai'},cwd:empty});
+  assert.equal(c.provider,'openai-compatible');
+  assert.deepEqual(c.openai,{baseUrl:'http://localhost:11434/v1',apiKey:'ollama',model:'qwen2.5:3b-instruct',structuredOutput:'json_object'});
+  assert.equal(loadConfig({env:{...AZURE,...LOCAL,MODEL_PROVIDER:'local'},cwd:empty}).provider,'local');
+  assert.equal(loadConfig({env:{...AZURE,...LOCAL},cwd:empty}).provider,'azure-openai');
+});
+test('a selector without its values, an unknown selector and an unknown flag refuse to start',()=>{
+  const bad=(env,message)=>assert.throws(()=>loadConfig({env,cwd:empty}),{code:'config_invalid',message});
+  bad({MODEL_PROVIDER:'azure'},'MODEL_PROVIDER=azure needs AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY and AZURE_OPENAI_DEPLOYMENT.');
+  bad({MODEL_PROVIDER:'openai'},'MODEL_PROVIDER=openai needs OPENAI_API_KEY (any value for a local server, such as ollama).');
+  bad({MODEL_PROVIDER:'ollama'},'MODEL_PROVIDER must be azure, openai or local.');
+  bad({OPENAI_API_KEY:'x',OPENAI_STRUCTURED_OUTPUT:'yaml'},'OPENAI_STRUCTURED_OUTPUT must be json_schema or json_object.');
+});
+test('structuredOutput defaults to json_schema and YOCV_SERVICE_SECRET is read',()=>{
+  assert.equal(loadConfig({env:{OPENAI_API_KEY:'x'},cwd:empty}).openai.structuredOutput,'json_schema');
+  assert.deepEqual(loadConfig({env:{YOCV_SERVICE_SECRET:'s3cret'},cwd:empty}).yocv,{serviceSecret:'s3cret'});
+});
+test('the banner prints the provider and the model',()=>{
+  const cfg=loadConfig({env:{...LOCAL,MODEL_PROVIDER:'openai'},cwd:empty});
+  assert.ok(banner(cfg,{name:'openai-compatible',model:'qwen2.5:3b-instruct'}).includes(' · provider: openai-compatible · model: qwen2.5:3b-instruct · '));
+  assert.ok(banner(loadConfig({env:{},cwd:empty}),{name:'local',model:null}).includes(' · provider: local · model: none · '));
+});
+test('.env.example carries the selector, the flag, the secret and the commented local block',()=>{
+  const ex=read('.env.example');
+  for(const line of ['MODEL_PROVIDER=','YOCV_SERVICE_SECRET=','# MODEL_PROVIDER=openai','# OPENAI_BASE_URL=http://localhost:11434/v1','# OPENAI_API_KEY=ollama','# OPENAI_MODEL=qwen2.5:3b-instruct','# OPENAI_STRUCTURED_OUTPUT=json_object'])
+    assert.ok(ex.split('\n').some(l=>l.trim().startsWith(line)),line);
 });

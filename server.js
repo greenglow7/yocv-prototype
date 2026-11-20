@@ -289,7 +289,7 @@ function createApp({config,provider,yoma,roleSkills,core,rootDir=__dirname,maxIn
 
 function banner(config,provider,card){
   const mode=config.provider==='local'?'sample':'live';
-  return 'YoCV server on http://'+config.host+':'+config.port+' · mode: '+mode+' · provider: '+provider.name+' · Yoma: '+config.yomaBase+
+  return 'YoCV server on http://'+config.host+':'+config.port+' · mode: '+mode+' · provider: '+provider.name+' · model: '+(provider.model||'none')+' · Yoma: '+config.yomaBase+
     (card?' · YoCard: '+card.accountSource.kind+' accounts, cards in '+card.store.dir:'');
 }
 
@@ -299,7 +299,8 @@ function main(){
   const {createProvider}=require('./server/providers/index.js');
   const core=require('./core.js');
   const roleSkills=require('./data/role-skills.json');
-  const config=loadConfig();
+  let config;
+  try{config=loadConfig();}catch(err){if(err?.code!=='config_invalid')throw err;console.error(err.message);process.exit(1);}
   const yoma=createYomaClient({baseUrl:config.yomaBase});
   const provider=createProvider(config,core);
   const {createAccountSource}=require('./server/card/account.js');
@@ -321,6 +322,6 @@ function main(){
   process.on('SIGTERM',shutdown);
 }
 
-module.exports={createApp,validateGenerateInput,readJSONBody,readRawBody,STATIC,MAX_BODY_BYTES};
+module.exports={createApp,banner,validateGenerateInput,readJSONBody,readRawBody,STATIC,MAX_BODY_BYTES};
 
 if(require.main===module)main();
