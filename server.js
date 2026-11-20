@@ -4,6 +4,7 @@
      GET  /api/status                      mode, provider, model, Yoma reachability
      POST /api/generate                    grounded claim generation (live or sample)
      GET  /api/yoma/opportunities?role=    Yoma learning opportunities for a role
+   The YoCV routes (GET /api/cv/config|menu, POST /api/cv/record|review|check|skills) live in server/cv/routes.js.
    YoCard (Phase 2) routes live in server/card/routes.js and are mounted when createApp receives `card` deps:
      GET  /api/card/status, POST /api/card/account|draft|publish, POST /api/card/:id/check|withdraw,
      GET  /c/:id[.svg|.json], POST /c/:id/check, GET /.well-known/jwks.json
@@ -18,6 +19,8 @@ const {runGeneration}=require('./server/generation.js');
 const {ProviderError}=require('./server/providers/errors.js');
 const {createLocalProvider}=require('./server/providers/local.js');
 const {createCardRouter}=require('./server/card/routes.js');
+const {createAccountSource}=require('./server/card/account.js');
+const {createCvRouter}=require('./server/cv/routes.js');
 
 const MAX_BODY_BYTES=64*1024;
 const MAX_CONTEXT=120;
@@ -162,6 +165,8 @@ function createApp({config,provider,yoma,roleSkills,core,rootDir=__dirname,maxIn
   const liveConfigured=config.provider!=='local';
   const cardBase=String(publicUrl||config.publicUrl||('http://'+config.host+':'+config.port)).replace(/\/+$/,'');
   const cardRouter=card?createCardRouter({config,accountSource:card.accountSource,provider,store:card.store,key:card.key,yoma,publicUrl:cardBase,now,random:card.random,readJSONBody,maxInFlight,outbox:card.outbox??null,transcriber:card.transcriber}):null;
+  const cvRouter=createCvRouter({config,provider,core,yoma,roleSkills,accountSource:card?.accountSource??createAccountSource({config,yoma,now}),
+    cardStore:card?.store??null,vouchStore:cardRouter?.vouch?.vouchStore??null,chipSkills:require('./data/chip-skills.json'),now,readJSONBody,maxInFlight});
   let localProvider=provider&&provider.name==='local'?provider:null;
   const getLocalProvider=()=>{
     if(!localProvider)localProvider=createLocalProvider(core);
@@ -268,6 +273,8 @@ function createApp({config,provider,yoma,roleSkills,core,rootDir=__dirname,maxIn
       if(req.method!=='GET'&&req.method!=='HEAD')return sendError(res,405,'method_not_allowed',MESSAGES.methodNotAllowed,false,{allow:'GET, HEAD'});
       return opportunities(res,url);
     }
+    const cv=cvRouter.handle(req,res,url);
+    if(cv){await cv;return;}
     if(cardRouter){
       const handled=cardRouter.handle(req,res,url);
       if(handled){await handled;return;}
@@ -285,6 +292,7 @@ function createApp({config,provider,yoma,roleSkills,core,rootDir=__dirname,maxIn
     });
   });
   server.card=cardRouter; // tests reach the YoVouch system as server.card.vouch
+  server.cv=cvRouter;
   return server;
 }
 
@@ -304,7 +312,6 @@ function main(){
   try{config=loadConfig();}catch(err){if(err?.code!=='config_invalid')throw err;console.error(err.message);process.exit(1);}
   const yoma=createYomaClient({baseUrl:config.yomaBase});
   const provider=createProvider(config,core);
-  const {createAccountSource}=require('./server/card/account.js');
   const {createCardStore}=require('./server/card/store.js');
   const {loadOrCreateKey}=require('./server/card/sign.js');
   const cardDir=path.join(__dirname,'data','cards');

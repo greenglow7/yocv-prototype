@@ -42,6 +42,23 @@
     reason_duplicate:'It repeats another line.',
     reason_over_limit:'It goes past the number of lines one entry can have.',
     reason_skill_not_in_menu:'It names a skill that is not on the list for this role.',
+    errEntries:'Add one to three pieces of work.',
+    errTitle:'Give the work a short title, 2 to 60 characters.',
+    errPlace:'Keep the place under 60 characters.',
+    errWhat:'Say what you did in 20 to 400 characters.',
+    errForWhom:'Choose who the work was for, or type it in under 80 characters.',
+    errFrequency:'Choose how often from the list.',
+    errMonths:'Check the months. The end needs a start, comes after it, and neither is after this month.',
+    errNumber:'Give a whole number from 0 to 100000, with a unit and a word for how sure you are.',
+    errOutcome:'Keep what was better under 200 characters.',
+    errConfirm:'Choose who could confirm this. A Yoma completion must be one you ticked.',
+    errRole:'Choose one of the listed roles.',
+    errInclude:'Tick only items from your Yoma record.',
+    errBody:'Some of what was sent is missing or not in the right form.',
+    errPersona:'Choose one of the sample accounts.',
+    errSession:'Your session ended. Open your Yoma record again.',
+    errYoma:'Yoma could not be reached. Try again in a moment.',
+    errBusy:'The server is busy, try again in a moment.',
     cvExperience:'Experience',cvSkills:'Skills',cvEducation:'Education',cvReferences:'References available on request'
   }};
   if(typeof module!=='undefined'&&module.exports)module.exports=COPY;else root.YoCVCopy=COPY;

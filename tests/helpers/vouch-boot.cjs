@@ -14,6 +14,7 @@ const {createCardStore}=require('../../server/card/store.js');
 const {loadOrCreateKey}=require('../../server/card/sign.js');
 const personas=require('../../server/card/personas.json');
 const roleSkills=require('../../data/role-skills.json');
+const chipSkills=require('../../data/chip-skills.json');
 
 const NOW=Date.parse('2026-11-16T14:40:12Z');
 const PUBLIC_URL='https://yocard.example';
@@ -28,14 +29,23 @@ function fakeYoma(){
   async opportunityInfo(id){const item=INFO[id];return {item:item?JSON.parse(JSON.stringify(item)):null,source:'live'};},
   async reachable(){return true;},async skillByName(){return {item:null,source:'live'};},async searchLearningOpportunities(){return {items:[],totalCount:0,source:'live'};}};
 }
+// The CV fake (plan Task 12): only skillByName changes. It knows every role menu name and chip skill name, each with a stable fake id.
+const SKILL_NAMES=new Set([...Object.values(roleSkills).flatMap(r=>r.skillNames||[]),...Object.values(chipSkills).flatMap(Object.values).flat()]);
+const slug=name=>String(name).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+function skillYoma(){
+ return {...fakeYoma(),async skillByName(name){
+  return {item:SKILL_NAMES.has(name)?{id:'skill-'+slug(name),name,infoURL:'https://skills.example/'+slug(name)}:null,source:'live'};
+ }};
+}
 
-async function bootVouch({env={},provider=null,clock={t:NOW},outbox,maxInFlight,transcriber}={}){
+// yoma replaces fakeYoma() when given; cv is merged into config.yocv ({serviceSecret:'s3cret'}).
+async function bootVouch({env={},provider=null,clock={t:NOW},outbox,maxInFlight,transcriber,yoma=fakeYoma(),cv={}}={}){
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'yovouch-'));
  const now=()=>clock.t;
  const config={...loadConfig({env,cwd:dir}),provider:'local',model:null,azure:null,openai:null,port:0,host:'127.0.0.1',yomaAccessToken:'',publicUrl:PUBLIC_URL};
  // env keys named like config.yovouch fields ({sim:true}, {gatewaySecret:'s3cret'}) override its defaults.
  config.yovouch={...config.yovouch,...Object.fromEntries(Object.entries(env).filter(([k])=>Object.hasOwn(config.yovouch,k)))};
- const yoma=fakeYoma();
+ config.yocv={...config.yocv,...cv};
  const store=createCardStore(dir,{now});
  const key=loadOrCreateKey(dir);
  const card={accountSource:createAccountSource({config,yoma,now}),store,key,outbox,transcriber};
@@ -72,4 +82,4 @@ async function publishPersona(base,personaId,{trade,area}={}){
  return {cardId:json.cardId,cardToken:json.cardToken,smsId:json.smsId,myUrl:json.myUrl,code:json.code,ownerSecret:json.ownerSecret};
 }
 
-module.exports={NOW,PUBLIC_URL,bootVouch,publishPersona,post,form,page,get,fakeYoma};
+module.exports={NOW,PUBLIC_URL,bootVouch,publishPersona,post,form,page,get,raw,ok,skillYoma,fakeYoma};
