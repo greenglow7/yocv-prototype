@@ -5,6 +5,7 @@ const fs=require('node:fs');
 const os=require('node:os');
 const path=require('node:path');
 const {buildCv,renderCvHtml,buildCvText,buildCvRecord,renderRecordHtml}=require('../core.js');
+const core=require('../core.js');
 const {readCvRecord}=require('../server/cv/record.js');
 const {createAccountSource}=require('../server/card/account.js');
 const {loadConfig}=require('../server/config.js');
@@ -138,4 +139,18 @@ test('the record keeps each decision, the profile, the mode for every generation
   for(const x of ['+27735550147','thandi@example.org','Cape Town','2002-03-15','9001015009087','Lagos'])assert.ok(!json.includes(x)&&!html.includes(x),x);
   assert.ok(html.indexOf('Sample mode')<html.indexOf('<h1'),'the mode label comes first');
   assert.ok(html.includes(copy.reason_invented_number)&&html.includes('Vouched by a customer, confirmed by them, not by Yoma'));
+});
+test('HTML export escapes executable-looking user content',()=>{
+ assert.equal(typeof core.escapeHTML,'function');
+ assert.equal(core.escapeHTML('<img src=x onerror="alert(1)">'), '&lt;img src=x onerror=&quot;alert(1)&quot;&gt;');
+});
+test('shortQuote truncates long quotes for display and leaves short ones alone',()=>{
+ assert.equal(typeof core.shortQuote,'function');
+ const long='a'.repeat(300);
+ const short=core.shortQuote(long);
+ assert.equal(short.length,241);
+ assert.equal(short,'a'.repeat(240)+'…');
+ assert.equal(core.shortQuote('short quote'),'short quote');
+ assert.equal(core.shortQuote('abcdef',3),'abc…');
+ assert.equal(core.shortQuote(undefined),'');
 });

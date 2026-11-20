@@ -1,7 +1,6 @@
 'use strict';
 // Provider factory: picks the adapter from config.provider.
 const {ProviderError,messages}=require('./errors.js');
-const {buildSchema,validateOutput,buildMessages}=require('./schema.js');
 const {createAzureProvider}=require('./azure-openai.js');
 const {createOpenAICompatibleProvider}=require('./openai-compatible.js');
 const {createLocalProvider}=require('./local.js');
@@ -14,4 +13,4 @@ function createProvider(config,core,deps={}){
   throw new Error('Unknown provider "'+String(kind)+'"; expected azure-openai, openai-compatible or local.');
 }
 
-module.exports={createProvider,createAzureProvider,createOpenAICompatibleProvider,createLocalProvider,ProviderError,messages,buildSchema,validateOutput,buildMessages};
+module.exports={createProvider,createAzureProvider,createOpenAICompatibleProvider,createLocalProvider,ProviderError,messages};

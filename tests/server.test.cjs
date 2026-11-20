@@ -1,16 +1,15 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const path=require('node:path');
+const fs=require('node:fs');
 const core=require('../core.js');
 const {YomaUnavailable}=require('../server/yoma.js');
-const {ProviderError}=require('../server/providers/errors.js');
+const {createLocalProvider}=require('../server/providers/local.js');
 let serverModule={}; try {serverModule=require('../server.js')}catch{}
 const {createApp}=serverModule;
 
 const rootDir=path.join(__dirname,'..');
 const roleSkills=require('../data/role-skills.json');
-const experience='I helped customers find products and packed orders at my aunt’s shop.\nI counted the cash at the end of the day.';
-const body={role:'Retail assistant',experience,context:'Family shop',dates:'School holidays, 2025'};
 const skillTable={
  'Customer Service':{id:'448bb36e-6e5a-4c5a-9150-78703666c37a',name:'Customer Service',infoURL:'https://lightcast.io/skills/customer-service'},
  'Cash Handling':{id:'cash-1',name:'Cash Handling',infoURL:'https://lightcast.io/skills/cash-handling'}
@@ -57,10 +56,6 @@ async function boot({config=liveConfig,provider=fakeProvider(good),yoma=fakeYoma
 }
 test.after(()=>{for(const s of servers){s.closeAllConnections();s.close();}});
 
-async function post(base,payload,init={}){
- return fetch(base+'/api/generate',{method:'POST',headers:{'content-type':'application/json'},body:typeof payload==='string'?payload:JSON.stringify(payload),...init});
-}
-
 test('GET /api/status reports live mode, provider, model and Yoma reachability',async()=>{
  const {base,yoma}=await boot();
  const res=await fetch(base+'/api/status');
@@ -80,193 +75,6 @@ test('GET /api/status reports sample mode with the local provider',async()=>{
  const {base}=await boot({config:localConfig,provider:{name:'local',model:null,async generate(){return {output:{experience:[],skills:[]}};}},yoma:fakeYoma({reachable:false})});
  const json=await (await fetch(base+'/api/status')).json();
  assert.deepEqual({mode:json.mode,provider:json.provider,model:json.model,reachable:json.yoma.reachable},{mode:'sample',provider:'local',model:null,reachable:false});
-});
-
-test('POST /api/generate returns 400 invalid_input for a short experience with core wording',async()=>{
- const {base,provider}=await boot();
- const res=await post(base,{...body,experience:'Shop work'});
- assert.equal(res.status,400);
- assert.equal(res.headers.get('cache-control'),'no-store');
- const json=await res.json();
- assert.equal(json.error.code,'invalid_input');
- assert.equal(json.error.retryable,false);
- assert.equal(json.error.message,'Tell us one concrete responsibility, such as who you helped and what you did.');
- assert.equal(provider.calls.length,0);
-});
-test('POST /api/generate rejects an experience over 4000 characters',async()=>{
- const {base}=await boot();
- const res=await post(base,{...body,experience:'I helped customers. '.repeat(250)});
- assert.equal(res.status,400);
- assert.equal((await res.json()).error.message,'Keep your experience under 4,000 characters for this demo.');
-});
-test('POST /api/generate rejects a role that differs only by case or whitespace (Review Focus 5)',async()=>{
- const {base,provider}=await boot();
- for(const role of ['retail assistant ','Retail Assistant','Retail assistant ',' Retail assistant','Barista']){
-  const res=await post(base,{...body,role});
-  assert.equal(res.status,400,'role '+JSON.stringify(role));
-  assert.equal((await res.json()).error.code,'invalid_input');
- }
- assert.equal(provider.calls.length,0);
-});
-test('POST /api/generate rejects context over 120 and dates over 100 characters',async()=>{
- const {base}=await boot();
- assert.equal((await post(base,{...body,context:'c'.repeat(121)})).status,400);
- assert.equal((await post(base,{...body,dates:'d'.repeat(101)})).status,400);
- assert.equal((await post(base,{...body,context:'c'.repeat(120),dates:'d'.repeat(100)})).status,200);
-});
-test('POST /api/generate rejects an unknown mode',async()=>{
- const {base}=await boot();
- const res=await post(base,{...body,mode:'turbo'});
- assert.equal(res.status,400);
- assert.equal((await res.json()).error.code,'invalid_input');
-});
-test('POST /api/generate returns 400 for a body over 64 KB and for a non-object JSON root (Review Focus 4)',async()=>{
- const {base,provider}=await boot();
- const big=JSON.stringify({...body,padding:'x'.repeat(70*1024)});
- const resBig=await post(base,big);
- assert.equal(resBig.status,400);
- assert.equal((await resBig.json()).error.code,'invalid_input');
- const resArray=await post(base,'[1,2,3]');
- assert.equal(resArray.status,400);
- assert.equal((await resArray.json()).error.code,'invalid_input');
- const resString=await post(base,'"hello"');
- assert.equal(resString.status,400);
- const resNull=await post(base,'null');
- assert.equal(resNull.status,400);
- const resBroken=await post(base,'{"role":');
- assert.equal(resBroken.status,400);
- assert.equal((await resBroken.json()).error.code,'invalid_input');
- assert.equal(provider.calls.length,0);
-});
-
-test('POST /api/generate returns 200 with claims and generation metadata',async()=>{
- const {base,provider}=await boot();
- const res=await post(base,body);
- assert.equal(res.status,200);
- assert.equal(res.headers.get('cache-control'),'no-store');
- const json=await res.json();
- assert.ok(Array.isArray(json.claims));
- assert.deepEqual(json.claims.map(c=>c.kind),['experience','experience','skill']);
- assert.equal(json.claims[0].text,'Helped customers find products in a family shop.');
- assert.equal(json.claims[0].generated,'model');
- assert.deepEqual(json.claims[2].yomaSkill,skillTable['Customer Service']);
- assert.equal(json.generation.mode,'live');
- assert.equal(json.generation.provider,'azure-openai');
- assert.equal(json.generation.model,'gpt-4.1-mini');
- assert.ok(!Number.isNaN(Date.parse(json.generation.generatedAt)));
- assert.equal(typeof json.generation.durationMs,'number');
- assert.equal(json.generation.skillMenuSize,2);
- assert.equal(json.generation.skillMenuSource,'live');
- assert.deepEqual(json.generation.rejected,[{kind:'experience',text:'Managed 2 tills every day.',reason:'invented_number'}]);
- assert.equal(provider.calls.length,1);
-});
-test('POST /api/generate forwards only role, context, dates, experience and the menu to the provider',async()=>{
- const {base,provider}=await boot();
- const res=await post(base,{...body,profile:{name:'Amina',email:'a@example.com'},name:'Amina',email:'a@example.com',phone:'123',city:'Durban'});
- assert.equal(res.status,200);
- const input=provider.calls[0].input;
- assert.deepEqual(Object.keys(input).sort(),['context','dates','experience','menuNames','role','skillMenu']);
- assert.ok(!JSON.stringify(input).includes('Amina'));
- assert.ok(!JSON.stringify(input).includes('example.com'));
-});
-test('POST /api/generate with mode sample uses the local provider even when a live provider is configured',async()=>{
- const {base,provider}=await boot();
- const res=await post(base,{...body,mode:'sample'});
- assert.equal(res.status,200);
- const json=await res.json();
- assert.equal(json.generation.mode,'sample');
- assert.equal(json.generation.provider,'local');
- assert.equal(json.generation.model,null);
- assert.ok(json.claims.length>0);
- assert.ok(json.claims.every(c=>c.generated==='local'));
- assert.equal(provider.calls.length,0);
-});
-test('POST /api/generate with mode live and a local config returns 502 provider_not_configured',async()=>{
- const {base}=await boot({config:localConfig,provider:{name:'local',model:null,async generate(){throw new Error('must not be called');}}});
- const res=await post(base,{...body,mode:'live'});
- assert.equal(res.status,502);
- const json=await res.json();
- assert.equal(json.error.code,'provider_not_configured');
- assert.equal(json.error.retryable,false);
- assert.equal(typeof json.error.message,'string');
-});
-test('POST /api/generate without mode on a local config runs the configured local provider',async()=>{
- const provider=fakeProvider({experience:[good.experience[0]],skills:[]},{name:'local',model:null});
- const {base}=await boot({config:localConfig,provider});
- const res=await post(base,body);
- assert.equal(res.status,200);
- const json=await res.json();
- assert.equal(json.generation.mode,'sample');
- assert.equal(json.generation.provider,'local');
- assert.equal(json.generation.model,null);
- assert.equal(json.claims.length,1);
- assert.equal(json.claims[0].generated,'local');
- assert.equal(provider.calls.length,1);
-});
-test('POST /api/generate maps a ProviderError to 502 with code and retryable, never leaking details',async()=>{
- const {base}=await boot({provider:fakeProvider(new ProviderError('provider_timeout',undefined,{retryable:true}))});
- const res=await post(base,body);
- assert.equal(res.status,502);
- const json=await res.json();
- assert.deepEqual(Object.keys(json),['error']);
- assert.equal(json.error.code,'provider_timeout');
- assert.equal(json.error.retryable,true);
- assert.equal(json.error.message,'The AI service did not answer in time. You can retry or continue in sample mode.');
- const auth=await boot({provider:fakeProvider(new ProviderError('provider_auth','key sk-secret-123 rejected',{retryable:false}))});
- const authJson=await (await post(auth.base,body)).json();
- assert.equal(authJson.error.code,'provider_auth');
- assert.equal(authJson.error.retryable,false);
-});
-test('POST /api/generate returns 200 with empty claims when nothing grounded survives (Review Focus 1)',async()=>{
- const output={experience:[{text:'Managed shop accounts.',sourceQuote:'managed the shop accounts',reason:'r'}],skills:[]};
- const {base}=await boot({provider:fakeProvider(output)});
- const res=await post(base,{...body,experience:'I swept the floor every morning.'});
- assert.equal(res.status,200);
- const json=await res.json();
- assert.deepEqual(json.claims,[]);
- assert.equal(json.generation.rejected[0].reason,'quote_not_in_source');
-});
-test('POST /api/generate rejects a numbers-only experience as invalid input',async()=>{
- const {base}=await boot({provider:fakeProvider({experience:[],skills:[]})});
- const res=await post(base,{...body,experience:'2024 2025 2026 2027 2028 2029'});
- assert.equal(res.status,400);
- assert.equal((await res.json()).error.code,'invalid_input');
-});
-test('POST /api/generate returns 500 internal_error for an unexpected failure',async()=>{
- const {base}=await boot({provider:fakeProvider(new TypeError('boom'))});
- const res=await post(base,body);
- assert.equal(res.status,500);
- const json=await res.json();
- assert.equal(json.error.code,'internal_error');
- assert.ok(!json.error.message.includes('boom'));
-});
-test('a fifth concurrent generate gets 503 busy while four are in flight',async()=>{
- let release;
- const gate=new Promise(resolve=>{release=resolve;});
- const provider=fakeProvider(good,{gate});
- const {base}=await boot({provider});
- const first=[1,2,3,4].map(()=>post(base,body));
- while(provider.calls.length<4)await new Promise(r=>setTimeout(r,5));
- const fifth=await post(base,body);
- assert.equal(fifth.status,503);
- const json=await fifth.json();
- assert.deepEqual(json.error,{code:'busy',message:'The server is busy, try again in a moment.',retryable:true});
- release();
- const statuses=(await Promise.all(first)).map(r=>r.status);
- assert.deepEqual(statuses,[200,200,200,200]);
- const after=await post(base,body);
- assert.equal(after.status,200);
-});
-test('a failing generate frees its in-flight slot',async()=>{
- const {base}=await boot({provider:fakeProvider(new ProviderError('provider_error',undefined,{retryable:true})),maxInFlight:1});
- assert.equal((await post(base,body)).status,502);
- assert.equal((await post(base,body)).status,502);
-});
-test('GET /api/generate is not allowed',async()=>{
- const {base}=await boot();
- const res=await fetch(base+'/api/generate');
- assert.equal(res.status,405);
- assert.equal(res.headers.get('allow'),'POST');
 });
 
 test('GET /api/yoma/opportunities returns completable items from the first phrase with results',async()=>{
@@ -342,10 +150,11 @@ test('static allowlist serves the app files with content types',async()=>{
   assert.equal(js.status,200,file);
   assert.match(js.headers.get('content-type'),/javascript/);
  }
- const fixture=await fetch(base+'/data/sample-credential.json');
- assert.equal(fixture.status,200);
- assert.match(fixture.headers.get('content-type'),/application\/json/);
- assert.equal((await fixture.json()).id,'sample-credential-atingi-digital-skills');
+ for(const file of ['/cv-copy.js','/cv-rules.js']){
+  const js=await fetch(base+file);
+  assert.equal(js.status,200,file);
+  assert.match(js.headers.get('content-type'),/javascript/);
+ }
  const query=await fetch(base+'/index.html?v=1');
  assert.equal(query.status,200);
 });
@@ -363,4 +172,16 @@ test('HEAD works for static files and POST to a static path is rejected',async()
  assert.equal(await head.text(),'');
  const res=await fetch(base+'/index.html',{method:'POST'});
  assert.equal(res.status,405);
+});
+test('the old flow is gone',async()=>{
+  const {base}=await boot({config:localConfig});
+  // the file's post() helper always targets /api/generate and is deleted with those cases, so fetch directly
+  const res=await fetch(base+'/api/generate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({role:'Retail assistant',experience:'x'})});
+  assert.equal(res.status,404);
+  assert.equal((await fetch(base+'/data/sample-credential.json')).status,404);
+  assert.ok(!fs.existsSync(path.join(rootDir,'server/generation.js'))&&!fs.existsSync(path.join(rootDir,'data/sample-credential.json')));
+  for(const name of ['localExperienceClaims','generateClaims','buildTextCV','setCredential'])assert.equal(require('../core.js')[name],undefined,name);
+  for(const name of ['escapeHTML','shortQuote'])assert.equal(typeof require('../core.js')[name],'function',name);
+  assert.doesNotThrow(()=>createLocalProvider(require('../core.js')));
+  assert.equal(typeof createLocalProvider(require('../core.js')).generate,'undefined');
 });

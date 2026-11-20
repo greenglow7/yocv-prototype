@@ -1,9 +1,9 @@
 'use strict';
 // OpenAI-compatible chat completions adapter (spec §5.4) and the shared HTTP
-// logic (callChatCompletions, completionToOutput, createChatProvider) that the
-// Azure adapter reuses, so retry, timeout and error mapping exist once.
+// logic (callChatCompletions, createChatProvider) that the Azure adapter
+// reuses, so retry, timeout and error mapping exist once.
 const {ProviderError,messages}=require('./errors.js');
-const {buildSchema,validateOutput,buildMessages,menuNamesOf,CV_SCHEMA_NAME,buildCvSchema,buildCvMessages}=require('./schema.js');
+const {CV_SCHEMA_NAME,buildCvSchema,buildCvMessages}=require('./schema.js');
 const {matchesSchema}=require('./schema-check.js');
 
 const RETRY_DELAY_MS=1500;
@@ -76,14 +76,6 @@ function completionToJson(json){
   try{return JSON.parse(message.content);}catch{throw bad();}
 }
 
-// Extracts and validates choices[0].message.content against the strict YoCV shape.
-function completionToOutput(json,menuNames){
-  const output=completionToJson(json);
-  const check=validateOutput(output,menuNames);
-  if(!check.ok)throw new ProviderError('provider_bad_output',messages.provider_bad_output,{retryable:true,status:200});
-  return output;
-}
-
 // json_object mode (spec 8): the schema goes into the first system message,
 // or into a new one at the front when the chat has none.
 const SCHEMA_PROMPT='Reply with one JSON object only. It must match this JSON Schema:\n';
@@ -100,18 +92,6 @@ function createChatProvider({name,model,url,headers,bodyExtra={},structuredOutpu
   const provider={
     name,
     model,
-    async generate(input,{signal}={}){
-      const menuNames=menuNamesOf(input);
-      const body={
-        ...bodyExtra,
-        messages:buildMessages(input),
-        response_format:{type:'json_schema',json_schema:{name:'yocv_claims',strict:true,schema:buildSchema(menuNames)}},
-        temperature:0.2,
-        max_tokens:800
-      };
-      const json=await callChatCompletions({url,headers,body,fetch,sleep,timeoutMs,signal});
-      return {output:completionToOutput(json,menuNames)};
-    },
     // Generic structured completion (YoCard draft pipeline): the caller owns
     // the messages and the strict schema; this only transports and parses.
     async complete({schemaName,schema,messages:chat,maxTokens=900,temperature=0.2}={},{signal}={}){
@@ -130,7 +110,7 @@ function createChatProvider({name,model,url,headers,bodyExtra={},structuredOutpu
       return output;
     },
     // CV bullets for one masked entry (spec 8), checked against the CV schema in both modes.
-    // With no menu an empty skills list is tolerated, as validateOutput does for claims.
+    // With no menu an empty skills list is tolerated.
     async cvBullets(input,{signal}={}){
       const schema=buildCvSchema(input?.menuNames);
       const output=await provider.complete({schemaName:CV_SCHEMA_NAME,schema,messages:buildCvMessages(input),maxTokens:600},{signal});
@@ -156,4 +136,4 @@ function createOpenAICompatibleProvider(openaiConfig,deps={}){
   },deps);
 }
 
-module.exports={createOpenAICompatibleProvider,createChatProvider,callChatCompletions,completionToOutput,completionToJson,RETRY_DELAY_MS};
+module.exports={createOpenAICompatibleProvider,createChatProvider,callChatCompletions,completionToJson,RETRY_DELAY_MS};

@@ -1,8 +1,7 @@
 'use strict';
-/* YoCV HTTP server (spec §4): serves the buildless frontend from a static allowlist and exposes three
-   JSON routes. Dependency free: node:http, node:fs, node:path only.
+/* YoCV HTTP server (spec §4): serves the buildless frontend from a static allowlist and exposes two
+   JSON routes of its own. Dependency free: node:http, node:fs, node:path only.
      GET  /api/status                      mode, provider, model, Yoma reachability
-     POST /api/generate                    grounded claim generation (live or sample)
      GET  /api/yoma/opportunities?role=    Yoma learning opportunities for a role
    The YoCV routes (GET /api/cv/config|menu, POST /api/cv/record|review|check|skills) live in server/cv/routes.js.
    YoCard (Phase 2) routes live in server/card/routes.js and are mounted when createApp receives `card` deps:
@@ -15,18 +14,12 @@
 const http=require('node:http');
 const fs=require('node:fs/promises');
 const path=require('node:path');
-const {runGeneration}=require('./server/generation.js');
-const {ProviderError}=require('./server/providers/errors.js');
-const {createLocalProvider}=require('./server/providers/local.js');
 const {createCardRouter}=require('./server/card/routes.js');
 const {createAccountSource}=require('./server/card/account.js');
 const {createCvRouter}=require('./server/cv/routes.js');
 
 const MAX_BODY_BYTES=64*1024;
-const MAX_CONTEXT=120;
-const MAX_DATES=100;
 const MAX_OPPORTUNITIES=4;
-const MODES=new Set(['live','sample']);
 
 // Static allowlist: URL path -> file relative to rootDir. Exact matches only.
 const STATIC={
@@ -41,8 +34,7 @@ const STATIC={
   '/card.js':'card.js',
   '/card.css':'card.css',
   '/thread.html':'thread.html',
-  '/thread.js':'thread.js',
-  '/data/sample-credential.json':'data/sample-credential.json'
+  '/thread.js':'thread.js'
 };
 const CONTENT_TYPES={
   '.html':'text/html; charset=utf-8',
@@ -53,11 +45,6 @@ const CONTENT_TYPES={
 
 const MESSAGES={
   role:'Choose one of the listed roles.',
-  experienceShort:'Tell us one concrete responsibility, such as who you helped and what you did.',
-  experienceLong:'Keep your experience under 4,000 characters for this demo.',
-  context:'Keep the context under '+MAX_CONTEXT+' characters.',
-  dates:'Keep the dates under '+MAX_DATES+' characters.',
-  mode:'mode must be "live" or "sample".',
   body:'Send a JSON object with role, experience, context and dates.',
   bodyTooLarge:'The request body must be under 64 KB.',
   busy:'The server is busy, try again in a moment.',
@@ -84,7 +71,6 @@ function sendJSON(res,status,payload,extraHeaders={}){
 function sendError(res,status,code,message,retryable,extraHeaders){
   sendJSON(res,status,{error:{code,message,retryable:Boolean(retryable)}},extraHeaders);
 }
-function isPlainObject(value){return value!==null&&typeof value==='object'&&!Array.isArray(value);}
 function isUnavailable(err){return err?.code==='yoma_unavailable'||err?.name==='YomaUnavailable';}
 
 // Reads a JSON body of at most MAX_BODY_BYTES. Resolves the parsed value; rejects with InputError when
@@ -136,26 +122,6 @@ function readRawBody(req,maxBytes){
   });
 }
 
-// Validates the generate request. `role` must equal a roleSkills key exactly (no trimming, no case folding).
-// Experience uses the same rule and wording as core.localExperienceClaims.
-function validateGenerateInput(payload,roleKeys){
-  if(!isPlainObject(payload))throw new InputError(MESSAGES.body);
-  const {role,experience,context,dates,mode}=payload;
-  if(typeof role!=='string'||!roleKeys.includes(role))throw new InputError(MESSAGES.role);
-  if(typeof experience!=='string')throw new InputError(MESSAGES.experienceShort);
-  const trimmed=experience.trim();
-  if(trimmed.length<12||trimmed.split(/\s+/).length<3)throw new InputError(MESSAGES.experienceShort);
-  if((trimmed.match(/\p{L}{2,}/gu)||[]).length<3)throw new InputError(MESSAGES.experienceShort); // numbers or symbols alone are not a responsibility
-  if(trimmed.length>4000)throw new InputError(MESSAGES.experienceLong);
-  if(context!==undefined&&context!==null&&typeof context!=='string')throw new InputError(MESSAGES.context);
-  if(dates!==undefined&&dates!==null&&typeof dates!=='string')throw new InputError(MESSAGES.dates);
-  const ctx=String(context??'').trim(),dt=String(dates??'').trim();
-  if(ctx.length>MAX_CONTEXT)throw new InputError(MESSAGES.context);
-  if(dt.length>MAX_DATES)throw new InputError(MESSAGES.dates);
-  if(mode!==undefined&&mode!==null&&!MODES.has(mode))throw new InputError(MESSAGES.mode);
-  return {input:{role,experience:trimmed,context:ctx,dates:dt},mode:mode??null};
-}
-
 // `card` = {accountSource, store, key, outbox?, transcriber?, random?} mounts the YoCard and YoVouch routes
 // (main() builds them from config; tests inject fakes). Without it the card routes are absent and only the Phase 1 routes answer.
 function createApp({config,provider,yoma,roleSkills,core,rootDir=__dirname,maxInFlight=4,card=null,publicUrl=null,now=Date.now}={}){
@@ -167,12 +133,6 @@ function createApp({config,provider,yoma,roleSkills,core,rootDir=__dirname,maxIn
   const cardRouter=card?createCardRouter({config,accountSource:card.accountSource,provider,store:card.store,key:card.key,yoma,publicUrl:cardBase,now,random:card.random,readJSONBody,maxInFlight,outbox:card.outbox??null,transcriber:card.transcriber}):null;
   const cvRouter=createCvRouter({config,provider,core,yoma,roleSkills,accountSource:card?.accountSource??createAccountSource({config,yoma,now}),
     cardStore:card?.store??null,vouchStore:cardRouter?.vouch?.vouchStore??null,chipSkills:require('./data/chip-skills.json'),now,readJSONBody,maxInFlight});
-  let localProvider=provider&&provider.name==='local'?provider:null;
-  const getLocalProvider=()=>{
-    if(!localProvider)localProvider=createLocalProvider(core);
-    return localProvider;
-  };
-  let inFlight=0;
 
   async function status(res){
     let reachable=false;
@@ -183,36 +143,6 @@ function createApp({config,provider,yoma,roleSkills,core,rootDir=__dirname,maxIn
       model:liveConfigured?(provider?.model??config.model??null):null,
       yoma:{reachable,baseUrl:String(config.yomaBase??yoma?.baseUrl??''),checkedAt:new Date().toISOString()}
     });
-  }
-
-  async function generate(req,res){
-    let validated;
-    try{
-      const payload=await readJSONBody(req);
-      validated=validateGenerateInput(payload,roleKeys);
-    }catch(err){
-      if(err instanceof InputError)return sendError(res,400,'invalid_input',err.message,false);
-      throw err;
-    }
-    const {input,mode}=validated;
-    let chosen;
-    if(mode==='sample')chosen=getLocalProvider();
-    else if(mode==='live'&&!liveConfigured)return sendError(res,502,'provider_not_configured',new ProviderError('provider_not_configured').message,false);
-    else chosen=liveConfigured?provider:getLocalProvider();
-
-    if(inFlight>=maxInFlight)return sendError(res,503,'busy',MESSAGES.busy,true);
-    inFlight++;
-    try{
-      const result=await runGeneration({input,provider:chosen,yoma,roleSkills,core});
-      sendJSON(res,200,result);
-    }catch(err){
-      if(err instanceof ProviderError||(err&&typeof err.code==='string'&&err.code.startsWith('provider_'))){
-        return sendError(res,502,err.code,err.message,err.retryable);
-      }
-      throw err;
-    }finally{
-      inFlight--;
-    }
   }
 
   async function opportunities(res,url){
@@ -264,10 +194,6 @@ function createApp({config,provider,yoma,roleSkills,core,rootDir=__dirname,maxIn
     if(pathname==='/api/status'){
       if(req.method!=='GET'&&req.method!=='HEAD')return sendError(res,405,'method_not_allowed',MESSAGES.methodNotAllowed,false,{allow:'GET, HEAD'});
       return status(res);
-    }
-    if(pathname==='/api/generate'){
-      if(req.method!=='POST')return sendError(res,405,'method_not_allowed',MESSAGES.methodNotAllowed,false,{allow:'POST'});
-      return generate(req,res);
     }
     if(pathname==='/api/yoma/opportunities'){
       if(req.method!=='GET'&&req.method!=='HEAD')return sendError(res,405,'method_not_allowed',MESSAGES.methodNotAllowed,false,{allow:'GET, HEAD'});
@@ -330,6 +256,6 @@ function main(){
   process.on('SIGTERM',shutdown);
 }
 
-module.exports={createApp,banner,validateGenerateInput,readJSONBody,readRawBody,STATIC,MAX_BODY_BYTES};
+module.exports={createApp,banner,readJSONBody,readRawBody,STATIC,MAX_BODY_BYTES};
 
 if(require.main===module)main();
