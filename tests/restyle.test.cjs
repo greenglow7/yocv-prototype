@@ -65,7 +65,8 @@ test('the step heading moves into the band and receives focus there',()=>{
   assert.ok(s.includes("document.querySelector('#page-band h1')?.focus("),f+' focuses the band h1');
   assert.ok(!s.includes("view.querySelector('h1')?.focus("),f+' no longer focuses the view h1');
  }
- assert.ok(read('app.js').includes('work you have <span class="hl">already done</span>'),'landing highlight');
+ assert.match(read('app.js'),/querySelector\('h1\.step-title'\)/);
+ assert.ok(!read('app.js').includes('class="hl"'));
  assert.ok(!read('card.js').includes('class="hl"'),'no highlight in YoCard');
 });
 

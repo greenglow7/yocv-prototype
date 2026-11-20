@@ -423,6 +423,21 @@
     s+='<h2>'+E(copy.learningHeading)+'</h2>'+ul((record.learning||[]).map(l=>li(E(l.line)+(l.skills.length?' '+E(fill(copy.recordLearningSkills,{skills:l.skills.join(', ')})):''))));
     return s+'</article>';
   }
-  const api={labels,credential,MONTHS,WEEKDAYS,escapeHTML,shortQuote,setCredential,localExperienceClaims,evidenceClaims,generateClaims,reviewClaim,canExport,buildTextCV,buildEvidence,contactsIn,numbersIn,allowedNumbers,properNouns,maskNames,restoreNames,checkCvText,monthLabel,monthsBetween,templateBullet,profileLine,buildCv,renderCvHtml,buildCvText,buildCvRecord,renderRecordHtml};
+  // The app state (plan Shared shapes, CvState): every field empty, null or 0.
+  function newCvState(){
+    return {step:0,maxStep:0,sessionId:null,selector:null,record:null,role:'',include:{completions:[],credentials:[],selfAttested:[]},entries:[],
+      contact:{name:'',phone:'',email:'',town:'',education:''},optional:{photo:'',dateOfBirth:'',idNumber:'',stateOfOrigin:''},
+      review:null,decisions:{},handAdded:[],skills:[],profile:null,generation:null,offline:false};
+  }
+  // The body of POST /api/cv/review. Each entry goes without its place; contact and optional fields never go.
+  // knownWords lists the words of every place, the name and the town once each, only so the server can mask them.
+  function reviewPayload(state){
+    const words=v=>String(v??'').split(/[\s,]+/).filter(Boolean),c=state.contact||{};
+    const entries=(state.entries||[]).map(e=>({title:e.title,what:e.what,forWhom:e.forWhom,frequency:e.frequency,months:{start:e.months?.start??'',end:e.months?.end??''},
+      number:e.number?{value:e.number.value,unit:e.number.unit,hedge:e.number.hedge}:null,outcome:e.outcome,confirm:{...e.confirm}}));
+    const knownWords=[...new Set([...(state.entries||[]).flatMap(e=>words(e.place)),...words(c.name),...words(c.town)])];
+    return {sessionId:state.sessionId,role:state.role,include:state.include,entries,knownWords};
+  }
+  const api={labels,credential,MONTHS,WEEKDAYS,escapeHTML,shortQuote,setCredential,localExperienceClaims,evidenceClaims,generateClaims,reviewClaim,canExport,buildTextCV,buildEvidence,contactsIn,numbersIn,allowedNumbers,properNouns,maskNames,restoreNames,checkCvText,monthLabel,monthsBetween,templateBullet,profileLine,buildCv,renderCvHtml,buildCvText,buildCvRecord,renderRecordHtml,newCvState,reviewPayload};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.YoCV=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
