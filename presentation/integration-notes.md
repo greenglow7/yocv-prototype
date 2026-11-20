@@ -1,5 +1,7 @@
 # YoCV integration notes (Week 6)
 
+The credential CV of 2026-11-19 has its own Yoma integration pack: start at [`integration/yoma/README.md`](../integration/yoma/README.md). It maps the four steps onto Yoma's API and web code at the paths they would take there. The Week 6 notes below describe the earlier story flow, which this build removed; `server/generation.js` and `data/sample-credential.json` no longer exist.
+
 ## What changed since the midterm
 
 | Midterm | Week 6 |

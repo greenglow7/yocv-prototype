@@ -148,3 +148,25 @@ Open issues from this pass:
 5. **Live model and live transcription not exercised** (no key on this machine), so the live half of beat 3 and the voice-note path are untested against a provider.
 
 Final automated count after YoVouch: `npm test` → 503 tests, 501 pass, 0 fail, 2 skipped (the two live model tests in `tests/live.test.cjs`, skipped without a model key; the live transcription check is a subtest inside one of them; the two live Yoma tests ran against api.yoma.world).
+
+# YoCV credential CV, 2026-11-19
+
+Environment: macOS, Node v25.8.1, Yoma production API reachable, Ollama 0.40.16 on the same laptop with `qwen3.5:9b` already installed (nothing pulled). No Azure key. The model runs passed the provider values in the process environment; `.env` was not changed. The banner lines below drop the local cards path.
+
+| # | Scenario | Result |
+| --- | --- | --- |
+| 1 | Suite, online: `npm test` | Pass. `ℹ tests 559`, `ℹ pass 557`, `ℹ fail 0`, `ℹ skipped 2` (the two live model tests, skipped without a model key; the two live Yoma tests and the taxonomy subtest ran against api.yoma.world). |
+| 2 | Suite, offline switch: `YOCV_LIVE_YOMA=0 npm test` | Pass. `ℹ tests 558`, `ℹ pass 554`, `ℹ fail 0`, `ℹ skipped 4` (the taxonomy subtest is not registered under its skipped parent, so the count is one lower). |
+| 3 | Live taxonomy subtest: `node --test tests/live.test.cjs`, no model key | Pass. "every role menu name and chip skill name resolves exactly in the taxonomy" took 13.3 s; the Customer Service lookup and the Retail assistant opportunities passed; the two model tests were skipped (no key): tests 5, pass 3, fail 0, skipped 2. |
+| 4 | The four steps at 360 px | controller |
+| 5 | Print preview at A4 and Letter, three entries on one page | controller |
+| 6 | The offline path (opened from disk, and the server stopped after load) | controller |
+| 7 | The six-minute demo once, end to end | controller |
+| 8 | Ollama run, shipped server: `MODEL_PROVIDER=openai`, `OPENAI_BASE_URL=http://localhost:11434/v1`, `OPENAI_API_KEY=ollama`, `OPENAI_MODEL=qwen3.5:9b`, `OPENAI_STRUCTURED_OUTPUT=json_object`, `npm start` on a free port | Failed. Banner: `YoCV server on http://127.0.0.1:4180 · mode: live · provider: openai-compatible · model: qwen3.5:9b · Yoma: https://api.yoma.world/api/v3 · YoCard: sample accounts, cards in <repo>/data/cards`. `GET /api/cv/config` gave mode live. Thandi's record read, two completions and their two credentials ticked, Hairdresser, the Braiding at home entry from `tests/fixtures/cv-thandi.json`. `POST /api/cv/review` answered 502 `provider_timeout` after 20.3 s. The same with `json_schema`. `qwen3.5:9b` reasons before it answers: a logging pass-through showed the reasoning call took 74.9 s and returned empty content. With reasoning turned off (`reasoning_effort: "none"`, added by the pass-through, not by the adapter) the call took 28.4 s, still past the 20 s deadline. |
+| 9 | Ollama run, diagnostic: as row 8 through the pass-through with reasoning turned off, and a copy of `server.js` `main()` in a scratch script that passes `timeoutMs: 120000` to the provider factory. No repository file changed | Pass, in both modes. `json_object`: review 200 in 24.8 s, generation `{mode: live, provider: openai-compatible, model: qwen3.5:9b}`. Two model lines, each through every check: "Braided hair for about 40 customers a week at home." and "Served customers who returned every month." `json_schema`: review 200 in 14.8 s, the same first line and "Served returning customers who came back every month.", and one proposed skill refused as `quote_not_found`. Skills in both: Cosmetics and Customer Service `Confirmed from Yoma`, Hairstyling `Vouched by a customer, confirmed by them, not by Yoma`. The evidence record's mode label reads `Live AI · qwen3.5:9b` and names provider `openai-compatible` and the model. So `json_object` was not needed with this Ollama version: `json_schema` worked and was faster here. The live model smoke tests through the same pass-through still timed out at the shipped 20 s (27.7 s). Both evidence records, and a sample-mode record of the same entry, were saved under the git-ignored `reports/`. |
+| 10 | Azure run | Not run, no key. Without an Azure key, the Ollama run and the unit-tested Azure adapter are what is shown. |
+
+Open issues from this pass:
+
+1. **The local model beat does not fit the deadline.** On this laptop `qwen3.5:9b` cannot answer inside the adapter's fixed 20 s, and the adapter cannot turn a model's reasoning off. Either use a small instruct model without a reasoning pass for the demo (the `.env.example` model, `qwen2.5:3b-instruct`, is not installed here and was not pulled), or make the client deadline and the reasoning setting configurable in a later task.
+2. **The YoCV app has no client-side deadline.** On `main`, `app.js` ended each generation request after 30 s with a retryable error. The four-step `app.js` has no deadline, so the review waits for the server's answer (20 s per provider call, plus one retry on a network error, 429 or 5xx).
