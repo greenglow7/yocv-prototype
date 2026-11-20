@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Written to the Yoma repository's patterns by the YoCV prototype. Not compiled. -->
+  <!-- No new package. Flurl, Newtonsoft and the ASP.NET Core health check types come through the domain project. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\domain\Yoma.Core.Domain\Yoma.Core.Domain.csproj" />
+  </ItemGroup>
+
+</Project>
