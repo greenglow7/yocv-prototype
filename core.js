@@ -3,7 +3,8 @@
   const labels={self:'Self-reported',document:'Document awaiting verification',verified:'Issuer-recorded achievement · representative Yoma sample'};
   const builtInCredential={id:'credential-demo',title:'Introduction to digital skills',issuer:'Demo Learning Partner',date:'2026-09-12',dates:'September 2026',statement:'Completed Introduction to digital skills.',sourceLabel:'Demo Learning Partner',synthetic:true,sample:false};
   const credential={...builtInCredential};
-  const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const MONTHS=Object.freeze(['January','February','March','April','May','June','July','August','September','October','November','December']);
+  const WEEKDAYS=Object.freeze(['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']);
   function escapeHTML(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
   function shortQuote(text,max=240){
     const s=String(text??'');
@@ -13,7 +14,7 @@
   function monthYear(iso){
     const d=new Date(iso);
     if(Number.isNaN(d.getTime()))return '';
-    return months[d.getUTCMonth()]+' '+d.getUTCFullYear();
+    return MONTHS[d.getUTCMonth()]+' '+d.getUTCFullYear();
   }
   function setCredential(fixture){
     if(fixture!=null&&(typeof fixture!=='object'||!fixture.id||!fixture.title))throw new Error('A credential fixture needs an id and a title.');
@@ -116,6 +117,95 @@
     if(generation)record.generation={...generation};
     return record;
   }
-  const api={labels,credential,escapeHTML,shortQuote,setCredential,localExperienceClaims,evidenceClaims,generateClaims,reviewClaim,canExport,buildTextCV,buildEvidence};
+  // Spec 3 and spec 7 checks 1 and 2: contact details, numbers and proper nouns, read the same way in the browser and on the server.
+  const PLACEHOLDER=/\[(?:name|contact)\d+\]/g;
+  function contactsIn(text){
+    const s=String(text??''),out=[];
+    for(const m of s.matchAll(/\S+@\S+\.\S+/g)){
+      const lead=/^[("'<[]*/.exec(m[0])[0].length,raw=m[0].slice(lead).replace(/[.,;:!?)\]'">]+$/,'');
+      out.push({raw,index:m.index+lead});
+    }
+    // A run of digit groups is a phone from its first group on which 7 or more digits follow and that starts with + or 0,
+    // or is one group with no separator, so '2025 2026' is not a phone and '2025 071 000 0000' still finds it.
+    for(const m of s.matchAll(/\+?\d+(?:[ -]\d+)*/g)){
+      const parts=[...m[0].matchAll(/\+?\d+/g)];
+      const p=parts.find((p,g)=>{const tail=m[0].slice(p.index);return tail.replace(/\D/g,'').length>=7&&(/^[+0]/.test(tail)||g===parts.length-1);});
+      if(!p)continue;
+      const raw=m[0].slice(p.index),index=m.index+p.index;
+      if(!out.some(c=>index<c.index+c.raw.length&&c.index<index+raw.length))out.push({raw,index});
+    }
+    return out.sort((a,b)=>a.index-b.index);
+  }
+  const SMALL=['zero','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen'];
+  const TENS=['twenty','thirty','forty','fifty','sixty','seventy','eighty','ninety'];
+  const VAGUE=['dozens','hundreds','thousands'];
+  function numbersIn(text){
+    const s=String(text??''),out=[];
+    const spans=contactsIn(s).map(c=>[c.index,c.index+c.raw.length]).concat([...s.matchAll(PLACEHOLDER)].map(m=>[m.index,m.index+m[0].length]));
+    const free=i=>!spans.some(([a,b])=>i>=a&&i<b);
+    for(const m of s.matchAll(/\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?/g))if(free(m.index))out.push({value:Number(m[0].replace(/,/g,'')),raw:m[0],index:m.index});
+    const w=[...s.matchAll(/\p{L}+/gu)].filter(m=>free(m.index)).map(m=>({w:m[0].toLowerCase(),index:m.index,end:m.index+m[0].length}));
+    // The word at j when it follows word j-1 across a space or a hyphen only, so a comma ends a number.
+    const next=j=>j>0&&j<w.length&&/^(?:\s+|-)$/.test(s.slice(w[j-1].end,w[j].index))?w[j].w:null;
+    const below100=j=>{
+      const a=SMALL.indexOf(w[j].w);if(a>=0)return {v:a,n:1};
+      const t=TENS.indexOf(w[j].w);if(t<0)return null;
+      const u=SMALL.indexOf(next(j+1)??'');return u>=1&&u<=9?{v:20+10*t+u,n:2}:{v:20+10*t,n:1};
+    };
+    // After 'hundred' at j-1: an optional 'and' and a number below 100.
+    const hundred=(base,j)=>{
+      const r=next(j)==='and'&&next(j+1)?below100(j+1):null;if(r)return {v:base+r.v,n:3+r.n};
+      const q=next(j)?below100(j):null;return q?{v:base+q.v,n:2+q.n}:{v:base,n:2};
+    };
+    for(let i=0;i<w.length;){
+      const x=w[i].w,nx=next(i+1);let r=null;
+      if(VAGUE.includes(x))r={v:null,n:1};
+      else if(x==='dozen')r={v:12,n:1};
+      else if((x==='a'||x==='one')&&nx==='dozen')r={v:12,n:2};
+      else if((x==='a'||x==='one')&&nx==='thousand')r={v:1000,n:2};
+      else if(x==='a'&&nx==='hundred')r=hundred(100,i+2);
+      else{const b=below100(i);r=b&&b.n===1&&b.v>=1&&b.v<=9&&nx==='hundred'?hundred(b.v*100,i+2):b;}
+      if(r){out.push({value:r.v,raw:s.slice(w[i].index,w[i+r.n-1].end),index:w[i].index});i+=r.n;}else i++;
+    }
+    return out.sort((a,b)=>a.index-b.index);
+  }
+  function allowedNumbers(fields,extra=[]){
+    const f=fields||{},set=new Set(),add=t=>{for(const n of numbersIn(t))if(n.value!=null)set.add(n.value);};
+    for(const k of ['title','what','forWhom','outcome'])add(f[k]);
+    const value=f.number?.value;
+    if(typeof value==='number'){if(Number.isFinite(value))set.add(value);}else if(value!=null)add(value);
+    for(const m of [f.months?.start,f.months?.end]){const y=/^(\d{4})-\d{2}$/.exec(String(m??''));if(y)set.add(Number(y[1]));}
+    for(const n of extra)if(Number.isFinite(n))set.add(n);
+    return set;
+  }
+  // Words with their position, flagged when sentence-initial: the first word, or the first after . ! ? or a newline.
+  function wordsIn(text){
+    const s=String(text??''),out=[];let end=-1;
+    for(const m of s.matchAll(/\[(?:name|contact)\d+\]|\p{L}[\p{L}\p{M}\p{N}]*/gu)){
+      const initial=end<0||/[.!?]['"’”)\]]*(?:\s|$)|\n/.test(s.slice(end,m.index));
+      end=m.index+m[0].length;
+      if(m[0][0]!=='[')out.push({word:m[0],index:m.index,initial});
+    }
+    return out;
+  }
+  const NOT_NAMES=new Set(['I',...MONTHS,...WEEKDAYS,...WEEKDAYS.map(d=>d+'s')]);
+  function properNouns(text){return wordsIn(text).filter(w=>!w.initial&&/^\p{Lu}/u.test(w.word)&&!NOT_NAMES.has(w.word)).map(({word,index})=>({word,index}));}
+  function maskNames(fields,{role='',verbs=[],known=[]}={}){
+    const out={...fields},map={},keys=['title','what','forWhom','outcome'].filter(k=>typeof out[k]==='string');
+    const tag=(store,kind,raw)=>{if(!store.has(raw)){const p='['+kind+(store.size+1)+']';store.set(raw,p);map[p]=raw;}return store.get(raw);};
+    const swap=(s,spans)=>{let r='',at=0;for(const x of spans){r+=s.slice(at,x.index)+x.to;at=x.index+x.len;}return r+s.slice(at);};
+    const words=t=>String(t??'').toLowerCase().split(/[^\p{L}\p{M}\p{N}]+/u).filter(Boolean);
+    const contacts=new Map(),names=new Map();
+    for(const k of keys)out[k]=swap(out[k],contactsIn(out[k]).map(c=>({index:c.index,len:c.raw.length,to:tag(contacts,'contact',c.raw)})));
+    const keep=new Set([...words(role),...verbs.flatMap(v=>String(v).split('|').map(f=>words(f)[0]))]);
+    const knownWords=new Set(known.flatMap(words));
+    const mask=new Set();
+    for(const k of keys)for(const w of properNouns(out[k]))if(!keep.has(w.word.toLowerCase()))mask.add(w.word);
+    for(const k of keys)out[k]=swap(out[k],wordsIn(out[k]).filter(w=>mask.has(w.word)||knownWords.has(w.word.toLowerCase())).map(w=>({index:w.index,len:w.word.length,to:tag(names,'name',w.word)})));
+    return {fields:out,map};
+  }
+  // A [contactN] placeholder is never restored, so a contact detail cannot come back from the model.
+  function restoreNames(text,map={}){return String(text??'').replace(/\[name\d+\]/g,p=>Object.hasOwn(map,p)?map[p]:p);}
+  const api={labels,credential,MONTHS,WEEKDAYS,escapeHTML,shortQuote,setCredential,localExperienceClaims,evidenceClaims,generateClaims,reviewClaim,canExport,buildTextCV,buildEvidence,contactsIn,numbersIn,allowedNumbers,properNouns,maskNames,restoreNames};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.YoCV=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
