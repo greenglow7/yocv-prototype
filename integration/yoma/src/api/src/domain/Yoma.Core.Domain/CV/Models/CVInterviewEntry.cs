@@ -13,6 +13,9 @@ namespace Yoma.Core.Domain.CV.Models
 
     public string? ForWhom { get; set; }
 
+    /// <summary>
+    /// One of CVService.FrequencyChips, or null. Any other value is refused, since it goes to the model unmasked.
+    /// </summary>
     public string? Frequency { get; set; }
 
     /// <summary>
@@ -26,14 +29,17 @@ namespace Yoma.Core.Domain.CV.Models
     public string? MonthEnd { get; set; }
 
     /// <summary>
-    /// The number as typed, digits or words.
+    /// A whole number from 0 to 100000 as digits, or null for no number. Any other text is refused.
     /// </summary>
     public string? NumberValue { get; set; }
 
+    /// <summary>
+    /// One of CVService.UnitChips. Required with a number.
+    /// </summary>
     public string? NumberUnit { get; set; }
 
     /// <summary>
-    /// about, at least or exactly.
+    /// One of CVService.HedgeChips: exactly, about or at least. Required with a number.
     /// </summary>
     public string? NumberHedge { get; set; }
 

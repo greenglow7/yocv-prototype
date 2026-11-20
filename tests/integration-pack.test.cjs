@@ -27,6 +27,16 @@ test('the C# rule lists and verbs match the JavaScript ones',()=>{
   assert.deepEqual(JSON.parse(read(PACK+'src/api/src/domain/Yoma.Core.Domain/CV/Data/verbs.json')),VERBS);
   for(const r of ['invented_number','hedge_dropped','invented_name','overstated','weak_opening','quote_not_found'])assert.ok(cs.includes('"'+r+'"'),r);
 });
+test('the C# request check holds frequency, unit and hedge to the chips and the number to a whole number, as the route does',()=>{
+  const cs=read(PACK+DOMAIN+'CV/Services/CVService.cs'),COPY=require('../cv-copy.js').en;
+  const arr=name=>JSON.parse('['+cs.match(new RegExp(name+'\\s*=\\s*\\[([^\\]]*)\\]'))[1]+']');
+  assert.deepEqual(arr('FrequencyChips'),COPY.frequencyChips); assert.deepEqual(arr('UnitChips'),COPY.unitChips); assert.deepEqual(arr('HedgeChips'),COPY.hedgeChips);
+  assert.match(cs,/Number_Max = 100000;/);
+  const validate=cs.slice(cs.indexOf('private static void Validate('),cs.indexOf('private static CVCheckResult CheckText('));
+  for(const f of ['Frequency','NumberValue','NumberUnit','NumberHedge'])assert.ok(validate.includes('Entries[{i}].'+f),f);
+  const tests=read(PACK+'src/api/src/test/Yoma.Core.Test/CV/CVServiceTests.cs');
+  for(const f of ['Frequency','NumberValue'])assert.ok(tests.includes('"Entries[0].'+f+'"'),f);
+});
 test('the controller, options and settings follow the spec',()=>{
   const ctl=read(PACK+'src/api/src/application/Yoma.Core.Api/Controllers/CVController.cs');
   assert.ok(ctl.includes('api/v3/cv')||ctl.includes('Api_Version}/cv'),'route, literal or Yoma constant form');

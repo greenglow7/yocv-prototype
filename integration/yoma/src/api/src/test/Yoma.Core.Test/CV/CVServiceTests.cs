@@ -121,6 +121,40 @@ namespace Yoma.Core.Test.CV
       Assert.Contains(ex.Errors, o => o.PropertyName == "Entries[0].Months");
     }
 
+    [Theory]
+    [InlineData("Frequency", "every Saturday at Mama Joy's")]
+    [InlineData("NumberValue", "0710000000")]
+    [InlineData("NumberValue", "forty at Mama Joy's")]
+    [InlineData("NumberUnit", "customers at Mama Joy's")]
+    [InlineData("NumberHedge", "Thandi says about")]
+    public async Task DraftRefusesFreeTextInTheChipFieldsAndSendsNothing(string field, string value)
+    {
+      var entry = Entry();
+      typeof(CVInterviewEntry).GetProperty(field)!.SetValue(entry, value);
+      var client = new FakeClient("{}");
+
+      var ex = await Assert.ThrowsAsync<ValidationException>(() => Service(client).Draft(new CVDraftRequest { Role = Role, Entries = [entry] }));
+      Assert.Contains(ex.Errors, o => o.PropertyName == $"Entries[0].{field}");
+
+      // Frequency and the number pass to the model unmasked, so a name or a phone number there must stop the call.
+      Assert.Empty(client.Requests);
+      var sent = string.Join("\n", client.Requests.SelectMany(o => o.Messages).Select(o => o.Content));
+      foreach (var word in new[] { "Mama", "Joy", "Thandi", "0710000000" }) Assert.DoesNotContain(word, sent);
+    }
+
+    [Theory]
+    [InlineData("Entries[0].Frequency")]
+    [InlineData("Entries[0].NumberValue")]
+    public async Task DraftNamesTheFieldThatFails(string property)
+    {
+      var entry = Entry();
+      if (property.EndsWith("Frequency")) entry.Frequency = "every day";
+      else entry.NumberValue = "100001";
+
+      var ex = await Assert.ThrowsAsync<ValidationException>(() => Service(new FakeClient("{}")).Draft(new CVDraftRequest { Role = Role, Entries = [entry] }));
+      Assert.Equal(property, Assert.Single(ex.Errors).PropertyName);
+    }
+
     [Fact]
     public void VolumeNeverPromotesASkillAndAYomaRecordDoes()
     {
@@ -170,7 +204,7 @@ namespace Yoma.Core.Test.CV
       Title = "Fruit stall",
       What = "I sell fruit at the stall by the taxi rank",
       ForWhom = "customers",
-      Frequency = "every day",
+      Frequency = "daily",
       MonthStart = "2024-01",
       MonthEnd = "2024-12",
       NumberValue = "40",

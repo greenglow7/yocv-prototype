@@ -57,6 +57,12 @@ namespace Yoma.Core.Domain.CV.Services
       ["trained"] = ["trained", "train", "trains", "training", "trainer"]
     };
 
+    // The Step 2 chips, equal to frequencyChips, unitChips and hedgeChips in the prototype's cv-copy.js. Validate refuses any
+    // other value, so these fields go to the model unmasked and hold no name, place or contact detail.
+    public static readonly string[] FrequencyChips = ["daily", "a few times a week", "weekly", "now and then"];
+    public static readonly string[] UnitChips = ["customers a day", "customers a week", "items", "people", "trips", "rand a week", "shillings a week"];
+    public static readonly string[] HedgeChips = ["exactly", "about", "at least"];
+
     // Each entry is 'past|form|form', the past form first. Read once from the embedded CV/Data/verbs.json.
     public static readonly string[] Verbs = LoadVerbs();
 
@@ -71,6 +77,7 @@ namespace Yoma.Core.Domain.CV.Services
 
     private const int Bullets_Max = 2;
     private const int Entries_Max = 10;
+    private const int Number_Max = 100000;
     private const int Learning_PageSize = 100;
     private const string Attribute_Skills = "Opportunity_Skills";
     private const string Schema_Name = "yoma_cv_bullets";
@@ -341,7 +348,9 @@ namespace Yoma.Core.Domain.CV.Services
       }
     }
 
-    // Months are 'YYYY-MM'; an end needs a start, never precedes it and never lies after this month. The field is named.
+    // Months are 'YYYY-MM'; an end needs a start, never precedes it and never lies after this month. Frequency, unit and hedge
+    // are chip values, and the number is a whole number from 0 to Number_Max as digits, with a unit and a hedge, as the
+    // prototype's route holds them. These four pass to the model unmasked, so free text there is refused. The field is named.
     private static void Validate(CVDraftRequest request, DateTimeOffset now)
     {
       var failures = new List<ValidationFailure>();
@@ -357,6 +366,13 @@ namespace Yoma.Core.Domain.CV.Services
         var badStart = !string.IsNullOrEmpty(e.MonthStart) && start == null;
         var badEnd = !string.IsNullOrEmpty(e.MonthEnd) && (end == null || start == null);
         if (badStart || badEnd || start > current || end > current || end < start) failures.Add(new($"Entries[{i}].Months", "Check the months"));
+
+        if (!string.IsNullOrEmpty(e.Frequency) && !FrequencyChips.Contains(e.Frequency, StringComparer.Ordinal)) failures.Add(new($"Entries[{i}].Frequency", "Choose how often from the list"));
+        var hasNumber = !string.IsNullOrEmpty(e.NumberValue);
+        if (hasNumber && !(WholeNumber().IsMatch(e.NumberValue!) && int.Parse(e.NumberValue, CultureInfo.InvariantCulture) <= Number_Max))
+          failures.Add(new($"Entries[{i}].NumberValue", $"Give a whole number from 0 to {Number_Max}"));
+        if ((hasNumber || !string.IsNullOrEmpty(e.NumberUnit)) && !UnitChips.Contains(e.NumberUnit, StringComparer.Ordinal)) failures.Add(new($"Entries[{i}].NumberUnit", "Choose the unit from the list"));
+        if ((hasNumber || !string.IsNullOrEmpty(e.NumberHedge)) && !HedgeChips.Contains(e.NumberHedge, StringComparer.Ordinal)) failures.Add(new($"Entries[{i}].NumberHedge", "Choose how sure you are from the list"));
       }
 
       if (failures.Count > 0) throw new ValidationException(failures);
@@ -548,7 +564,7 @@ namespace Yoma.Core.Domain.CV.Services
     /// <summary>
     /// Spec 3: contact details become [contactN] and are never restored; capitalised words that are not sentence-initial,
     /// not the role and not a verb, and the person's own name and town in any case, become [nameN] and are restored after.
-    /// Frequency and the number's unit are chip values and pass as they are.
+    /// Frequency, the number's unit and hedge are chip values and the number is digits, all held to that by Validate, so they pass as they are.
     /// </summary>
     private static (CVInterviewEntry Masked, Dictionary<string, string> Map) MaskNames(CVInterviewEntry entry, string role, List<string> known)
     {
@@ -777,6 +793,10 @@ namespace Yoma.Core.Domain.CV.Services
 
     [GeneratedRegex(@"\p{L}+")]
     private static partial Regex Letters();
+
+    // ASCII digits only, no leading zero, and \z so a trailing newline is refused too.
+    [GeneratedRegex(@"^(?:0|[1-9][0-9]{0,5})\z")]
+    private static partial Regex WholeNumber();
 
     [GeneratedRegex(@"^(?:\s+|-)$")]
     private static partial Regex Joiner();

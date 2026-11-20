@@ -63,6 +63,8 @@ The prompt holds the role, the masked interview answers and the credential and o
 
 The interview answers can hold a person's or a shop's name, a place, a phone number or an email. Before the call, capitalised words that are not sentence-initial, not the role and not a listed verb become `[name1]`, `[name2]` and so on. So do the person's own name and town, in any case. Phone numbers and emails become `[contact1]` and are never restored. Names are restored after the call. A placeholder the model invents is refused as `invented_name`.
 
+Frequency, the number, its unit and its hedge pass to the model unmasked, so `CVService` holds them to fixed values before the call, as the prototype's route does. `Frequency`, `NumberUnit` and `NumberHedge` must be one of `FrequencyChips`, `UnitChips` and `HedgeChips`, which a test here compares with the chips in `cv-copy.js`. `NumberValue` must be a whole number from 0 to 100000 as digits, and needs a unit and a hedge. Any other value is a validation error naming the field, such as `Entries[0].Frequency`, and nothing is sent.
+
 ### The language model project
 
 `Yoma.Core.Infrastructure.LanguageModel` follows three existing projects:
