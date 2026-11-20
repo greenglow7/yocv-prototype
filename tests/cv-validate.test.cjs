@@ -68,3 +68,8 @@ test('duplicates and the lists',()=>{
   for(const w of ['served','sold','cared for','repaired','delivered','kept','counted','cleaned','taught','organised','braided','drove','built','worked'])assert.ok(forms.includes(w),w);
   for(const w of [...INFLATION,...ROLE_UPGRADE])assert.ok(!forms.includes(w),w);
 });
+test('Review Focus 2: no verb form is a common name or shop name, so maskNames with VERBS still hides them',()=>{
+  const {fields}=core.maskNames({title:'Packing shelves',what:'I pack shelves at Pick n Pay for Drew Cook and Mr Price.',forWhom:'customers',outcome:"They said Welcome Waters, Harry Styles, Lift, Coach, Budget and Lay's came back."},{role:'Shelf packer',verbs:VERBS});
+  const left=w=>new RegExp('\\b'+w+'\\b').test(fields.what+'\n'+fields.outcome);
+  for(const w of ['Pick','Pay','Drew','Cook','Price','Welcome','Waters','Styles','Lift','Coach','Budget','Lay'])assert.ok(!left(w),w);
+});
