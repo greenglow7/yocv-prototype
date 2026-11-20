@@ -211,7 +211,13 @@ function createAccountSource({config,yoma,fetch=globalThis.fetch,now=Date.now,pe
     return readPersona(selector?.persona);
   }
 
-  return {kind,apiBase,listPersonas,read};
+  // One holder request with the configured token, for callers beyond the snapshot (the CV record's wallet calls).
+  async function request(method,path,body){
+    if(kind!=='token')throw coded('yoma_auth');
+    return holderRequest(method,path,body,token);
+  }
+
+  return {kind,apiBase,listPersonas,read,request};
 }
 
 module.exports={createAccountSource,ageAt,MESSAGES};

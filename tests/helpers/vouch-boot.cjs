@@ -72,4 +72,4 @@ async function publishPersona(base,personaId,{trade,area}={}){
  return {cardId:json.cardId,cardToken:json.cardToken,smsId:json.smsId,myUrl:json.myUrl,code:json.code,ownerSecret:json.ownerSecret};
 }
 
-module.exports={NOW,PUBLIC_URL,bootVouch,publishPersona,post,form,page,get};
+module.exports={NOW,PUBLIC_URL,bootVouch,publishPersona,post,form,page,get,fakeYoma};

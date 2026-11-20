@@ -64,7 +64,52 @@
       {"id": "6e85a30a-008b-4340-a3de-eeb8e7f7ce88", "name": "Cosmetics", "infoURL": "https://lightcast.io/open-skills/skills/KS122FL69C9376N0WS3D", "organizations": [{"id": "019e072e-dbf5-7098-83c6-d0bf7d88a87a", "name": "Alison Learning", "logoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/5d2bd805-affa-479b-b7e2-eca5adf9b244.png"}]},
       {"id": "448bb36e-6e5a-4c5a-9150-78703666c37a", "name": "Customer Service", "infoURL": "https://lightcast.io/open-skills/skills/KS121Z26S4VJLQ1WXN21", "organizations": [{"id": "019e072e-dbf5-7098-83c6-d0bf7d88a87a", "name": "Alison Learning", "logoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/5d2bd805-affa-479b-b7e2-eca5adf9b244.png"}]},
       {"id": "757753d2-9981-4240-b2e1-183884d66bb1", "name": "Financial Management", "infoURL": "https://lightcast.io/open-skills/skills/KS123Y170JP7JBSFVBSS", "organizations": [{"id": "90d0ee66-e06a-4da8-ae84-0de3f01b8b75", "name": "UNICEF Kenya", "logoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/979cdb17-9bd7-41d9-b06b-14140c309444.png"}]}
-    ]
+    ],
+    "credentials": [
+      {
+        "id": "sample-cred-thandi-1",
+        "artifactType": "JWS",
+        "schemaType": "Opportunity",
+        "typeContext": "Learning",
+        "status": "Issued",
+        "issuer": "Alison Learning",
+        "issuerLogoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/5d2bd805-affa-479b-b7e2-eca5adf9b244.png",
+        "title": "Hair Styling: Blow-Dry, Cut, and Colour Like a Pro",
+        "dateIssued": "2025-09-18T16:20:00+00:00",
+        "attributes": [
+          {"name": "Opportunity_Skills", "nameDisplay": "Skills", "valueDisplay": "Cosmetics", "group": null, "subGroup": null, "sortOrder": null, "itemsDisplay": [{"name": "Cosmetics"}]}
+        ]
+      },
+      {
+        "id": "sample-cred-thandi-2",
+        "artifactType": "JWS",
+        "schemaType": "Opportunity",
+        "typeContext": "Learning",
+        "status": "Issued",
+        "issuer": "Alison Learning",
+        "issuerLogoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/5d2bd805-affa-479b-b7e2-eca5adf9b244.png",
+        "title": "Customer Care Skills and Telephone Etiquette",
+        "dateIssued": "2025-10-06T11:05:00+00:00",
+        "attributes": [
+          {"name": "Opportunity_Skills", "nameDisplay": "Skills", "valueDisplay": "Customer Service", "group": null, "subGroup": null, "sortOrder": null, "itemsDisplay": [{"name": "Customer Service"}]}
+        ]
+      },
+      {
+        "id": "sample-cred-thandi-3",
+        "artifactType": "JWS",
+        "schemaType": "Opportunity",
+        "typeContext": "Learning",
+        "status": "Issued",
+        "issuer": "UNICEF Kenya",
+        "issuerLogoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/979cdb17-9bd7-41d9-b06b-14140c309444.png",
+        "title": "Financial Literacy for Gig Workers",
+        "dateIssued": "2026-01-21T18:47:00+00:00",
+        "attributes": [
+          {"name": "Opportunity_Skills", "nameDisplay": "Skills", "valueDisplay": "Financial Management", "group": null, "subGroup": null, "sortOrder": null, "itemsDisplay": [{"name": "Financial Management"}]}
+        ]
+      }
+    ],
+    "selfAttestedSkills": []
   },
   {
     "id": "brian",
@@ -131,7 +176,52 @@
       {"id": "ca0dbc9f-ae9b-4023-8faf-b9392fdce6d0", "name": "Law Enforcement", "infoURL": "https://lightcast.io/open-skills/skills/KS125R467HSMPWMRXWNB", "organizations": [{"id": "019e072e-dbf5-7098-83c6-d0bf7d88a87a", "name": "Alison Learning", "logoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/5d2bd805-affa-479b-b7e2-eca5adf9b244.png"}]},
       {"id": "d4e73cdf-35fe-4f16-bab6-52f6249ae0c9", "name": "First Aid", "infoURL": "https://lightcast.io/open-skills/skills/KS1200X6V3937RSF8VVM", "organizations": [{"id": "019e072e-dbf5-7098-83c6-d0bf7d88a87a", "name": "Alison Learning", "logoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/5d2bd805-affa-479b-b7e2-eca5adf9b244.png"}]},
       {"id": "757753d2-9981-4240-b2e1-183884d66bb1", "name": "Financial Management", "infoURL": "https://lightcast.io/open-skills/skills/KS123Y170JP7JBSFVBSS", "organizations": [{"id": "90d0ee66-e06a-4da8-ae84-0de3f01b8b75", "name": "UNICEF Kenya", "logoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/979cdb17-9bd7-41d9-b06b-14140c309444.png"}]}
-    ]
+    ],
+    "credentials": [
+      {
+        "id": "sample-cred-brian-1",
+        "artifactType": "JWS",
+        "schemaType": "Opportunity",
+        "typeContext": "Learning",
+        "status": "Issued",
+        "issuer": "Alison Learning",
+        "issuerLogoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/5d2bd805-affa-479b-b7e2-eca5adf9b244.png",
+        "title": "Understanding Driving Safety and Laws",
+        "dateIssued": "2025-08-11T13:55:00+00:00",
+        "attributes": [
+          {"name": "Opportunity_Skills", "nameDisplay": "Skills", "valueDisplay": "Law Enforcement", "group": null, "subGroup": null, "sortOrder": null, "itemsDisplay": [{"name": "Law Enforcement"}]}
+        ]
+      },
+      {
+        "id": "sample-cred-brian-2",
+        "artifactType": "JWS",
+        "schemaType": "Opportunity",
+        "typeContext": "Learning",
+        "status": "Issued",
+        "issuer": "Alison Learning",
+        "issuerLogoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/5d2bd805-affa-479b-b7e2-eca5adf9b244.png",
+        "title": "Basic First Aid Training",
+        "dateIssued": "2026-04-22T10:18:00+00:00",
+        "attributes": [
+          {"name": "Opportunity_Skills", "nameDisplay": "Skills", "valueDisplay": "First Aid", "group": null, "subGroup": null, "sortOrder": null, "itemsDisplay": [{"name": "First Aid"}]}
+        ]
+      },
+      {
+        "id": "sample-cred-brian-3",
+        "artifactType": "JWS",
+        "schemaType": "Opportunity",
+        "typeContext": "Learning",
+        "status": "Issued",
+        "issuer": "UNICEF Kenya",
+        "issuerLogoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/979cdb17-9bd7-41d9-b06b-14140c309444.png",
+        "title": "Financial Literacy for Gig Workers",
+        "dateIssued": "2025-12-02T17:40:00+00:00",
+        "attributes": [
+          {"name": "Opportunity_Skills", "nameDisplay": "Skills", "valueDisplay": "Financial Management", "group": null, "subGroup": null, "sortOrder": null, "itemsDisplay": [{"name": "Financial Management"}]}
+        ]
+      }
+    ],
+    "selfAttestedSkills": []
   },
   {
     "id": "amara",
@@ -208,6 +298,53 @@
       {"id": "e5fd5064-f9e5-42ec-bcdf-5308f8887a12", "name": "Active Listening", "infoURL": "https://lightcast.io/open-skills/skills/KS1205H6HZDXGDV2R0QZ", "organizations": [{"id": "e685f109-9ab1-43e7-b836-08dad9c6d345", "name": "Atingi", "logoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/d19a12f3-d8c4-4e3e-91c5-4a4d57eea704.png"}]},
       {"id": "4049307d-45d8-4cd1-94de-e116a43d3c90", "name": "Conflict Resolution", "infoURL": "https://lightcast.io/open-skills/skills/KS1228S6YKWXMH4M4DL7", "organizations": [{"id": "e685f109-9ab1-43e7-b836-08dad9c6d345", "name": "Atingi", "logoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/d19a12f3-d8c4-4e3e-91c5-4a4d57eea704.png"}]},
       {"id": "7a67d869-e6cb-4cce-9551-98a126af8e33", "name": "Empathy", "infoURL": "https://lightcast.io/open-skills/skills/ES1C53496B6F1ECEDD9A", "organizations": [{"id": "e685f109-9ab1-43e7-b836-08dad9c6d345", "name": "Atingi", "logoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/d19a12f3-d8c4-4e3e-91c5-4a4d57eea704.png"}]}
+    ],
+    "credentials": [
+      {
+        "id": "sample-cred-amara-1",
+        "artifactType": "JWS",
+        "schemaType": "Opportunity",
+        "typeContext": "Learning",
+        "status": "Issued",
+        "issuer": "Alison Learning",
+        "issuerLogoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/5d2bd805-affa-479b-b7e2-eca5adf9b244.png",
+        "title": "Basics of Sewing",
+        "dateIssued": "2025-07-09T09:33:00+00:00",
+        "attributes": [
+          {"name": "Opportunity_Skills", "nameDisplay": "Skills", "valueDisplay": "Fashion Design, Sewing", "group": null, "subGroup": null, "sortOrder": null, "itemsDisplay": [{"name": "Fashion Design"},{"name": "Sewing"}]}
+        ]
+      },
+      {
+        "id": "sample-cred-amara-2",
+        "artifactType": "JWS",
+        "schemaType": "Opportunity",
+        "typeContext": "Learning",
+        "status": "Issued",
+        "issuer": "UNICEF Nigeria",
+        "issuerLogoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/6336d29c-8b16-44eb-9973-1fb07a4e44d8.png",
+        "title": "FUCAP 1.0 LevelUp: The Lean Entrepreneurship Skills Course",
+        "dateIssued": "2025-11-14T20:02:00+00:00",
+        "attributes": [
+          {"name": "Opportunity_Skills", "nameDisplay": "Skills", "valueDisplay": "Creative Entrepreneurship, Entrepreneurship, Small Business Management", "group": null, "subGroup": null, "sortOrder": null, "itemsDisplay": [{"name": "Creative Entrepreneurship"},{"name": "Entrepreneurship"},{"name": "Small Business Management"}]}
+        ]
+      },
+      {
+        "id": "sample-cred-amara-3",
+        "artifactType": "JWS",
+        "schemaType": "Opportunity",
+        "typeContext": "Learning",
+        "status": "Issued",
+        "issuer": "Sample Skills Trust",
+        "issuerLogoURL": null,
+        "title": "Customer Care Basics",
+        "dateIssued": "2026-02-27T14:49:00+00:00",
+        "attributes": [
+          {"name": "Opportunity_Skills", "nameDisplay": "Skills", "valueDisplay": "Active Listening, Conflict Resolution, Empathy", "group": null, "subGroup": null, "sortOrder": null, "itemsDisplay": [{"name": "Active Listening"},{"name": "Conflict Resolution"},{"name": "Empathy"}]}
+        ]
+      }
+    ],
+    "selfAttestedSkills": [
+      {"id": "081d98d0-2094-449c-ab92-139cda908d36", "name": "Pattern Making", "infoURL": "https://lightcast.io/open-skills/skills/KS127LX759Q0BR1BYR7K"}
     ]
   },
   {
@@ -228,7 +365,9 @@
     "photoURL": null,
     "userId": "7b3e9d1f-4a6c-4f8b-a2d5-0e1c6b9f3a47",
     "completions": [],
-    "skills": []
+    "skills": [],
+    "credentials": [],
+    "selfAttestedSkills": []
   },
   {
     "id": "lerato",
@@ -248,7 +387,9 @@
     "photoURL": null,
     "userId": "5f8a2c6d-9e4b-4d7a-b3f1-8c2d5a0e7b19",
     "completions": [],
-    "skills": []
+    "skills": [],
+    "credentials": [],
+    "selfAttestedSkills": []
   },
   {
     "id": "bongani",
@@ -283,6 +424,23 @@
         ]
       }
     ],
-    "skills": []
+    "skills": [],
+    "credentials": [
+      {
+        "id": "sample-cred-bongani-1",
+        "artifactType": "JWS",
+        "schemaType": "Opportunity",
+        "typeContext": "Learning",
+        "status": "Issued",
+        "issuer": "Alison Learning",
+        "issuerLogoURL": "https://yoma-v3-public-storage.s3.eu-west-1.amazonaws.com/production/photos/5d2bd805-affa-479b-b7e2-eca5adf9b244.png",
+        "title": "Basic First Aid Training",
+        "dateIssued": "2026-06-10T09:30:00+00:00",
+        "attributes": [
+          {"name": "Opportunity_Skills", "nameDisplay": "Skills", "valueDisplay": "First Aid", "group": null, "subGroup": null, "sortOrder": null, "itemsDisplay": [{"name": "First Aid"}]}
+        ]
+      }
+    ],
+    "selfAttestedSkills": []
   }
 ]
