@@ -1,0 +1,15 @@
+{
+  "hair": {"Braids": ["Hairstyling"], "Cornrows": ["Hairstyling"], "Weave": ["Hairstyling"], "Relaxer": ["Hair Care"], "Cut": ["Hairstyling"], "Other": []},
+  "labourer": {"Paving": ["Paving"], "Plastering": ["Plastering"], "Painting": ["Painting"], "Digging": ["Excavation"], "Loading": ["Cargo Loading", "Material Handling"], "Other": []},
+  "nails": {"Gel nails": ["Nail Care"], "Acrylics": ["Artificial Nails"], "Pedicure": ["Pedicure"], "Other": []},
+  "boda": {"Rides": [], "Deliveries": ["Package Delivery"], "Errands": [], "Other": []},
+  "tailor": {"Alterations": ["Garment Alterations"], "New outfit": ["Sewing"], "School uniform": ["Sewing"], "Other": []},
+  "mechanic": {"Service": ["Vehicle Maintenance"], "Repair": ["Vehicle Maintenance"], "Tyres": ["Tire Maintenance"], "Other": []},
+  "electrician": {"Wiring": ["Electrical Wiring"], "Fault finding": ["Troubleshooting (Problem Solving)"], "Installation": ["Electrical Wiring"], "Other": []},
+  "plumber": {"Leak repair": ["Plumbing Repair"], "Installation": ["Plumbing"], "Drains": ["Drain Cleaning"], "Other": []},
+  "cleaner": {"House cleaning": ["House Cleaning"], "Laundry": [], "Garden": ["Gardening"], "Other": []},
+  "cook": {"Catering": ["Food Preparation"], "Meals": ["Cooking"], "Baking": ["Baking"], "Other": []},
+  "market": {"Fresh produce": ["Retail Sales"], "Goods": ["Retail Sales"], "Delivery": ["Package Delivery"], "Other": []},
+  "mobile-money": {"Deposits": ["Mobile Banking"], "Withdrawals": ["Mobile Banking"], "Transfers": ["Mobile Banking"], "Other": []},
+  "default": {"Work done": [], "Other": []}
+}

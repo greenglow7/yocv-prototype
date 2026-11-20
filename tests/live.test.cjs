@@ -16,6 +16,7 @@ const {createTranscriber}=require('../server/card/transcribe.js');
 const fs=require('node:fs');
 const core=require('../core.js');
 const roleSkills=require('../data/role-skills.json');
+const chipSkills=require('../data/chip-skills.json');
 
 const config=loadConfig({cwd:path.join(__dirname,'..')});
 const hasModel=config.provider!=='local';
@@ -69,8 +70,9 @@ test('live Yoma: skill lookup resolves Customer Service to its known id',{skip:l
  assert.ok(item);
  assert.equal(item.id,'448bb36e-6e5a-4c5a-9150-78703666c37a');
  assert.match(item.infoURL,/lightcast\.io\/open-skills/);
- await t.test('every role menu name resolves exactly in the taxonomy',async()=>{
+ await t.test('every role menu name and chip skill name resolves exactly in the taxonomy',async()=>{
   for(const r of Object.values(roleSkills))for(const name of r.skillNames)assert.ok((await yoma.skillByName(name)).item,name);
+  for(const name of new Set(Object.values(chipSkills).flatMap(Object.values).flat()))assert.ok((await yoma.skillByName(name)).item,name);
  });
 });
 
