@@ -8,18 +8,23 @@
      POST /api/cv/skills        recombines the skills with fresh vouches, no model call
      POST /api/cv/draft         the RapidPro webhook: no account, no session, S3 skills only. Mounted only with
                                 YOCV_SERVICE_SECRET, which x-yocv-service-secret must match.
+     GET  /demo/cv-rejected     the prepared refused suggestion (plan Task 17), only when YOVOUCH_SIM=1 and no gateway
+                                secret, as every /demo page. It runs tests/fixtures/cv-rejected.json through the real checks.
    Sessions live in memory, 30 minutes from their last use. A session holds the record without the phone number,
    which goes to the browser only for the contact prefill (plan Deviations 9). The place an entry names and its
    confirm choice never reach draftEntries: the place only adds words to mask. Nothing here is saved to disk. */
 const crypto=require('node:crypto');
-const {copyFor}=require('./copy.js');
+const fs=require('node:fs');
+const path=require('node:path');
+const {copyFor,t}=require('./copy.js');
 const {RULES,checkBullet,checkProfile}=require('./validate.js');
-const {draftEntries}=require('./draft.js');
+const {draftEntry,draftEntries}=require('./draft.js');
 const {buildSkillMenu,roleList}=require('./menu.js');
 const {readCvRecord}=require('./record.js');
 const {vouchSources,combineSkills}=require('./skills.js');
 const {ProviderError}=require('../providers/errors.js');
-const {gatewaySecretOk}=require('../card/vouch-routes.js');
+const {gatewaySecretOk,sendPage}=require('../card/vouch-routes.js');
+const {flowPage}=require('../card/pages.js');
 const {createLocalProvider}=require('../providers/local.js');
 
 const SESSION_TTL_MS=30*60*1000;
@@ -29,6 +34,7 @@ const MAX_ENTRIES=3,MAX_NUMBER=100000,MAX_WORDS=40,MAX_WORD=60,MAX_HAND=20,MAX_C
 const CONFIRM_KINDS=['none','person','completion','vouch'];
 const COPY=copyFor();
 const DRAFT_NOTICE='Draft. Nothing is saved until the person confirms it.';
+const PREPARED_FILE=path.join(__dirname,'..','..','tests','fixtures','cv-rejected.json');
 const YM=/^(\d{4})-(0[1-9]|1[0-2])$/;
 const str=v=>v==null?'':String(v);
 const list=v=>Array.isArray(v)?v:[];
@@ -297,6 +303,25 @@ function createCvRouter({config,provider,core,yoma,roleSkills,accountSource,card
     });
   }
 
+  // GET /demo/cv-rejected: the fixture's model output through draftEntry, read fresh on each load, so a change to the
+  // checks changes the page. No generation mode is printed: this is no live call and no sample run.
+  async function cvRejected(res){
+    const {role,entry,output}=JSON.parse(fs.readFileSync(PREPARED_FILE,'utf8'));
+    const prepared={name:'prepared',model:'none',async cvBullets(){return output;}};
+    const d=await draftEntry({role,entry,index:0,provider:prepared,menu:[],known:words(entry.place),now});
+    const H=core.escapeHTML,n=entry.number,m=entry.months;
+    const when=m.end?t('cvMonthsRange',{start:core.monthLabel(m.start),end:core.monthLabel(m.end)}):t('cvMonthsOpen',{start:core.monthLabel(m.start)});
+    const answers=[[t('fieldTitle'),entry.title],[t('fieldPlace'),entry.place],[t('qWhat'),entry.what],[t('qForWhom'),entry.forWhom],
+      [t('qOften'),[entry.frequency,when].filter(Boolean).join(', ')],[t('qNumber'),n?[n.hedge,n.value,n.unit].filter(Boolean).join(' '):''],[t('qBetter'),entry.outcome]]
+      .filter(([,v])=>str(v).trim()).map(([k,v])=>'<dt>'+H(k)+'</dt><dd>'+H(v)+'</dd>').join('');
+    const refused=d.rejected.filter(r=>r.kind==='bullet').map(r=>'<li>'+H(t('recordRejectedLine',{text:r.text,reason:COPY['reason_'+r.reason]??r.reason,code:r.reason}))+'</li>').join('');
+    const shown=d.proposals.map(p=>'<li>'+H(p.text)+(p.templateWording?' <span class="small">('+H(COPY.templateWording)+')</span>':'')+'</li>').join('');
+    const body='<section><h1>'+H(COPY.preparedExample)+'</h1><p>'+H(role)+'</p><h2>'+H(t('recordAnswers'))+'</h2><dl>'+answers+'</dl>'+
+      '<h2>'+H(t('recordRejected'))+'</h2><ul>'+refused+'</ul><h2>'+H(t('recordProposals'))+'</h2><ul>'+shown+'</ul></section>';
+    sendPage(res,200,flowPage({title:COPY.preparedExample,body,css:'dt{font-weight:600}dd{margin:0 0 8px}'}));
+  }
+  const simOn=Boolean(config?.yovouch?.sim)&&!config?.yovouch?.gatewaySecret;
+
   const POST={'/api/cv/record':record,'/api/cv/review':review,'/api/cv/check':check,'/api/cv/skills':skills};
   if(serviceSecret)POST['/api/cv/draft']=draft;
   function handle(req,res,url){
@@ -306,6 +331,7 @@ function createCvRouter({config,provider,core,yoma,roleSkills,accountSource,card
       if(m!=='GET'&&m!=='HEAD')return notAllowed();
       return p==='/api/cv/config'?Promise.resolve(cvConfig(res)):menu(res,url);
     }
+    if(p==='/demo/cv-rejected'&&simOn)return m==='GET'||m==='HEAD'?cvRejected(res):notAllowed();
     if(!Object.hasOwn(POST,p))return null;
     return m==='POST'?POST[p](req,res):notAllowed();
   }
