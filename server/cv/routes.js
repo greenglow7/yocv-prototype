@@ -6,6 +6,7 @@
      POST /api/cv/review        drafts the bullets and combines the skills
      POST /api/cv/check         checks the person's own edit of a bullet or the profile line
      POST /api/cv/skills        recombines the skills with fresh vouches, no model call
+     POST /api/cv/docx          the CV the page built, as a Word file. No session, nothing stored.
      POST /api/cv/draft         the RapidPro webhook: no account, no session, S3 skills only. Mounted only with
                                 YOCV_SERVICE_SECRET, which x-yocv-service-secret must match.
      GET  /demo/cv-rejected     the prepared refused suggestion (plan Task 17), only when YOVOUCH_SIM=1 and no gateway
@@ -26,6 +27,7 @@ const {ProviderError}=require('../providers/errors.js');
 const {gatewaySecretOk,sendPage}=require('../card/vouch-routes.js');
 const {flowPage}=require('../card/pages.js');
 const {createLocalProvider}=require('../providers/local.js');
+const {cvToDocx}=require('./docx.js');
 
 const SESSION_TTL_MS=30*60*1000;
 const MAX_SESSIONS=1000;
@@ -33,6 +35,7 @@ const SESSION_ID=/^[0-9a-f]{24}$/;
 const MAX_ENTRIES=3,MAX_NUMBER=100000,MAX_WORDS=40,MAX_WORD=60,MAX_HAND=20,MAX_CHECK_TEXT=1000,MAX_MONTHS=1200;
 const CONFIRM_KINDS=['none','person','completion','vouch'];
 const COPY=copyFor();
+const DOCX_TYPE='application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 const DRAFT_NOTICE='Draft. Nothing is saved until the person confirms it.';
 const PREPARED_FILE=path.join(__dirname,'..','..','tests','fixtures','cv-rejected.json');
 const YM=/^(\d{4})-(0[1-9]|1[0-2])$/;
@@ -107,6 +110,23 @@ function validateInclude(include,record){
     out[k]=[...new Set(v)];
   }
   return {include:out};
+}
+
+// The Cv the page built (plan Task 14), for the Word file: strings and lists of strings only, the photo dropped.
+// Returns the Cv, or null when a field is not in that form.
+function validateCv(cv){
+  let ok=isPlainObject(cv);
+  const s=v=>v==null?'':typeof v==='string'?v:(ok=false,'');
+  const obj=v=>v==null?{}:isPlainObject(v)?v:(ok=false,{});
+  const arr=(v,f)=>v==null?[]:Array.isArray(v)?v.map(f):(ok=false,[]);
+  if(!ok)return null;
+  const c=obj(cv.contact),o=obj(cv.optional);
+  const out={name:s(cv.name),contact:{phone:s(c.phone),email:s(c.email),town:s(c.town)},profile:cv.profile==null?null:s(cv.profile),
+    experience:arr(cv.experience,e=>{const x=obj(e);return {title:s(x.title),place:s(x.place),months:s(x.months),bullets:arr(x.bullets,s)};}),
+    skills:arr(cv.skills,k=>{const x=obj(k);return {name:s(x.name),label:s(x.label)};}),
+    learning:arr(cv.learning,s),education:s(cv.education),
+    optional:{photo:'',dateOfBirth:s(o.dateOfBirth),idNumber:s(o.idNumber),stateOfOrigin:s(o.stateOfOrigin)},sample:cv.sample!==false};
+  return ok?out:null;
 }
 
 function sendJSON(res,status,payload){
@@ -274,6 +294,19 @@ function createCvRouter({config,provider,core,yoma,roleSkills,accountSource,card
     sendJSON(res,200,{skills:out,skillsRejected:rejected});
   }
 
+  // The Word file (spec 10). Only a record read with a token can leave out the sample line: with sample accounts
+  // every CV is a sample, whatever the page sent.
+  async function docx(req,res){
+    const body=await readBody(req,res);
+    if(!body)return;
+    const cv=validateCv(body.cv);
+    if(!cv)return invalid(res,['cv'],COPY.errBody);
+    if(accountSource.kind!=='token')cv.sample=true;
+    const file=cvToDocx(cv,COPY);
+    res.writeHead(200,{'content-type':DOCX_TYPE,'content-disposition':'attachment; filename="cv.docx"','content-length':file.length,'cache-control':'no-store','x-content-type-options':'nosniff'});
+    res.end(file);
+  }
+
   // The webhook (spec 8): the same draft as Step 3, with no account, so the skills are the interview's only (S3).
   // The place only adds words to mask. Nothing is stored.
   async function draft(req,res){
@@ -322,7 +355,7 @@ function createCvRouter({config,provider,core,yoma,roleSkills,accountSource,card
   }
   const simOn=Boolean(config?.yovouch?.sim)&&!config?.yovouch?.gatewaySecret;
 
-  const POST={'/api/cv/record':record,'/api/cv/review':review,'/api/cv/check':check,'/api/cv/skills':skills};
+  const POST={'/api/cv/record':record,'/api/cv/review':review,'/api/cv/check':check,'/api/cv/skills':skills,'/api/cv/docx':docx};
   if(serviceSecret)POST['/api/cv/draft']=draft;
   function handle(req,res,url){
     const p=url.pathname,m=req.method;

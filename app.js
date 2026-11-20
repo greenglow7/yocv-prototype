@@ -5,6 +5,7 @@
 'use strict';
 const C=window.YoCV,E=C.escapeHTML;
 const fill=(t,v={})=>String(t??'').replace(/\{(\w+)\}/g,(m,k)=>v[k]==null?'':String(v[k]));
+const DOCX_TYPE='application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 const KINDS=['none','person','completion','vouch'],SCREENS=7,MAX_ENTRIES=3,PHOTO_TYPES=['image/png','image/jpeg','image/webp'],PHOTO_MAX=2*1024*1024;
 const len=s=>[...String(s??'')].length,ym=v=>{const m=/^(\d{4})-(0[1-9]|1[0-2])$/.exec(v);return m?+m[1]*12+(+m[2]-1):null;};
 const thisMonth=()=>{const d=new Date();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2);};
@@ -157,7 +158,7 @@ function cvStep(){
  if(!C.readyForCv(state))return head(4,copy.stepCv)+`<div class="notice">${E(copy.cvNotReady)}</div>`+footer(true);
  const paper=C.renderCvHtml(C.buildCv(state,copy),copy,{headingLevel:2});
  return head(4,copy.stepCv,copy.cvLead)+paper
-  +`<div class="export-actions"><button class="primary" data-action="print">${E(copy.printCv)}</button><button class="secondary" data-action="download-text">${E(copy.downloadText)}</button><button class="secondary" data-action="download-record-html">${E(copy.downloadRecordHtml)}</button><button class="secondary" data-action="download-record-json">${E(copy.downloadRecordJson)}</button></div>`
+  +`<div class="export-actions"><button class="primary" data-action="print">${E(copy.printCv)}</button><button class="secondary" data-action="download-text">${E(copy.downloadText)}</button>${state.offline?'':`<button class="secondary" data-action="download-docx">${E(copy.downloadDocx)}</button>`}<button class="secondary" data-action="download-record-html">${E(copy.downloadRecordHtml)}</button><button class="secondary" data-action="download-record-json">${E(copy.downloadRecordJson)}</button></div>`
   +oppsHTML()+footer(true);
 }
 // The first field that would fail the server's checks (server/cv/routes.js validateEntries), with its screen.
@@ -297,6 +298,15 @@ function download(name,content,type){
  const url=URL.createObjectURL(new Blob([content],{type})),a=document.createElement('a');
  a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);notify(copy.downloadDone);
 }
+// The Word file comes from POST /api/cv/docx, so its button shows only while the server answers. The photo stays here.
+async function downloadDocx(){
+ const cv=C.buildCv(state,copy);cv.optional.photo='';
+ let res;
+ try{res=await fetch('/api/cv/docx',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({cv})});}
+ catch{goOffline();rerender();notify(copy.errServer);return;}
+ if(!res.ok){const data=await res.json().catch(()=>({}));notify(data.error?.message||copy.errServer);return;}
+ download('YoCV-CV.docx',await res.blob(),DOCX_TYPE);
+}
 const recordPage=record=>`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${E(copy.recordTitle)}</title><style>body{font:16px/1.5 Arial,Helvetica,"Liberation Sans",sans-serif;max-width:720px;margin:32px auto;padding:0 16px;color:#020304}.record-row{border-top:1px solid #dce0e5;margin-top:16px;padding-top:8px}p,li,dd{overflow-wrap:anywhere}</style>${C.renderRecordHtml(record,copy)}</html>`;
 // Steps 3 and 4 need valid work answers and a fresh review; anything stale goes back through the review.
 async function enter(step){
@@ -382,6 +392,7 @@ view.addEventListener('click',async event=>{
  if(action==='cancel-edit'){ui.editing=null;ui.editError='';rerender();}
  if(action==='add-skill')await addSkill();
  if(action==='print')window.print();
+ if(action==='download-docx')await downloadDocx();
  if(action==='download-text')download('YoCV-CV.txt',C.buildCvText(C.buildCv(state,copy),copy),'text/plain;charset=utf-8');
  if(action==='download-record-html')download('YoCV-evidence.html',recordPage(C.buildCvRecord(state,copy)),'text/html;charset=utf-8');
  if(action==='download-record-json')download('YoCV-evidence.json',JSON.stringify(C.buildCvRecord(state,copy),null,2),'application/json');

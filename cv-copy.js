@@ -106,7 +106,7 @@
     profileWaiting:'The profile line appears once every line and skill has a decision.',profileNone:'No profile line could be built from what you accepted.',
     reviewPending:'Decide on every line and skill, and accept at least one line, to continue.',continueCv:'Continue to your CV',
     cvLead:'Print your CV or save the downloads.',cvNotReady:'Finish the review first. Every line needs a decision.',
-    printCv:'Print or save as PDF',downloadText:'Download text',downloadRecordHtml:'Download evidence record (HTML)',downloadRecordJson:'Download evidence record (JSON)',
+    printCv:'Print or save as PDF',downloadText:'Download text',downloadRecordHtml:'Download evidence record (HTML)',downloadRecordJson:'Download evidence record (JSON)',downloadDocx:'Download Word file',
     downloadDone:'Download prepared. Check your browser downloads.',
     oppHeading:'Learning opportunities on Yoma for this role',oppIntro:'These come from a keyword search of the public Yoma list for {role}, not from your record.',
     oppLoading:'Looking for learning opportunities on Yoma.',oppUnavailable:'Yoma opportunities are unavailable right now.',oppEmpty:'No Yoma learning opportunities matched this role yet.',
