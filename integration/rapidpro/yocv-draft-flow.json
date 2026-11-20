@@ -1,0 +1,1096 @@
+{
+  "_note": "Skeleton. Untested against a RapidPro instance.",
+  "version": "13",
+  "site": "https://rapidpro.example",
+  "flows": [
+    {
+      "uuid": "fade0e45-144b-4f7c-aa38-ba2bbf595d31",
+      "name": "YoCV draft",
+      "spec_version": "13.1.0",
+      "language": "eng",
+      "type": "messaging",
+      "revision": 1,
+      "expire_after_minutes": 10080,
+      "localization": {},
+      "nodes": [
+        {
+          "uuid": "1ad52952-8cd5-4057-aeb5-cbca7eee8e67",
+          "actions": [
+            {
+              "type": "send_msg",
+              "uuid": "aa399601-daba-4fc9-a9d0-243b5f0bb431",
+              "text": "What do you call this work? For example: Braiding at home.",
+              "attachments": [],
+              "quick_replies": []
+            }
+          ],
+          "exits": [
+            {
+              "uuid": "359ba004-ccf3-4d74-af67-a49addace6fc",
+              "destination_uuid": "56a41b4b-58ba-4e99-a0c9-4f4ecef12b7b"
+            }
+          ]
+        },
+        {
+          "uuid": "56a41b4b-58ba-4e99-a0c9-4f4ecef12b7b",
+          "actions": [],
+          "router": {
+            "type": "switch",
+            "operand": "@input.text",
+            "wait": {
+              "type": "msg"
+            },
+            "result_name": "title",
+            "cases": [
+              {
+                "uuid": "051e8aac-6aee-4658-abc6-4d262c30dd1f",
+                "type": "has_text",
+                "arguments": [],
+                "category_uuid": "45d81376-05ea-4e0c-a851-837cb6a4e79b"
+              }
+            ],
+            "categories": [
+              {
+                "uuid": "45d81376-05ea-4e0c-a851-837cb6a4e79b",
+                "name": "Answered",
+                "exit_uuid": "feb3195b-1644-4641-af28-e5c35a9b2648"
+              },
+              {
+                "uuid": "591c6c87-0297-4156-adc7-e17124a1fa36",
+                "name": "Other",
+                "exit_uuid": "4b2ffae8-c3bd-4461-adb0-e2981a56374b"
+              }
+            ],
+            "default_category_uuid": "591c6c87-0297-4156-adc7-e17124a1fa36"
+          },
+          "exits": [
+            {
+              "uuid": "feb3195b-1644-4641-af28-e5c35a9b2648",
+              "destination_uuid": "19a96b18-fe47-49f8-a785-6daaa53dedf7"
+            },
+            {
+              "uuid": "4b2ffae8-c3bd-4461-adb0-e2981a56374b",
+              "destination_uuid": "b2cc46a6-8514-4e4e-ad90-0a579f9c55ad"
+            }
+          ]
+        },
+        {
+          "uuid": "b2cc46a6-8514-4e4e-ad90-0a579f9c55ad",
+          "actions": [
+            {
+              "type": "send_msg",
+              "uuid": "a63a9692-0015-4a01-a5f9-08c1f1f65776",
+              "text": "Sorry, I did not get that. What do you call this work? For example: Braiding at home.",
+              "attachments": [],
+              "quick_replies": []
+            }
+          ],
+          "exits": [
+            {
+              "uuid": "acdce9e9-f315-4520-a260-04424412e37d",
+              "destination_uuid": "56a41b4b-58ba-4e99-a0c9-4f4ecef12b7b"
+            }
+          ]
+        },
+        {
+          "uuid": "19a96b18-fe47-49f8-a785-6daaa53dedf7",
+          "actions": [
+            {
+              "type": "send_msg",
+              "uuid": "1b00c5a0-d7ef-4cf6-a0e9-9ba6e76a6e3a",
+              "text": "What do you do in this work? Say it in your own words.",
+              "attachments": [],
+              "quick_replies": []
+            }
+          ],
+          "exits": [
+            {
+              "uuid": "b62aabb9-cffd-4368-aadf-b95b635f7d39",
+              "destination_uuid": "70f79581-ff8b-4a0a-a22f-b4fe8b795a37"
+            }
+          ]
+        },
+        {
+          "uuid": "70f79581-ff8b-4a0a-a22f-b4fe8b795a37",
+          "actions": [],
+          "router": {
+            "type": "switch",
+            "operand": "@input.text",
+            "wait": {
+              "type": "msg"
+            },
+            "result_name": "what",
+            "cases": [
+              {
+                "uuid": "b39eccfb-bb11-4336-a637-e737b7497ced",
+                "type": "has_text",
+                "arguments": [],
+                "category_uuid": "606da3d6-1a95-462f-ad96-44f055fbb0f1"
+              }
+            ],
+            "categories": [
+              {
+                "uuid": "606da3d6-1a95-462f-ad96-44f055fbb0f1",
+                "name": "Answered",
+                "exit_uuid": "9318a977-092f-49fc-ae49-bf76ff841ff5"
+              },
+              {
+                "uuid": "1312aebf-f289-4d3b-a21a-f5951eae9502",
+                "name": "Other",
+                "exit_uuid": "602168ba-8902-4afa-adcb-957ef3a29ab8"
+              }
+            ],
+            "default_category_uuid": "1312aebf-f289-4d3b-a21a-f5951eae9502"
+          },
+          "exits": [
+            {
+              "uuid": "9318a977-092f-49fc-ae49-bf76ff841ff5",
+              "destination_uuid": "9e8696c6-c1f6-4ea6-a082-60e74f4d5b24"
+            },
+            {
+              "uuid": "602168ba-8902-4afa-adcb-957ef3a29ab8",
+              "destination_uuid": "67b94242-9e02-4172-acf0-8a265ad7374c"
+            }
+          ]
+        },
+        {
+          "uuid": "67b94242-9e02-4172-acf0-8a265ad7374c",
+          "actions": [
+            {
+              "type": "send_msg",
+              "uuid": "88586568-b256-4fe2-ad80-b32fe40f62aa",
+              "text": "Sorry, I did not get that. What do you do in this work? Say it in your own words.",
+              "attachments": [],
+              "quick_replies": []
+            }
+          ],
+          "exits": [
+            {
+              "uuid": "342afe72-b155-4773-a0e3-d1f1396e74ed",
+              "destination_uuid": "70f79581-ff8b-4a0a-a22f-b4fe8b795a37"
+            }
+          ]
+        },
+        {
+          "uuid": "9e8696c6-c1f6-4ea6-a082-60e74f4d5b24",
+          "actions": [
+            {
+              "type": "send_msg",
+              "uuid": "c8b5b35b-710b-4614-abdf-753a87c3a905",
+              "text": "Who is it for?",
+              "attachments": [],
+              "quick_replies": [
+                "customers",
+                "a family business",
+                "a household",
+                "a community group",
+                "an employer"
+              ]
+            }
+          ],
+          "exits": [
+            {
+              "uuid": "e6c92a35-d672-42fb-a7d9-032ceade8faf",
+              "destination_uuid": "348b37a6-58e2-45cb-a25e-cc5391375107"
+            }
+          ]
+        },
+        {
+          "uuid": "348b37a6-58e2-45cb-a25e-cc5391375107",
+          "actions": [],
+          "router": {
+            "type": "switch",
+            "operand": "@input.text",
+            "wait": {
+              "type": "msg"
+            },
+            "result_name": "for_whom",
+            "cases": [
+              {
+                "uuid": "a6a0c269-cc64-4d58-a7be-28418f06d767",
+                "type": "has_text",
+                "arguments": [],
+                "category_uuid": "3232d3d2-23f3-487a-a9ab-9c7c76641d53"
+              }
+            ],
+            "categories": [
+              {
+                "uuid": "3232d3d2-23f3-487a-a9ab-9c7c76641d53",
+                "name": "Answered",
+                "exit_uuid": "6c5bb80e-6835-468b-a10b-a3681f268810"
+              },
+              {
+                "uuid": "62722941-cabd-4583-a039-a1cb793980b5",
+                "name": "Other",
+                "exit_uuid": "de3dce2e-983e-42c0-acf5-e1fe92388f6c"
+              }
+            ],
+            "default_category_uuid": "62722941-cabd-4583-a039-a1cb793980b5"
+          },
+          "exits": [
+            {
+              "uuid": "6c5bb80e-6835-468b-a10b-a3681f268810",
+              "destination_uuid": "d9c3cf38-bdda-42fb-a8a0-83ccabf0e035"
+            },
+            {
+              "uuid": "de3dce2e-983e-42c0-acf5-e1fe92388f6c",
+              "destination_uuid": "565bb224-2faf-413c-afa4-26a3ae80e899"
+            }
+          ]
+        },
+        {
+          "uuid": "565bb224-2faf-413c-afa4-26a3ae80e899",
+          "actions": [
+            {
+              "type": "send_msg",
+              "uuid": "011a83b2-2681-4b60-a31f-6266b60593f2",
+              "text": "Sorry, I did not get that. Who is it for?",
+              "attachments": [],
+              "quick_replies": [
+                "customers",
+                "a family business",
+                "a household",
+                "a community group",
+                "an employer"
+              ]
+            }
+          ],
+          "exits": [
+            {
+              "uuid": "ebe4539b-36a0-4bbc-a466-b53a398feb8a",
+              "destination_uuid": "348b37a6-58e2-45cb-a25e-cc5391375107"
+            }
+          ]
+        },
+        {
+          "uuid": "d9c3cf38-bdda-42fb-a8a0-83ccabf0e035",
+          "actions": [
+            {
+              "type": "send_msg",
+              "uuid": "a1084144-03d3-4143-a08c-bb40f2e18eba",
+              "text": "How often do you do it?",
+              "attachments": [],
+              "quick_replies": [
+                "daily",
+                "a few times a week",
+                "weekly",
+                "now and then"
+              ]
+            }
+          ],
+          "exits": [
+            {
+              "uuid": "570b7521-522b-4e04-aea6-f564ca107f12",
+              "destination_uuid": "fb968984-6ca4-4bc5-af13-0b2180a297ec"
+            }
+          ]
+        },
+        {
+          "uuid": "fb968984-6ca4-4bc5-af13-0b2180a297ec",
+          "actions": [],
+          "router": {
+            "type": "switch",
+            "operand": "@input.text",
+            "wait": {
+              "type": "msg"
+            },
+            "result_name": "frequency",
+            "cases": [
+              {
+                "uuid": "6ce83cd5-ee19-4451-a9cb-9d3ac4d86741",
+                "type": "has_text",
+                "arguments": [],
+                "category_uuid": "770bce87-170d-430d-abb2-4269c7dc9c77"
+              }
+            ],
+            "categories": [
+              {
+                "uuid": "770bce87-170d-430d-abb2-4269c7dc9c77",
+                "name": "Answered",
+                "exit_uuid": "21e52cbe-b3ce-4883-a9be-2791b4b9f1a8"
+              },
+              {
+                "uuid": "7f64b3c0-fa8a-4770-a6de-fdc86eda4aa7",
+                "name": "Other",
+                "exit_uuid": "1d881fe0-cf3c-4785-ab6c-1256fd357f44"
+              }
+            ],
+            "default_category_uuid": "7f64b3c0-fa8a-4770-a6de-fdc86eda4aa7"
+          },
+          "exits": [
+            {
+              "uuid": "21e52cbe-b3ce-4883-a9be-2791b4b9f1a8",
+              "destination_uuid": "fdd93c0f-13ea-4e76-a109-d7d48104b2c0"
+            },
+            {
+              "uuid": "1d881fe0-cf3c-4785-ab6c-1256fd357f44",
+              "destination_uuid": "6df5eaba-9dd2-4acc-aa6a-134943f6e5fc"
+            }
+          ]
+        },
+        {
+          "uuid": "6df5eaba-9dd2-4acc-aa6a-134943f6e5fc",
+          "actions": [
+            {
+              "type": "send_msg",
+              "uuid": "43112b88-8e72-4e71-aa1d-ef072b58af2c",
+              "text": "Sorry, I did not get that. How often do you do it?",
+              "attachments": [],
+              "quick_replies": [
+                "daily",
+                "a few times a week",
+                "weekly",
+                "now and then"
+              ]
+            }
+          ],
+          "exits": [
+            {
+              "uuid": "8ac9d0dd-165c-480a-a588-98fd202859e4",
+              "destination_uuid": "fb968984-6ca4-4bc5-af13-0b2180a297ec"
+            }
+          ]
+        },
+        {
+          "uuid": "fdd93c0f-13ea-4e76-a109-d7d48104b2c0",
+          "actions": [
+            {
+              "type": "send_msg",
+              "uuid": "992c04a5-18d5-41cf-ac95-a12fede60976",
+              "text": "When did you start? Reply with the year and month, like 2025-03.",
+              "attachments": [],
+              "quick_replies": []
+            }
+          ],
+          "exits": [
+            {
+              "uuid": "d6616d74-1cda-4601-adae-335f277d68d2",
+              "destination_uuid": "100948ba-4d71-4256-a975-3c2e453e55b3"
+            }
+          ]
+        },
+        {
+          "uuid": "100948ba-4d71-4256-a975-3c2e453e55b3",
+          "actions": [],
+          "router": {
+            "type": "switch",
+            "operand": "@input.text",
+            "wait": {
+              "type": "msg"
+            },
+            "result_name": "start_month",
+            "cases": [
+              {
+                "uuid": "c275ca24-7f62-4317-ae8d-4a8ebc13f0ce",
+                "type": "has_pattern",
+                "arguments": [
+                  "^\\d{4}-(0[1-9]|1[0-2])$"
+                ],
+                "category_uuid": "ecb8b629-e9b2-42d1-a1e3-6d15e722d473"
+              }
+            ],
+            "categories": [
+              {
+                "uuid": "ecb8b629-e9b2-42d1-a1e3-6d15e722d473",
+                "name": "Answered",
+                "exit_uuid": "5912d312-fc1c-43b8-a902-4ed14aea3a03"
+              },
+              {
+                "uuid": "892cba0b-4a04-4794-a00c-c21afe8ecea8",
+                "name": "Other",
+                "exit_uuid": "9e50e267-2cb3-4793-aa9e-93b42a1e244d"
+              }
+            ],
+            "default_category_uuid": "892cba0b-4a04-4794-a00c-c21afe8ecea8"
+          },
+          "exits": [
+            {
+              "uuid": "5912d312-fc1c-43b8-a902-4ed14aea3a03",
+              "destination_uuid": "c28db124-35ac-4408-ae7b-de75a31465e5"
+            },
+            {
+              "uuid": "9e50e267-2cb3-4793-aa9e-93b42a1e244d",
+              "destination_uuid": "5ea1724d-5ee7-4c45-a950-ff76f4786ab1"
+            }
+          ]
+        },
+        {
+          "uuid": "5ea1724d-5ee7-4c45-a950-ff76f4786ab1",
+          "actions": [
+            {
+              "type": "send_msg",
+              "uuid": "30722390-0823-464f-a9ef-92b21eeeae9b",
+              "text": "Sorry, I did not get that. When did you start? Reply with the year and month, like 2025-03.",
+              "attachments": [],
+              "quick_replies": []
+            }
+          ],
+          "exits": [
+            {
+              "uuid": "ea8163ef-34f0-488a-af2c-322a03249378",
+              "destination_uuid": "100948ba-4d71-4256-a975-3c2e453e55b3"
+            }
+          ]
+        },
+        {
+          "uuid": "c28db124-35ac-4408-ae7b-de75a31465e5",
+          "actions": [
+            {
+              "type": "send_msg",
+              "uuid": "3dfc7bed-2045-450a-a1cb-e14592af4cbf",
+              "text": "How many, as one number? For example: 40.",
+              "attachments": [],
+              "quick_replies": []
+            }
+          ],
+          "exits": [
+            {
+              "uuid": "d2c576e3-a6ff-445a-a04c-b76806b67540",
+              "destination_uuid": "5f33d169-c1d9-4f15-a8a9-50131f546a6a"
+            }
+          ]
+        },
+        {
+          "uuid": "5f33d169-c1d9-4f15-a8a9-50131f546a6a",
+          "actions": [],
+          "router": {
+            "type": "switch",
+            "operand": "@input.text",
+            "wait": {
+              "type": "msg"
+            },
+            "result_name": "number",
+            "cases": [
+              {
+                "uuid": "28bacd93-c29d-4181-a6a8-36c78b5566ee",
+                "type": "has_number",
+                "arguments": [],
+                "category_uuid": "02031d8b-c28c-4330-a287-d46366b3cb58"
+              }
+            ],
+            "categories": [
+              {
+                "uuid": "02031d8b-c28c-4330-a287-d46366b3cb58",
+                "name": "Answered",
+                "exit_uuid": "c8c4fcb9-f11c-4457-aab7-b5962c089a98"
+              },
+              {
+                "uuid": "98cc3b31-eefd-4fbf-a649-78dba845012d",
+                "name": "Other",
+                "exit_uuid": "a7aa3c20-526d-4cdf-a657-f2744f3d0f98"
+              }
+            ],
+            "default_category_uuid": "98cc3b31-eefd-4fbf-a649-78dba845012d"
+          },
+          "exits": [
+            {
+              "uuid": "c8c4fcb9-f11c-4457-aab7-b5962c089a98",
+              "destination_uuid": "7a24a6e3-457a-44f2-a27b-4ed70d2f99fc"
+            },
+            {
+              "uuid": "a7aa3c20-526d-4cdf-a657-f2744f3d0f98",
+              "destination_uuid": "bcdd63cb-e242-4c39-a0c2-3e11415014bd"
+            }
+          ]
+        },
+        {
+          "uuid": "bcdd63cb-e242-4c39-a0c2-3e11415014bd",
+          "actions": [
+            {
+              "type": "send_msg",
+              "uuid": "7140b425-a5db-4226-a750-38cca56ed5c6",
+              "text": "Sorry, I did not get that. How many, as one number? For example: 40.",
+              "attachments": [],
+              "quick_replies": []
+            }
+          ],
+          "exits": [
+            {
+              "uuid": "f1150e8e-c22c-49f1-ad61-bb45727616a3",
+              "destination_uuid": "5f33d169-c1d9-4f15-a8a9-50131f546a6a"
+            }
+          ]
+        },
+        {
+          "uuid": "7a24a6e3-457a-44f2-a27b-4ed70d2f99fc",
+          "actions": [
+            {
+              "type": "send_msg",
+              "uuid": "20afe6f5-4fcd-4b89-a190-dbb0dda69d3d",
+              "text": "Is that number exact?",
+              "attachments": [],
+              "quick_replies": [
+                "exactly",
+                "about",
+                "at least"
+              ]
+            }
+          ],
+          "exits": [
+            {
+              "uuid": "7334af90-5a11-418f-a312-b86e907e9957",
+              "destination_uuid": "d1f3bc0f-71ea-4d83-a6b6-67dba55447d2"
+            }
+          ]
+        },
+        {
+          "uuid": "d1f3bc0f-71ea-4d83-a6b6-67dba55447d2",
+          "actions": [],
+          "router": {
+            "type": "switch",
+            "operand": "@input.text",
+            "wait": {
+              "type": "msg"
+            },
+            "result_name": "hedge",
+            "cases": [
+              {
+                "uuid": "8e62fd49-bd71-47aa-a61f-d7b9e6cf8c44",
+                "type": "has_text",
+                "arguments": [],
+                "category_uuid": "0911a61c-0dbf-4b57-a838-f2bb4a74a7c7"
+              }
+            ],
+            "categories": [
+              {
+                "uuid": "0911a61c-0dbf-4b57-a838-f2bb4a74a7c7",
+                "name": "Answered",
+                "exit_uuid": "b0465fcc-980b-4908-ace9-900791c13ccb"
+              },
+              {
+                "uuid": "e7e19727-e2da-4663-a7df-ccbc3d5babe6",
+                "name": "Other",
+                "exit_uuid": "8be348d4-ad02-4afa-a74c-d75c297b8d0f"
+              }
+            ],
+            "default_category_uuid": "e7e19727-e2da-4663-a7df-ccbc3d5babe6"
+          },
+          "exits": [
+            {
+              "uuid": "b0465fcc-980b-4908-ace9-900791c13ccb",
+              "destination_uuid": "07617487-5d5b-401d-a577-6087b0bf6a74"
+            },
+            {
+              "uuid": "8be348d4-ad02-4afa-a74c-d75c297b8d0f",
+              "destination_uuid": "9adccd41-74a0-4555-a28a-c8b90e0acbef"
+            }
+          ]
+        },
+        {
+          "uuid": "9adccd41-74a0-4555-a28a-c8b90e0acbef",
+          "actions": [
+            {
+              "type": "send_msg",
+              "uuid": "abfe0c9e-0373-45e4-aa7d-8df0df43c880",
+              "text": "Sorry, I did not get that. Is that number exact?",
+              "attachments": [],
+              "quick_replies": [
+                "exactly",
+                "about",
+                "at least"
+              ]
+            }
+          ],
+          "exits": [
+            {
+              "uuid": "8ad76e29-c730-4bc9-a07d-38169060fc70",
+              "destination_uuid": "d1f3bc0f-71ea-4d83-a6b6-67dba55447d2"
+            }
+          ]
+        },
+        {
+          "uuid": "07617487-5d5b-401d-a577-6087b0bf6a74",
+          "actions": [
+            {
+              "type": "send_msg",
+              "uuid": "3a1a0001-34c6-47e7-aa3a-8cefb6f70c59",
+              "text": "How many of what?",
+              "attachments": [],
+              "quick_replies": [
+                "customers a day",
+                "customers a week",
+                "items",
+                "people",
+                "trips",
+                "rand a week",
+                "shillings a week"
+              ]
+            }
+          ],
+          "exits": [
+            {
+              "uuid": "222bd98e-183a-4dc8-a257-c29fd25de417",
+              "destination_uuid": "d6f5f84a-26f4-4d99-afbf-99240eb93da4"
+            }
+          ]
+        },
+        {
+          "uuid": "d6f5f84a-26f4-4d99-afbf-99240eb93da4",
+          "actions": [],
+          "router": {
+            "type": "switch",
+            "operand": "@input.text",
+            "wait": {
+              "type": "msg"
+            },
+            "result_name": "unit",
+            "cases": [
+              {
+                "uuid": "ce2a3e27-f39e-4c5c-a03e-d6a11ded213f",
+                "type": "has_text",
+                "arguments": [],
+                "category_uuid": "a4bfab0d-a016-486f-a932-f5bbe7e92a7e"
+              }
+            ],
+            "categories": [
+              {
+                "uuid": "a4bfab0d-a016-486f-a932-f5bbe7e92a7e",
+                "name": "Answered",
+                "exit_uuid": "e90f1e83-1792-46eb-a7c8-62d48a50ec37"
+              },
+              {
+                "uuid": "ca46927c-8813-4288-a5ae-33f1b0ddf73d",
+                "name": "Other",
+                "exit_uuid": "c81992c6-57bc-40fc-a76a-94230ec79ea0"
+              }
+            ],
+            "default_category_uuid": "ca46927c-8813-4288-a5ae-33f1b0ddf73d"
+          },
+          "exits": [
+            {
+              "uuid": "e90f1e83-1792-46eb-a7c8-62d48a50ec37",
+              "destination_uuid": "5e283c6c-da0a-4ba2-a740-150920113384"
+            },
+            {
+              "uuid": "c81992c6-57bc-40fc-a76a-94230ec79ea0",
+              "destination_uuid": "79e60a14-eb11-4e78-a0b6-614f4b960b3a"
+            }
+          ]
+        },
+        {
+          "uuid": "79e60a14-eb11-4e78-a0b6-614f4b960b3a",
+          "actions": [
+            {
+              "type": "send_msg",
+              "uuid": "65af171e-c6ba-4391-a0bd-1f5c8bcfb0ed",
+              "text": "Sorry, I did not get that. How many of what?",
+              "attachments": [],
+              "quick_replies": [
+                "customers a day",
+                "customers a week",
+                "items",
+                "people",
+                "trips",
+                "rand a week",
+                "shillings a week"
+              ]
+            }
+          ],
+          "exits": [
+            {
+              "uuid": "dc6be8ff-dabe-4026-a5f7-a9aae16c7423",
+              "destination_uuid": "d6f5f84a-26f4-4d99-afbf-99240eb93da4"
+            }
+          ]
+        },
+        {
+          "uuid": "5e283c6c-da0a-4ba2-a740-150920113384",
+          "actions": [
+            {
+              "type": "send_msg",
+              "uuid": "393d5873-671a-47a9-a403-8ce72276ea6a",
+              "text": "What came of it? For example: most of them come back.",
+              "attachments": [],
+              "quick_replies": []
+            }
+          ],
+          "exits": [
+            {
+              "uuid": "06ea217f-e9cb-44c5-a64d-911c18ec9405",
+              "destination_uuid": "7a406c9a-57c0-4866-a3db-dcb60a444737"
+            }
+          ]
+        },
+        {
+          "uuid": "7a406c9a-57c0-4866-a3db-dcb60a444737",
+          "actions": [],
+          "router": {
+            "type": "switch",
+            "operand": "@input.text",
+            "wait": {
+              "type": "msg"
+            },
+            "result_name": "outcome",
+            "cases": [
+              {
+                "uuid": "49a08acc-b9e2-491b-a284-fbc123ae7fa7",
+                "type": "has_text",
+                "arguments": [],
+                "category_uuid": "f7ee91c9-2762-44ac-a323-f9b480b1488c"
+              }
+            ],
+            "categories": [
+              {
+                "uuid": "f7ee91c9-2762-44ac-a323-f9b480b1488c",
+                "name": "Answered",
+                "exit_uuid": "dac99c1d-d4db-4596-a0ba-b399324222c4"
+              },
+              {
+                "uuid": "2568e9c0-9dae-4d92-ace3-425f98ed41e5",
+                "name": "Other",
+                "exit_uuid": "c2bf9423-ffe1-4f8f-afe3-99a623d7dd7d"
+              }
+            ],
+            "default_category_uuid": "2568e9c0-9dae-4d92-ace3-425f98ed41e5"
+          },
+          "exits": [
+            {
+              "uuid": "dac99c1d-d4db-4596-a0ba-b399324222c4",
+              "destination_uuid": "00de3b0e-c855-44f6-a589-3941f254329f"
+            },
+            {
+              "uuid": "c2bf9423-ffe1-4f8f-afe3-99a623d7dd7d",
+              "destination_uuid": "55f306c3-831e-46de-aa57-ac69081765fa"
+            }
+          ]
+        },
+        {
+          "uuid": "55f306c3-831e-46de-aa57-ac69081765fa",
+          "actions": [
+            {
+              "type": "send_msg",
+              "uuid": "63cc73dc-2faf-4f46-af87-3500945a7391",
+              "text": "Sorry, I did not get that. What came of it? For example: most of them come back.",
+              "attachments": [],
+              "quick_replies": []
+            }
+          ],
+          "exits": [
+            {
+              "uuid": "dfe46bd5-dda2-4944-a29d-08447acbff96",
+              "destination_uuid": "7a406c9a-57c0-4866-a3db-dcb60a444737"
+            }
+          ]
+        },
+        {
+          "uuid": "00de3b0e-c855-44f6-a589-3941f254329f",
+          "actions": [
+            {
+              "type": "call_webhook",
+              "uuid": "53f866e1-66de-408b-a541-f927110905bd",
+              "method": "POST",
+              "url": "@globals.yocv_base_url/api/cv/draft",
+              "headers": {
+                "Content-Type": "application/json",
+                "x-yocv-service-secret": "@globals.yocv_service_secret"
+              },
+              "body": "{\"role\":@(json(globals.yocv_role)),\"lang\":\"en\",\"entries\":[{\"title\":@(json(results.title.value)),\"what\":@(json(results.what.value)),\"forWhom\":@(json(results.for_whom.value)),\"frequency\":@(json(results.frequency.value)),\"months\":{\"start\":@(json(results.start_month.value)),\"end\":\"\"},\"number\":{\"value\":@(number(results.number.value)),\"unit\":@(json(results.unit.value)),\"hedge\":@(json(results.hedge.value))},\"outcome\":@(json(results.outcome.value))}]}",
+              "result_name": "yocv_draft"
+            }
+          ],
+          "router": {
+            "type": "switch",
+            "operand": "@results.yocv_draft.category",
+            "cases": [
+              {
+                "uuid": "db8dd723-fbc0-4784-ad09-521165de9f09",
+                "type": "has_only_text",
+                "arguments": [
+                  "Success"
+                ],
+                "category_uuid": "b254a894-e581-4652-ac18-7f7969941e43"
+              }
+            ],
+            "categories": [
+              {
+                "uuid": "b254a894-e581-4652-ac18-7f7969941e43",
+                "name": "Success",
+                "exit_uuid": "13ab9bfc-dedf-4d82-ac96-4b71962e56c9"
+              },
+              {
+                "uuid": "bebdded5-225f-4581-abc0-54e5113f7722",
+                "name": "Failure",
+                "exit_uuid": "65b811dd-75b8-4c66-a967-49aea58fa9c2"
+              }
+            ],
+            "default_category_uuid": "bebdded5-225f-4581-abc0-54e5113f7722"
+          },
+          "exits": [
+            {
+              "uuid": "13ab9bfc-dedf-4d82-ac96-4b71962e56c9",
+              "destination_uuid": "2890445a-7071-4844-a205-ba1120893305"
+            },
+            {
+              "uuid": "65b811dd-75b8-4c66-a967-49aea58fa9c2",
+              "destination_uuid": "e1bac145-0ab5-49dd-a12f-c9717fab699f"
+            }
+          ]
+        },
+        {
+          "uuid": "2890445a-7071-4844-a205-ba1120893305",
+          "actions": [
+            {
+              "type": "send_msg",
+              "uuid": "ff9e66bf-37d7-4898-ab79-4da920485806",
+              "text": "Here is a line for your CV, written from your answers:\n\n@webhook.json.bullets.0.text\n\nReply 1 to accept it or 2 to change your answers.",
+              "attachments": [],
+              "quick_replies": [
+                "1",
+                "2"
+              ]
+            }
+          ],
+          "exits": [
+            {
+              "uuid": "d4f61d9b-c676-4efd-a47a-ef43c7234c83",
+              "destination_uuid": "92abe91a-aeae-4099-ad0c-c0c39be2c9ad"
+            }
+          ]
+        },
+        {
+          "uuid": "92abe91a-aeae-4099-ad0c-c0c39be2c9ad",
+          "actions": [],
+          "router": {
+            "type": "switch",
+            "operand": "@input.text",
+            "wait": {
+              "type": "msg"
+            },
+            "result_name": "decision",
+            "cases": [
+              {
+                "uuid": "e89fd0f5-7a40-4e08-ac83-78c0cfc0dfa5",
+                "type": "has_any_word",
+                "arguments": [
+                  "1"
+                ],
+                "category_uuid": "cb492abe-b432-44f4-aa3f-a1938d41f8ec"
+              },
+              {
+                "uuid": "d8c77c8b-cf8e-43d0-a70d-aca317731aec",
+                "type": "has_any_word",
+                "arguments": [
+                  "2"
+                ],
+                "category_uuid": "c0644e56-464f-4fd2-ab76-a126ad41bd55"
+              }
+            ],
+            "categories": [
+              {
+                "uuid": "cb492abe-b432-44f4-aa3f-a1938d41f8ec",
+                "name": "Accept",
+                "exit_uuid": "4f63d533-bcc1-4b4d-a5ce-ea3f1cd2e3f5"
+              },
+              {
+                "uuid": "c0644e56-464f-4fd2-ab76-a126ad41bd55",
+                "name": "Change",
+                "exit_uuid": "59e10e75-08de-462d-a1da-007814bd69bb"
+              },
+              {
+                "uuid": "f7ab126f-08ef-41a6-a153-e400b55d68f0",
+                "name": "Other",
+                "exit_uuid": "046630f8-1a07-44a4-a7a9-827aa7c9d919"
+              }
+            ],
+            "default_category_uuid": "f7ab126f-08ef-41a6-a153-e400b55d68f0"
+          },
+          "exits": [
+            {
+              "uuid": "4f63d533-bcc1-4b4d-a5ce-ea3f1cd2e3f5",
+              "destination_uuid": "0ec7ae40-78b8-49ab-ad63-cdac2eb91e55"
+            },
+            {
+              "uuid": "59e10e75-08de-462d-a1da-007814bd69bb",
+              "destination_uuid": "19a96b18-fe47-49f8-a785-6daaa53dedf7"
+            },
+            {
+              "uuid": "046630f8-1a07-44a4-a7a9-827aa7c9d919",
+              "destination_uuid": "de061c47-c22a-43e2-a85f-7b243e50007f"
+            }
+          ]
+        },
+        {
+          "uuid": "de061c47-c22a-43e2-a85f-7b243e50007f",
+          "actions": [
+            {
+              "type": "send_msg",
+              "uuid": "7642e7af-d9c6-4a22-ae01-4a8290dec976",
+              "text": "Please reply 1 to accept the line or 2 to change your answers.",
+              "attachments": [],
+              "quick_replies": [
+                "1",
+                "2"
+              ]
+            }
+          ],
+          "exits": [
+            {
+              "uuid": "63b31332-d056-4f12-a701-4b62b0e53a90",
+              "destination_uuid": "92abe91a-aeae-4099-ad0c-c0c39be2c9ad"
+            }
+          ]
+        },
+        {
+          "uuid": "0ec7ae40-78b8-49ab-ad63-cdac2eb91e55",
+          "actions": [
+            {
+              "type": "send_msg",
+              "uuid": "3d0c6c82-552f-4f11-a104-505c8c0802ba",
+              "text": "Thank you. You accepted this line for your CV.",
+              "attachments": [],
+              "quick_replies": []
+            }
+          ],
+          "exits": [
+            {
+              "uuid": "f438c361-884f-4107-a9b3-6410307a2239",
+              "destination_uuid": null
+            }
+          ]
+        },
+        {
+          "uuid": "e1bac145-0ab5-49dd-a12f-c9717fab699f",
+          "actions": [
+            {
+              "type": "send_msg",
+              "uuid": "3e8450f3-c536-46c7-a3b8-48ba7356384f",
+              "text": "Sorry, I could not write your line just now. Please try again later.",
+              "attachments": [],
+              "quick_replies": []
+            }
+          ],
+          "exits": [
+            {
+              "uuid": "3dd32d2b-8a77-45ff-a0be-babe83d9f648",
+              "destination_uuid": null
+            }
+          ]
+        }
+      ],
+      "_ui": {
+        "nodes": {
+          "1ad52952-8cd5-4057-aeb5-cbca7eee8e67": {
+            "type": "execute_actions"
+          },
+          "56a41b4b-58ba-4e99-a0c9-4f4ecef12b7b": {
+            "type": "wait_for_response"
+          },
+          "b2cc46a6-8514-4e4e-ad90-0a579f9c55ad": {
+            "type": "execute_actions"
+          },
+          "19a96b18-fe47-49f8-a785-6daaa53dedf7": {
+            "type": "execute_actions"
+          },
+          "70f79581-ff8b-4a0a-a22f-b4fe8b795a37": {
+            "type": "wait_for_response"
+          },
+          "67b94242-9e02-4172-acf0-8a265ad7374c": {
+            "type": "execute_actions"
+          },
+          "9e8696c6-c1f6-4ea6-a082-60e74f4d5b24": {
+            "type": "execute_actions"
+          },
+          "348b37a6-58e2-45cb-a25e-cc5391375107": {
+            "type": "wait_for_response"
+          },
+          "565bb224-2faf-413c-afa4-26a3ae80e899": {
+            "type": "execute_actions"
+          },
+          "d9c3cf38-bdda-42fb-a8a0-83ccabf0e035": {
+            "type": "execute_actions"
+          },
+          "fb968984-6ca4-4bc5-af13-0b2180a297ec": {
+            "type": "wait_for_response"
+          },
+          "6df5eaba-9dd2-4acc-aa6a-134943f6e5fc": {
+            "type": "execute_actions"
+          },
+          "fdd93c0f-13ea-4e76-a109-d7d48104b2c0": {
+            "type": "execute_actions"
+          },
+          "100948ba-4d71-4256-a975-3c2e453e55b3": {
+            "type": "wait_for_response"
+          },
+          "5ea1724d-5ee7-4c45-a950-ff76f4786ab1": {
+            "type": "execute_actions"
+          },
+          "c28db124-35ac-4408-ae7b-de75a31465e5": {
+            "type": "execute_actions"
+          },
+          "5f33d169-c1d9-4f15-a8a9-50131f546a6a": {
+            "type": "wait_for_response"
+          },
+          "bcdd63cb-e242-4c39-a0c2-3e11415014bd": {
+            "type": "execute_actions"
+          },
+          "7a24a6e3-457a-44f2-a27b-4ed70d2f99fc": {
+            "type": "execute_actions"
+          },
+          "d1f3bc0f-71ea-4d83-a6b6-67dba55447d2": {
+            "type": "wait_for_response"
+          },
+          "9adccd41-74a0-4555-a28a-c8b90e0acbef": {
+            "type": "execute_actions"
+          },
+          "07617487-5d5b-401d-a577-6087b0bf6a74": {
+            "type": "execute_actions"
+          },
+          "d6f5f84a-26f4-4d99-afbf-99240eb93da4": {
+            "type": "wait_for_response"
+          },
+          "79e60a14-eb11-4e78-a0b6-614f4b960b3a": {
+            "type": "execute_actions"
+          },
+          "5e283c6c-da0a-4ba2-a740-150920113384": {
+            "type": "execute_actions"
+          },
+          "7a406c9a-57c0-4866-a3db-dcb60a444737": {
+            "type": "wait_for_response"
+          },
+          "55f306c3-831e-46de-aa57-ac69081765fa": {
+            "type": "execute_actions"
+          },
+          "00de3b0e-c855-44f6-a589-3941f254329f": {
+            "type": "split_by_webhook"
+          },
+          "2890445a-7071-4844-a205-ba1120893305": {
+            "type": "execute_actions"
+          },
+          "92abe91a-aeae-4099-ad0c-c0c39be2c9ad": {
+            "type": "wait_for_response"
+          },
+          "de061c47-c22a-43e2-a85f-7b243e50007f": {
+            "type": "execute_actions"
+          },
+          "0ec7ae40-78b8-49ab-ad63-cdac2eb91e55": {
+            "type": "execute_actions"
+          },
+          "e1bac145-0ab5-49dd-a12f-c9717fab699f": {
+            "type": "execute_actions"
+          }
+        }
+      }
+    }
+  ],
+  "campaigns": [],
+  "triggers": [],
+  "fields": [],
+  "groups": [],
+  "globals": [
+    {
+      "key": "yocv_base_url",
+      "name": "YoCV base URL",
+      "value": "https://yocv.example"
+    },
+    {
+      "key": "yocv_service_secret",
+      "name": "YoCV service secret",
+      "value": ""
+    },
+    {
+      "key": "yocv_role",
+      "name": "YoCV role",
+      "value": "Hairdresser"
+    }
+  ]
+}

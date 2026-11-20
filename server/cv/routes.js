@@ -6,6 +6,8 @@
      POST /api/cv/review        drafts the bullets and combines the skills
      POST /api/cv/check         checks the person's own edit of a bullet or the profile line
      POST /api/cv/skills        recombines the skills with fresh vouches, no model call
+     POST /api/cv/draft         the RapidPro webhook: no account, no session, S3 skills only. Mounted only with
+                                YOCV_SERVICE_SECRET, which x-yocv-service-secret must match.
    Sessions live in memory, 30 minutes from their last use. A session holds the record without the phone number,
    which goes to the browser only for the contact prefill (plan Deviations 9). The place an entry names and its
    confirm choice never reach draftEntries: the place only adds words to mask. Nothing here is saved to disk. */
@@ -17,6 +19,7 @@ const {buildSkillMenu,roleList}=require('./menu.js');
 const {readCvRecord}=require('./record.js');
 const {vouchSources,combineSkills}=require('./skills.js');
 const {ProviderError}=require('../providers/errors.js');
+const {gatewaySecretOk}=require('../card/vouch-routes.js');
 const {createLocalProvider}=require('../providers/local.js');
 
 const SESSION_TTL_MS=30*60*1000;
@@ -25,6 +28,7 @@ const SESSION_ID=/^[0-9a-f]{24}$/;
 const MAX_ENTRIES=3,MAX_NUMBER=100000,MAX_WORDS=40,MAX_WORD=60,MAX_HAND=20,MAX_CHECK_TEXT=1000,MAX_MONTHS=1200;
 const CONFIRM_KINDS=['none','person','completion','vouch'];
 const COPY=copyFor();
+const DRAFT_NOTICE='Draft. Nothing is saved until the person confirms it.';
 const YM=/^(\d{4})-(0[1-9]|1[0-2])$/;
 const str=v=>v==null?'':String(v);
 const list=v=>Array.isArray(v)?v:[];
@@ -110,6 +114,7 @@ const invalid=(res,fields,message)=>sendError(res,400,'invalid_input',message,fa
 function createCvRouter({config,provider,core,yoma,roleSkills,accountSource,cardStore,vouchStore,chipSkills,now=Date.now,readJSONBody,maxInFlight=4,random=crypto.randomBytes}={}){
   if(!accountSource||!core||typeof readJSONBody!=='function')throw new Error('createCvRouter needs accountSource, core and readJSONBody');
   const roleKeys=Object.keys(roleSkills||{});
+  const serviceSecret=str(config?.yocv?.serviceSecret);
   const live=Boolean(provider)&&provider.name!=='local'&&typeof provider.cvBullets==='function';
   let localProvider=provider?.name==='local'&&typeof provider.cvBullets==='function'?provider:null;
   const getLocal=()=>localProvider||(localProvider=createLocalProvider(core));
@@ -263,7 +268,37 @@ function createCvRouter({config,provider,core,yoma,roleSkills,accountSource,card
     sendJSON(res,200,{skills:out,skillsRejected:rejected});
   }
 
+  // The webhook (spec 8): the same draft as Step 3, with no account, so the skills are the interview's only (S3).
+  // The place only adds words to mask. Nothing is stored.
+  async function draft(req,res){
+    if(!gatewaySecretOk(String(req.headers['x-yocv-service-secret']||''),serviceSecret))return sendError(res,403,'forbidden','Unknown service.');
+    const body=await readBody(req,res);
+    if(!body)return;
+    if(typeof body.role!=='string'||!roleKeys.includes(body.role))return invalid(res,['role'],COPY.errRole);
+    const v=validateEntries(body.entries,{now,webhook:true});
+    if(v.fields)return invalid(res,v.fields,v.message);
+    const known=body.entries.flatMap(e=>words(e.place));
+    return withSlot(res,async()=>{
+      try{
+        const {menu:items}=await buildSkillMenu(body.role,{yoma,roleSkills});
+        const {entries:drafts,generation}=await draftEntries({role:body.role,entries:v.entries,provider:live?provider:getLocal(),menu:items,learningTitles:[],known,now});
+        const seen=new Set(),skillsOut=[];
+        for(const k of drafts.flatMap(d=>d.skills))if(!seen.has(k.name)){seen.add(k.name);skillsOut.push({name:k.name,yomaSkill:k.yomaSkill,level:'S3'});}
+        sendJSON(res,200,{draft:true,
+          bullets:drafts.flatMap(d=>d.proposals.map(p=>({entryIndex:d.index,text:p.text,checks:p.checks}))),
+          skills:skillsOut,
+          rejected:drafts.flatMap(d=>d.rejected.filter(r=>r.kind==='bullet').map(r=>({entryIndex:d.index,text:r.text,reason:r.reason}))),
+          generation:{mode:generation.mode,provider:generation.provider,model:generation.model},
+          notice:DRAFT_NOTICE});
+      }catch(err){
+        if(isProviderError(err))return sendError(res,502,err.code,err.message,err.retryable);
+        throw err;
+      }
+    });
+  }
+
   const POST={'/api/cv/record':record,'/api/cv/review':review,'/api/cv/check':check,'/api/cv/skills':skills};
+  if(serviceSecret)POST['/api/cv/draft']=draft;
   function handle(req,res,url){
     const p=url.pathname,m=req.method;
     const notAllowed=()=>Promise.resolve(sendError(res,405,'method_not_allowed','Method not allowed.',false));
