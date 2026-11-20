@@ -206,6 +206,48 @@
   }
   // A [contactN] placeholder is never restored, so a contact detail cannot come back from the model.
   function restoreNames(text,map={}){return String(text??'').replace(/\[name\d+\]/g,p=>Object.hasOwn(map,p)?map[p]:p);}
-  const api={labels,credential,MONTHS,WEEKDAYS,escapeHTML,shortQuote,setCredential,localExperienceClaims,evidenceClaims,generateClaims,reviewClaim,canExport,buildTextCV,buildEvidence,contactsIn,numbersIn,allowedNumbers,properNouns,maskNames,restoreNames};
+  // Spec 7 checks 1 to 4 and 6 on a bullet or the profile line, the same online and offline. The quote and duplicate checks run on the server.
+  // rules is RULES from cv-rules.js, passed in, so this file never reads window.YoCVRules.
+  function checkCvText(text,ctx,rules){
+    const s=String(text??'').trim(),{fields:f={},role='',kind='bullet',extraNumbers=[],extraNames=[]}=ctx||{},fail=reason=>({ok:false,reason});
+    const lower=t=>String(t??'').toLowerCase().split(/[^\p{L}\p{M}\p{N}]+/u).filter(Boolean);
+    const fw=new Set(lower([f.title,f.what,f.forWhom,f.frequency,f.number?.unit,f.outcome].join('\n'))),tw=lower(s);
+    // 1. numbers: each one the person gave, their hedge kept before their number, a month only one they chose.
+    const nums=numbersIn(s),allowed=allowedNumbers(f,extraNumbers);
+    if(nums.some(n=>n.value==null||!allowed.has(n.value)))return fail('invented_number');
+    const hedge=f.number?.hedge,value=f.number?.value;
+    if(hedge==='about'||hedge==='at least'){
+      const vals=typeof value==='number'?[value]:numbersIn(value).map(n=>n.value),before=new RegExp('\\b'+hedge+'\\s+$','i');
+      if(nums.some(n=>vals.includes(n.value)&&!before.test(s.slice(0,n.index))))return fail('hedge_dropped');
+    }
+    const chosen=[f.months?.start,f.months?.end].map(m=>/^\d{4}-(\d{2})$/.exec(String(m??''))).filter(Boolean).map(m=>MONTHS[Number(m[1])-1]);
+    if(wordsIn(s).some(w=>MONTHS.includes(w.word)&&!chosen.includes(w.word)&&!fw.has(w.word.toLowerCase())))return fail('invented_number');
+    // 2. names: contact details stay in the contact line; every name and weekday comes from the person.
+    if(/\[contact/i.test(s)||contactsIn(s).length)return fail('contact_detail');
+    if(/\[name/i.test(s))return fail('invented_name');
+    const known=new Set([...fw,...lower(role),...extraNames.flatMap(lower)]);
+    if(properNouns(s).some(w=>!known.has(w.word.toLowerCase())))return fail('invented_name');
+    const day=w=>w.replace(/s$/,''),days=WEEKDAYS.map(d=>d.toLowerCase()),theirDays=new Set([...fw].map(day));
+    if(tw.some(w=>days.includes(day(w))&&!theirDays.has(day(w))))return fail('invented_name');
+    // 3. overstatement: no inflation stem; a role-upgrade word only when the person used a form of it ('own' counts for owned).
+    if(tw.some(w=>rules.inflationStems.some(st=>w.startsWith(st))))return fail('overstated');
+    const theirs=new Set(lower([f.what,f.outcome].join('\n'))),forms=rules.roleUpgradeForms;
+    const permitted=new Set(Object.keys(forms).filter(k=>forms[k].some(x=>theirs.has(x))||(k==='owned'&&theirs.has('own'))).flatMap(k=>forms[k]));
+    if(tw.some(w=>!permitted.has(w)&&Object.values(forms).some(list=>list.includes(w))))return fail('overstated');
+    // 4. opening (bullets only): a listed verb, an allowed role-upgrade form, or an -ed or -ing word from their own answer.
+    if(kind!=='profile'){
+      if(/^(?:responsible for|helped with|duties included)\b/i.test(s))return fail('weak_opening');
+      const m=/^(\p{L}[\p{L}\p{M}]*)(?:\s+(\p{L}[\p{L}\p{M}]*))?/u.exec(s),one=m?m[1].toLowerCase():'',two=m&&m[2]?one+' '+m[2].toLowerCase():'';
+      const verbs=new Set(rules.verbs.flatMap(v=>v.split('|')));
+      if(!one||!(verbs.has(one)||verbs.has(two)||permitted.has(one)||(/(?:ed|ing)$/.test(one)&&theirs.has(one))))return fail('weak_opening');
+    }
+    // 6. length in code points, one sentence, no exclamation mark.
+    const n=[...s].length;
+    if(n<40||n>180)return fail('length');
+    if(/[.!?] \p{Lu}/u.test(s))return fail('not_one_sentence');
+    if(s.includes('!'))return fail('exclamation');
+    return {ok:true,checks:kind==='profile'?['numbers','names','overstatement','length']:['numbers','names','overstatement','opening','length']};
+  }
+  const api={labels,credential,MONTHS,WEEKDAYS,escapeHTML,shortQuote,setCredential,localExperienceClaims,evidenceClaims,generateClaims,reviewClaim,canExport,buildTextCV,buildEvidence,contactsIn,numbersIn,allowedNumbers,properNouns,maskNames,restoreNames,checkCvText};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.YoCV=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

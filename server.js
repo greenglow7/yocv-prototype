@@ -32,6 +32,7 @@ const STATIC={
   '/styles.css':'styles.css',
   '/core.js':'core.js',
   '/cv-copy.js':'cv-copy.js',
+  '/cv-rules.js':'cv-rules.js',
   '/app.js':'app.js',
   '/card.html':'card.html',
   '/card.js':'card.js',
