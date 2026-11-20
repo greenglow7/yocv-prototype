@@ -39,7 +39,7 @@
     'translated|translate|translates|translating','improved|improve|improves|improving','learned|learn|learns|learning',
     'wiped|wipe|wipes|wiping','folded|fold|folds|folding','chopped|chop|chops|chopping','boiled|boil|boils|boiling',
     'wrapped|wrap|wraps|wrapping','filled|fill|fills|filling','rinsed|rinse|rinses|rinsing','babysat|babysit|babysits|babysitting',
-    'knitted|knit|knits|knitting','trimmed|trim|trims|trimming'
+    'knitted|knit|knits|knitting','trimmed|trim|trims|trimming','helped|help|helps|helping'
   ]);
   // INFLATION and ROLE_UPGRADE are the spec 6 rule 5 words, in spec order. Check 3 matches the stems and the forms.
   const INFLATION=Object.freeze(['certified','qualified','licensed','verified','expert','proficient','professional','advanced']);

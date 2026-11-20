@@ -88,6 +88,11 @@ namespace Yoma.Core.Domain.CV.Services
     private static readonly string[] Small = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"];
     private static readonly string[] Tens = ["twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
     private static readonly string[] Vague = ["dozens", "hundreds", "thousands"];
+    // A period after one of these ends no sentence (Mr. Dlamini, e.g.), so the word after it is still a proper noun.
+    private static readonly HashSet<string> Abbreviations = ["mr", "mrs", "ms", "dr", "prof", "st", "mt", "no", "e", "g", "vs"];
+    // Common bare verbs that are not in verbs.json. A clause that opens with one has a verb, so it gets no opener;
+    // the opening check then says whether it can open a CV line.
+    private static readonly HashSet<string> BareVerbs = ["did", "do", "does", "had", "have", "got", "get", "went", "go", "took", "take", "gave", "give", "made", "used", "am", "was", "were", "sold", "ran"];
     private static readonly Dictionary<string, string> Openers = new()
     {
       ["customers"] = "Worked with customers on",
@@ -385,9 +390,10 @@ namespace Yoma.Core.Domain.CV.Services
       var tw = LowerWords(s);
 
       // 1. numbers: each one the person gave, their hedge kept before their number, a month only one they chose.
+      // A vague plural (dozens, hundreds) passes only when the person wrote that word themselves.
       var nums = NumbersIn(s);
       var allowed = AllowedNumbers(f);
-      if (nums.Any(n => n.Value == null || !allowed.Contains(n.Value.Value))) return CVCheckResult.Fail("invented_number");
+      if (nums.Any(n => n.Value == null ? !fw.Contains(n.Raw.ToLowerInvariant()) : !allowed.Contains(n.Value.Value))) return CVCheckResult.Fail("invented_number");
       if (f.NumberHedge is "about" or "at least")
       {
         var values = NumbersIn(f.NumberValue).Select(n => n.Value).ToList();
@@ -497,6 +503,18 @@ namespace Yoma.Core.Domain.CV.Services
         var q = Next(j) != null ? Below100(j) : null;
         return q != null ? (b + q.Value.V, 2 + q.Value.N) : (b, 2);
       }
+      (decimal V, int N)? Below1000(int j)
+      {
+        var b = Below100(j);
+        return b != null && b.Value.N == 1 && b.Value.V is >= 1 and <= 9 && Next(j + 1) == "hundred" ? Hundred(b.Value.V * 100, j + 2) : b;
+      }
+      // After 'thousand' at j-1 (n words so far): an optional 'and' and a number below 1000, so 'two thousand and fifty' is 2050.
+      (decimal V, int N) Thousand(decimal b, int n, int j)
+      {
+        var a = Next(j) == "and" && Next(j + 1) != null ? 1 : 0;
+        var q = Next(j + a) != null ? Below1000(j + a) : null;
+        return q != null && q.Value.V is >= 1 and <= 999 ? (b + q.Value.V, n + a + q.Value.N) : (b, n);
+      }
 
       for (var i = 0; i < w.Count;)
       {
@@ -505,12 +523,12 @@ namespace Yoma.Core.Domain.CV.Services
         if (Vague.Contains(x)) r = (null, 1);
         else if (x == "dozen") r = (12, 1);
         else if (x is "a" or "one" && nx == "dozen") r = (12, 2);
-        else if (x is "a" or "one" && nx == "thousand") r = (1000, 2);
-        else if (x == "a" && nx == "hundred") { var h = Hundred(100, i + 2); r = (h.V, h.N); }
+        else if (x == "a" && nx == "thousand") { var t = Thousand(1000, 2, i + 2); r = (t.V, t.N); }
         else
         {
-          var b = Below100(i);
-          if (b != null && b.Value.N == 1 && b.Value.V is >= 1 and <= 9 && nx == "hundred") { var h = Hundred(b.Value.V * 100, i + 2); r = (h.V, h.N); }
+          // 'N thousand' (1 to 999) multiplies, so 'two thousand' is 2000, never 2.
+          (decimal V, int N)? b = x == "a" && nx == "hundred" ? Hundred(100, i + 2) : Below1000(i);
+          if (b != null && b.Value.V is >= 1 and <= 999 && Next(i + b.Value.N) == "thousand") { var t = Thousand(b.Value.V * 1000, b.Value.N + 1, i + b.Value.N + 1); r = (t.V, t.N); }
           else if (b != null) r = (b.Value.V, b.Value.N);
         }
         if (r == null) { i++; continue; }
@@ -521,8 +539,9 @@ namespace Yoma.Core.Domain.CV.Services
       return [.. result.OrderBy(o => o.Index)];
     }
 
-    // An email, or a run of digit groups from its first group on which 7 or more digits follow and that starts with + or 0,
-    // or is the last group, so '2025 2026' is not a phone and '2025 071 000 0000' still finds it.
+    // An email, or a run of digit groups joined by spaces, hyphens, dots, slashes or brackets, a phone from its first group on
+    // which 9 or more digits follow, or 7 or more that start with + or 0, or a last group alone. So '2025 2026' is not a phone,
+    // and '071.000.0000', '(071) 000 0000', '27 71 000 0000' and '803 123 4567' are masked whole.
     private static List<(string Raw, int Index)> ContactsIn(string? text)
     {
       var s = text ?? string.Empty;
@@ -535,24 +554,29 @@ namespace Yoma.Core.Domain.CV.Services
       foreach (Match m in PhoneRun().Matches(s))
       {
         var parts = DigitGroup().Matches(m.Value).ToList();
-        var p = parts.Where((g, i) => { var tail = m.Value[g.Index..]; return tail.Count(char.IsAsciiDigit) >= 7 && (tail[0] is '+' or '0' || i == parts.Count - 1); }).FirstOrDefault();
+        var p = parts.Where((g, i) => { var tail = m.Value[g.Index..]; var n = tail.Count(char.IsAsciiDigit); return n >= 9 || n >= 7 && (tail[0] is '+' or '0' || i == parts.Count - 1); }).FirstOrDefault();
         if (p == null) continue;
-        var (raw, index) = (m.Value[p.Index..], m.Index + p.Index);
+        var start = p == parts[0] ? 0 : p.Index; // a leading bracket goes with its group
+        var (raw, index) = (m.Value[start..], m.Index + start);
         if (!result.Any(c => index < c.Index + c.Raw.Length && c.Index < index + raw.Length)) result.Add((raw, index));
       }
       return [.. result.OrderBy(o => o.Index)];
     }
 
     // Words with their position, flagged when sentence-initial: the first word, or the first after . ! ? or a newline.
+    // A period after a title or an abbreviation (Mr. Dlamini, e.g.) ends no sentence.
     private static List<(string Word, int Index, bool Initial)> WordsIn(string? text)
     {
       var s = text ?? string.Empty;
       var result = new List<(string Word, int Index, bool Initial)>();
       var end = -1;
+      var prev = string.Empty;
       foreach (Match m in WordOrPlaceholder().Matches(s))
       {
-        var initial = end < 0 || SentenceBreak().IsMatch(s[end..m.Index]);
+        var gap = end < 0 ? string.Empty : s[end..m.Index];
+        var initial = end < 0 || SentenceBreak().IsMatch(gap) && !(Abbreviations.Contains(prev) && AbbreviationStop().IsMatch(gap));
         end = m.Index + m.Length;
+        prev = m.Value.ToLowerInvariant();
         if (m.Value[0] != '[') result.Add((m.Value, m.Index, initial));
       }
       return result;
@@ -618,23 +642,28 @@ namespace Yoma.Core.Domain.CV.Services
       NamePlaceholder().Replace(text ?? string.Empty, m => map.TryGetValue(m.Value, out var raw) ? raw : m.Value);
 
     /// <summary>
-    /// Spec 7: the person's what clause after a leading I or I was, with a chip opener when it has no listed verb,
-    /// then for whom, the frequency, the months, the hedged number and the outcome. Over 180 characters drops the
-    /// outcome, then the frequency, and is never shown over the limit.
+    /// Spec 7: the person's what clause after its lead-in (I, I was, I'm, we used to), with a chip opener only when it has
+    /// no verb of its own, then for whom when the clause does not name them, the frequency, the months, the hedged number
+    /// and the outcome. Over 180 characters drops the outcome, then the frequency, and is never shown over the limit.
     /// </summary>
     private static CVBullet? TemplateBullet(CVInterviewEntry f, DateTimeOffset now)
     {
       static string Clean(string? t) => Regex.Replace(Regex.Replace((t ?? string.Empty).Trim(), @"[\s.!?,;:]+$", string.Empty), @"\s*[.!?]+\s+|\s*\n+\s*", ", ");
-      var what = Clean(Regex.Replace(f.What ?? string.Empty, @"^\s*i(?:\s+was)?\s+", string.Empty, RegexOptions.IgnoreCase));
+      var what = Clean(LeadIn().Replace(f.What ?? string.Empty, string.Empty));
       if (what.Length == 0) return null;
 
       var m = Opening().Match(what);
       var one = m.Success ? m.Groups[1].Value.ToLowerInvariant() : string.Empty;
       var two = m.Success && m.Groups[2].Success ? one + " " + m.Groups[2].Value.ToLowerInvariant() : string.Empty;
-      var forms = Verbs.SelectMany(v => v.Split('|')).ToHashSet();
+      var forms = Verbs.SelectMany(v => v.Split('|')).Concat(RoleUpgradeForms.Values.SelectMany(o => o)).ToHashSet();
       var whom = (f.ForWhom ?? string.Empty).Trim();
-      var opener = forms.Contains(one) || forms.Contains(two) ? string.Empty : Openers.GetValueOrDefault(whom.ToLowerInvariant(), "Worked on");
-      var head = opener.Length > 0 ? opener + " " + LowerFirst(what, f) : char.ToUpperInvariant(what[0]) + what[1..] + (whom.Length > 0 ? " for " + whom : string.Empty);
+      // The clause has a verb when it opens with a listed verb, a role-upgrade form (the person's own word), an -ed or -ing word or a bare verb.
+      var hasVerb = forms.Contains(one) || forms.Contains(two) || BareVerbs.Contains(one) || one.EndsWith("ed") || one.EndsWith("ing");
+      var chip = Openers.GetValueOrDefault(whom.ToLowerInvariant(), string.Empty);
+      var opener = hasVerb ? string.Empty : chip.Length > 0 ? chip : "Worked on";
+      // The people are named once: a chip opener names them, and a clause that already says 'for' keeps its own words.
+      var addWhom = whom.Length > 0 && !(opener.Length > 0 && chip.Length > 0) && !ForWord().IsMatch(what);
+      var head = (opener.Length > 0 ? opener + " " + LowerFirst(what, f) : char.ToUpperInvariant(what[0]) + what[1..]) + (addWhom ? " for " + whom : string.Empty);
 
       // Both ends count; an open end counts to this month. No span for no start, a reversed span or a month after now.
       var current = now.Year * 12 + now.Month - 1;
@@ -654,7 +683,7 @@ namespace Yoma.Core.Domain.CV.Services
         var text = head + (fq.Length > 0 ? " " + fq : string.Empty) + span + number + (outc.Length > 0 ? "; " + outc : string.Empty) + ".";
         if (text.EnumerateRunes().Count() > 180) continue;
         var used = new List<string> { "what" };
-        if (opener.Length > 0 ? Openers.ContainsKey(whom.ToLowerInvariant()) : whom.Length > 0) used.Add("forWhom");
+        if (opener.Length > 0 && chip.Length > 0 || addWhom) used.Add("forWhom");
         if (fq.Length > 0) used.Add("frequency");
         if (span.Length > 0) used.Add("months");
         if (value.Length > 0) used.Add("number");
@@ -804,7 +833,7 @@ namespace Yoma.Core.Domain.CV.Services
     [GeneratedRegex(@"\S+@\S+\.\S+")]
     private static partial Regex Email();
 
-    [GeneratedRegex(@"\+?\d+(?:[ -]\d+)*")]
+    [GeneratedRegex(@"\(?\+?\d+(?:[ \-./()]+\d+)*")]
     private static partial Regex PhoneRun();
 
     [GeneratedRegex(@"\+?\d+")]
@@ -815,6 +844,15 @@ namespace Yoma.Core.Domain.CV.Services
 
     [GeneratedRegex(@"[.!?]['""’”)\]]*(?:\s|$)|\n")]
     private static partial Regex SentenceBreak();
+
+    [GeneratedRegex(@"^\.\s*$")]
+    private static partial Regex AbbreviationStop();
+
+    [GeneratedRegex(@"^\s*(?:i|we)(?:'m|'ve\s+been|\s+(?:am|was|were|also|used\s+to|would|usually|still|just))*\s+", RegexOptions.IgnoreCase)]
+    private static partial Regex LeadIn();
+
+    [GeneratedRegex(@"\bfor\b", RegexOptions.IgnoreCase)]
+    private static partial Regex ForWord();
     #endregion
 
     #region Nested Types

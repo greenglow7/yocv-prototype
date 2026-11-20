@@ -66,6 +66,38 @@ namespace Yoma.Core.Test.CV
       Assert.True(CVService.CheckBullet("Managed the fruit stall by the taxi rank for about 40 customers a day.", entry, Role).Ok);
     }
 
+    [Theory]
+    [InlineData("I sell fruit at the stall for dozens of regulars", "Served dozens of regulars at the fruit stall by the taxi rank every day.", true, null)]
+    [InlineData("I sell fruit at the stall by the taxi rank", "Served dozens of regulars at the fruit stall by the taxi rank every day.", false, "invented_number")]
+    [InlineData("I sell fruit to two thousand customers a month at the stall", "Served 2,000 customers a month at the fruit stall by the taxi rank.", true, null)]
+    [InlineData("I sell fruit to two thousand customers a month at the stall", "Served 2 customers a month at the fruit stall by the taxi rank.", false, "invented_number")]
+    public void CheckBulletReadsAVaguePluralAndAThousandAsThePersonWroteThem(string what, string text, bool ok, string? reason)
+    {
+      var entry = Entry();
+      entry.What = what;
+
+      var result = CVService.CheckBullet(text, entry, Role);
+
+      Assert.Equal(ok, result.Ok);
+      Assert.Equal(reason, result.Reason);
+    }
+
+    [Fact]
+    public async Task DraftMasksASurnameAfterATitleAndAPhoneWrittenWithDotsOrBrackets()
+    {
+      var client = new FakeClient("""{"bullets":[],"skills":[]}""");
+      var entry = Entry();
+      entry.What = "I sell fruit for Mr. Dlamini at the stall, orders on 071.000.0000 or (071) 000 0000 or 27 71 000 0000";
+
+      await Service(client).Draft(new CVDraftRequest { Role = Role, Entries = [entry] });
+
+      var sent = string.Join("\n", client.Requests.SelectMany(o => o.Messages).Select(o => o.Content));
+      Assert.Contains("[name1]. [name2]", sent);
+      Assert.DoesNotContain("Dlamini", sent);
+      Assert.DoesNotContain("071", sent);
+      Assert.DoesNotContain("27 71", sent);
+    }
+
     [Fact]
     public async Task DraftKeepsTheCheckedBulletAndRefusesTheInventedOne()
     {

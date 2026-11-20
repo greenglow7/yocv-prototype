@@ -92,7 +92,7 @@ test('the text CV keeps the same section order and the sample line last',()=>{
   assert.deepEqual(lines,['Thandi Mokoena','+27735550147 · Khayelitsha, Cape Town','',
     'Hairdresser with cosmetics and customer service recorded on Yoma and 9 months of braiding at home.','',
     'Experience','Braiding at home','Khayelitsha · March 2025 to now',
-    '- Braid hair at home for women in my street, mostly box braids and cornrows for customers a few times a week since March 2025, about 40 customers a week.','',
+    '- Braid hair at home for women in my street, mostly box braids and cornrows a few times a week since March 2025, about 40 customers a week; Most of them come back every month.','',
     'Skills','- Cosmetics (Confirmed from Yoma)','- Customer Service (Confirmed from Yoma)','- Hairstyling (Vouched by a customer, confirmed by them, not by Yoma)','',
     'Learning recorded on Yoma','- Hair Styling: Blow-Dry, Cut, and Colour Like a Pro. Credential issued by Alison Learning, September 2025.','- Customer Care Skills and Telephone Etiquette. Credential issued by Alison Learning, October 2025.','',
     'References available on request','','Sample account: fictional, for demonstration']);
@@ -122,7 +122,7 @@ test('the evidence record names the mode, every quote, every refusal, every skil
 test('the record keeps each decision, the profile, the mode for every generation and no contact detail',()=>{
   const r=buildCvRecord(state,copy);
   assert.equal(r.entries[0].linkedCompletion,null);
-  assert.deepEqual(r.entries[0].proposals,[{text:state.review.entries[0].proposals[0].text,origin:'template',templateWording:false,decision:'accepted',finalText:state.review.entries[0].proposals[0].text,sourceQuote:state.entries[0].what,sourceFields:['what','forWhom','frequency','months','number']}]);
+  assert.deepEqual(r.entries[0].proposals,[{text:state.review.entries[0].proposals[0].text,origin:'template',templateWording:false,decision:'accepted',finalText:state.review.entries[0].proposals[0].text,sourceQuote:state.entries[0].what,sourceFields:['what','frequency','months','number','outcome']}]);
   assert.deepEqual(r.profile,{text:state.profile.text,decision:'accepted'});
   assert.deepEqual(r.account,{source:'sample',fictional:true});
   assert.ok(!Number.isNaN(Date.parse(r.createdAt)));

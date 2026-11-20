@@ -42,6 +42,15 @@ test('a role-upgrade word passes when the person used a form of it',()=>{
 test('Review Focus 5 (offline half): the core check refuses an edit the same way',()=>{
   assert.equal(core.checkCvText('Braided hair at home for about 45 customers a week since 2025.',ctx,RULES).reason,'invented_number');
 });
+test('Review Focus 1: a vague plural the person wrote themselves passes; one they did not write is refused',()=>{
+  const own={...ctx,fields:{...fields,what:'I braid hair at home for dozens of women in my street every week.'}};
+  const line='Braided hair at home for dozens of women in my street every week.';
+  assert.equal(core.checkCvText(line,own,RULES).ok,true);
+  assert.equal(core.checkCvText(line,ctx,RULES).reason,'invented_number');
+  assert.equal(core.checkCvText('Braided hair at home for hundreds of women in my street every week.',own,RULES).reason,'invented_number');
+  const t=core.templateBullet(own.fields,RULES,{nowIso:'2025-11-19T10:00:00Z'});
+  assert.equal(core.checkCvText(t.text,own,RULES).ok,true,t.text);
+});
 test('length counts code points: 180 characters with emoji pass, 181 fail',()=>{
   const pad=n=>'Braided hair for about 40 customers a week '+'😀'.repeat(n-44)+'.';
   assert.equal(core.checkCvText(pad(180),ctx,RULES).ok,true);

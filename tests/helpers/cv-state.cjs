@@ -31,9 +31,9 @@ function sampleState(){
     contact:{name:'Thandi Mokoena',phone:'+27735550147',email:'',town:'Khayelitsha, Cape Town',education:''},
     optional:{photo:'',dateOfBirth:'',idNumber:'',stateOfOrigin:''},
     review:{entries:[{index:0,proposals:[{
-      text:'Braid hair at home for women in my street, mostly box braids and cornrows for customers a few times a week since March 2025, about 40 customers a week.',
-      origin:'template',templateWording:false,sourceQuote:entry.what,sourceFields:['what','forWhom','frequency','months','number'],
-      usedNumbers:['2025','40'],highlight:[125,133],checks:['numbers','names','overstatement','opening','length','quote']
+      text:'Braid hair at home for women in my street, mostly box braids and cornrows a few times a week since March 2025, about 40 customers a week; Most of them come back every month.',
+      origin:'template',templateWording:false,sourceQuote:entry.what,sourceFields:['what','frequency','months','number','outcome'],
+      usedNumbers:['2025','40'],highlight:[111,119],checks:['numbers','names','overstatement','opening','length','quote']
     }],rejected:[{kind:'bullet',text:'Braided hair for over 50 customers a week since March 2025.',reason:'invented_number'}],skills:[],needsDetail:false}]},
     decisions:{'0:0':{decision:'accepted'},'skill:Customer Service':{decision:'accepted'},'skill:Cosmetics':{decision:'accepted'},'skill:Hairstyling':{decision:'accepted'},profile:{decision:'accepted'}},
     handAdded:[],

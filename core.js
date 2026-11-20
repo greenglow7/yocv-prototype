@@ -16,13 +16,14 @@
       const lead=/^[("'<[]*/.exec(m[0])[0].length,raw=m[0].slice(lead).replace(/[.,;:!?)\]'">]+$/,'');
       out.push({raw,index:m.index+lead});
     }
-    // A run of digit groups is a phone from its first group on which 7 or more digits follow and that starts with + or 0,
-    // or is one group with no separator, so '2025 2026' is not a phone and '2025 071 000 0000' still finds it.
-    for(const m of s.matchAll(/\+?\d+(?:[ -]\d+)*/g)){
-      const parts=[...m[0].matchAll(/\+?\d+/g)];
-      const p=parts.find((p,g)=>{const tail=m[0].slice(p.index);return tail.replace(/\D/g,'').length>=7&&(/^[+0]/.test(tail)||g===parts.length-1);});
+    // A run of digit groups joined by spaces, hyphens, dots, slashes or brackets is a phone from its first group on which
+    // 9 or more digits follow, or 7 or more that start with + or 0, or a last group alone. So '2025 2026' is not a phone,
+    // and '071.000.0000', '(071) 000 0000', '27 71 000 0000' and '803 123 4567' are masked whole.
+    for(const m of s.matchAll(/\(?\+?\d+(?:[ \-./()]+\d+)*/g)){
+      const parts=[...m[0].matchAll(/\+?\d+/g)],digits=t=>t.replace(/\D/g,'').length;
+      const p=parts.find((p,g)=>{const tail=m[0].slice(p.index),n=digits(tail);return n>=9||(n>=7&&(/^[+0]/.test(tail)||g===parts.length-1));});
       if(!p)continue;
-      const raw=m[0].slice(p.index),index=m.index+p.index;
+      const start=p===parts[0]?0:p.index,raw=m[0].slice(start),index=m.index+start; // a leading bracket goes with its group
       if(!out.some(c=>index<c.index+c.raw.length&&c.index<index+raw.length))out.push({raw,index});
     }
     return out.sort((a,b)=>a.index-b.index);
@@ -48,14 +49,20 @@
       const r=next(j)==='and'&&next(j+1)?below100(j+1):null;if(r)return {v:base+r.v,n:3+r.n};
       const q=next(j)?below100(j):null;return q?{v:base+q.v,n:2+q.n}:{v:base,n:2};
     };
+    const below1000=j=>{const b=below100(j);return b&&b.n===1&&b.v>=1&&b.v<=9&&next(j+1)==='hundred'?hundred(b.v*100,j+2):b;};
+    // After 'thousand' at j-1 (n words so far): an optional 'and' and a number below 1000, so 'two thousand and fifty' is 2050.
+    const thousand=(base,n,j)=>{const a=next(j)==='and'&&next(j+1)?1:0,q=next(j+a)?below1000(j+a):null;return q&&q.v>=1&&q.v<=999?{v:base+q.v,n:n+a+q.n}:{v:base,n};};
     for(let i=0;i<w.length;){
       const x=w[i].w,nx=next(i+1);let r=null;
       if(VAGUE.includes(x))r={v:null,n:1};
       else if(x==='dozen')r={v:12,n:1};
       else if((x==='a'||x==='one')&&nx==='dozen')r={v:12,n:2};
-      else if((x==='a'||x==='one')&&nx==='thousand')r={v:1000,n:2};
-      else if(x==='a'&&nx==='hundred')r=hundred(100,i+2);
-      else{const b=below100(i);r=b&&b.n===1&&b.v>=1&&b.v<=9&&nx==='hundred'?hundred(b.v*100,i+2):b;}
+      else if(x==='a'&&nx==='thousand')r=thousand(1000,2,i+2);
+      else{
+        // 'N thousand' (1 to 999) multiplies, so 'two thousand' is 2000, never 2 (final review finding 2).
+        const b=x==='a'&&nx==='hundred'?hundred(100,i+2):below1000(i);
+        r=b&&b.v>=1&&b.v<=999&&next(i+b.n)==='thousand'?thousand(b.v*1000,b.n+1,i+b.n+1):b;
+      }
       if(r){out.push({value:r.v,raw:s.slice(w[i].index,w[i+r.n-1].end),index:w[i].index});i+=r.n;}else i++;
     }
     return out.sort((a,b)=>a.index-b.index);
@@ -70,11 +77,14 @@
     return set;
   }
   // Words with their position, flagged when sentence-initial: the first word, or the first after . ! ? or a newline.
+  // A period after a title or an abbreviation (Mr. Dlamini, e.g.) ends no sentence, so the surname is still a proper noun.
+  const ABBREV=new Set(['mr','mrs','ms','dr','prof','st','mt','no','e','g','vs']);
   function wordsIn(text){
-    const s=String(text??''),out=[];let end=-1;
+    const s=String(text??''),out=[];let end=-1,prev='';
     for(const m of s.matchAll(/\[(?:name|contact)\d+\]|\p{L}[\p{L}\p{M}\p{N}]*/gu)){
-      const initial=end<0||/[.!?]['"’”)\]]*(?:\s|$)|\n/.test(s.slice(end,m.index));
-      end=m.index+m[0].length;
+      const gap=s.slice(end,m.index);
+      const initial=end<0||(/[.!?]['"’”)\]]*(?:\s|$)|\n/.test(gap)&&!(ABBREV.has(prev)&&/^\.\s*$/.test(gap)));
+      end=m.index+m[0].length;prev=m[0].toLowerCase();
       if(m[0][0]!=='[')out.push({word:m[0],index:m.index,initial});
     }
     return out;
@@ -104,8 +114,9 @@
     const lower=t=>String(t??'').toLowerCase().split(/[^\p{L}\p{M}\p{N}]+/u).filter(Boolean);
     const fw=new Set(lower([f.title,f.what,f.forWhom,f.frequency,f.number?.unit,f.outcome].join('\n'))),tw=lower(s);
     // 1. numbers: each one the person gave, their hedge kept before their number, a month only one they chose.
+    // A vague plural (dozens, hundreds) passes only when the person wrote that word themselves.
     const nums=numbersIn(s),allowed=allowedNumbers(f,extraNumbers);
-    if(nums.some(n=>n.value==null||!allowed.has(n.value)))return fail('invented_number');
+    if(nums.some(n=>n.value==null?!fw.has(n.raw.toLowerCase()):!allowed.has(n.value)))return fail('invented_number');
     const hedge=f.number?.hedge,value=f.number?.value;
     if(hedge==='about'||hedge==='at least'){
       const vals=typeof value==='number'?[value]:numbersIn(value).map(n=>n.value),before=new RegExp('\\b'+hedge+'\\s+$','i');
@@ -158,13 +169,22 @@
     return caps?s:s.replace(/^\p{Lu}/u,c=>c.toLowerCase());
   }
   const clean=t=>String(t??'').trim().replace(/[\s.!?,;:]+$/,'').replace(/\s*[.!?]+\s+|\s*\n+\s*/g,', ');
+  // The lead-in a person types before the verb: I, I was, I'm, I've been, we used to, and so on.
+  const LEAD_IN=/^\s*(?:i|we)(?:'m|'ve\s+been|\s+(?:am|was|were|also|used\s+to|would|usually|still|just))*\s+/i;
+  // Common bare verbs that are not on the list. A clause that opens with one has a verb, so no opener is put in front of it;
+  // the opening check then says whether it can open a CV line.
+  const BARE_VERBS=new Set(['did','do','does','had','have','got','get','went','go','took','take','gave','give','made','used','am','was','were','sold','ran']);
   function templateBullet(fields,rules,{nowIso}={}){
-    const f=fields||{},what=clean(String(f.what??'').replace(/^\s*i(?:\s+was)?\s+/i,''));
+    const f=fields||{},what=clean(String(f.what??'').replace(LEAD_IN,''));
     if(!what)return null;
     const m=/^(\p{L}[\p{L}\p{M}]*)(?:\s+(\p{L}[\p{L}\p{M}]*))?/u.exec(what),one=m?m[1].toLowerCase():'',two=m&&m[2]?one+' '+m[2].toLowerCase():'';
-    const forms=new Set((rules?.verbs||[]).flatMap(v=>String(v).split('|'))),whom=String(f.forWhom??'').trim();
-    const opener=forms.has(one)||forms.has(two)?'':OPENERS[whom.toLowerCase()]||'Worked on';
-    const head=(opener?opener+' '+lowerFirst(what,f):what.replace(/^\p{Ll}/u,c=>c.toUpperCase()))+(!opener&&whom?' for '+whom:'');
+    const forms=new Set([...(rules?.verbs||[]).flatMap(v=>String(v).split('|')),...Object.values(rules?.roleUpgradeForms||{}).flat()]),whom=String(f.forWhom??'').trim();
+    // The clause has a verb when it opens with a listed verb, a role-upgrade form (the person's own word), an -ed or -ing word or a bare verb.
+    const hasVerb=forms.has(one)||forms.has(two)||BARE_VERBS.has(one)||/(?:ed|ing)$/.test(one);
+    const chip=OPENERS[whom.toLowerCase()]||'',opener=hasVerb?'':chip||'Worked on';
+    // The people are named once: a chip opener names them, and a clause that already says 'for' keeps its own words.
+    const addWhom=!!whom&&!(opener&&chip)&&!/\bfor\b/i.test(what);
+    const head=(opener?opener+' '+lowerFirst(what,f):what.replace(/^\p{Ll}/u,c=>c.toUpperCase()))+(addWhom?' for '+whom:'');
     const n=monthsBetween(f.months?.start,f.months?.end,nowIso),s=monthLabel(f.months?.start),e=monthLabel(f.months?.end);
     const span=n==null?'':!e?' since '+s:n===1?' in '+s:' from '+s+' to '+e;
     const num=f.number,value=num&&num.value!=null&&String(num.value).trim()!==''?String(num.value).trim():'',hedge=num&&num.hedge&&num.hedge!=='exactly'?num.hedge+' ':'';
@@ -173,7 +193,7 @@
     for(const [fq,out] of [[freq,outcome],[freq,''],['','']]){
       const before=head+(fq?' '+fq:'')+span,text=before+numPart+(out?'; '+out:'')+'.';
       if(len(text)<=180){
-        const used=['what',(opener?OPENERS[whom.toLowerCase()]:whom)&&'forWhom',fq&&'frequency',span&&'months',value&&'number',out&&'outcome'].filter(Boolean);
+        const used=['what',((opener&&chip)||addWhom)&&'forWhom',fq&&'frequency',span&&'months',value&&'number',out&&'outcome'].filter(Boolean);
         return {text,highlight:value?[before.length+2,before.length+2+lead.length]:null,sourceFields:used};
       }
     }
