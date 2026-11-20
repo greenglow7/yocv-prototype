@@ -1,5 +1,7 @@
 {
   "Retail assistant": {
+    "tradeId": null,
+    "description": "Help customers, organise stock and support a shop.",
     "skillNames": [
       "Customer Service",
       "Cash Handling",
@@ -19,6 +21,8 @@
     ]
   },
   "Customer support assistant": {
+    "tradeId": null,
+    "description": "Listen to people, answer questions and solve problems.",
     "skillNames": [
       "Customer Support",
       "Customer Service",
@@ -39,6 +43,8 @@
     ]
   },
   "Community outreach assistant": {
+    "tradeId": null,
+    "description": "Bring people together and support local activities.",
     "skillNames": [
       "Community Outreach",
       "Event Planning",
@@ -56,6 +62,203 @@
     "opportunityQueries": [
       "community",
       "volunteer"
+    ]
+  },
+  "Hairdresser": {
+    "tradeId": "hair",
+    "description": "Braid, cut and care for hair for customers.",
+    "skillNames": [
+      "Hairstyling",
+      "Hair Care",
+      "Customer Service",
+      "Cleanliness",
+      "Time Management",
+      "Cash Handling",
+      "Reliability"
+    ],
+    "opportunityQueries": [
+      "hair",
+      "beauty"
+    ]
+  },
+  "Nail technician": {
+    "tradeId": "nails",
+    "description": "Do manicures, pedicures and nail sets for customers.",
+    "skillNames": [
+      "Manicure",
+      "Pedicure",
+      "Nail Care",
+      "Artificial Nails",
+      "Customer Service",
+      "Cleanliness",
+      "Cash Handling"
+    ],
+    "opportunityQueries": [
+      "nail",
+      "beauty"
+    ]
+  },
+  "Boda boda or taxi driver": {
+    "tradeId": "boda",
+    "description": "Drive people and deliver goods safely and on time.",
+    "skillNames": [
+      "Defensive Driving",
+      "Motorcycles",
+      "Package Delivery",
+      "Vehicle Maintenance",
+      "Customer Service",
+      "Cash Handling",
+      "Reliability"
+    ],
+    "opportunityQueries": [
+      "driving",
+      "delivery"
+    ]
+  },
+  "Tailor": {
+    "tradeId": "tailor",
+    "description": "Sew, alter and repair clothes for customers.",
+    "skillNames": [
+      "Sewing",
+      "Garment Alterations",
+      "Pattern Making",
+      "Textiles",
+      "Embroidery",
+      "Customer Service",
+      "Cash Handling"
+    ],
+    "opportunityQueries": [
+      "sewing",
+      "fashion"
+    ]
+  },
+  "Mechanic": {
+    "tradeId": "mechanic",
+    "description": "Service and repair cars, motorbikes and tyres.",
+    "skillNames": [
+      "Vehicle Maintenance",
+      "Engine Repair",
+      "Tire Maintenance",
+      "Hand Tools",
+      "Troubleshooting (Problem Solving)",
+      "Customer Service"
+    ],
+    "opportunityQueries": [
+      "mechanic",
+      "vehicle"
+    ]
+  },
+  "Electrician": {
+    "tradeId": "electrician",
+    "description": "Wire, install and fix electrical faults in homes and shops.",
+    "skillNames": [
+      "Electrical Wiring",
+      "Electrical Systems",
+      "Troubleshooting (Problem Solving)",
+      "Hand Tools",
+      "Reliability",
+      "Customer Service"
+    ],
+    "opportunityQueries": [
+      "electrical"
+    ]
+  },
+  "Plumber": {
+    "tradeId": "plumber",
+    "description": "Fix leaks, clear drains and fit pipes and taps.",
+    "skillNames": [
+      "Plumbing",
+      "Plumbing Repair",
+      "Drain Cleaning",
+      "Hand Tools",
+      "Troubleshooting (Problem Solving)",
+      "Customer Service"
+    ],
+    "opportunityQueries": [
+      "plumbing"
+    ]
+  },
+  "Cleaner": {
+    "tradeId": "cleaner",
+    "description": "Clean homes, do laundry and keep gardens tidy.",
+    "skillNames": [
+      "House Cleaning",
+      "Housekeeping",
+      "Ironing",
+      "Gardening",
+      "Cleanliness",
+      "Reliability",
+      "Time Management"
+    ],
+    "opportunityQueries": [
+      "cleaning"
+    ]
+  },
+  "Cook or food seller": {
+    "tradeId": "cook",
+    "description": "Cook, bake and sell meals and food to customers.",
+    "skillNames": [
+      "Cooking",
+      "Baking",
+      "Food Preparation",
+      "Cleanliness",
+      "Cash Handling",
+      "Customer Service"
+    ],
+    "opportunityQueries": [
+      "cooking",
+      "food"
+    ]
+  },
+  "Market seller": {
+    "tradeId": "market",
+    "description": "Sell produce and goods, handle cash and keep stock.",
+    "skillNames": [
+      "Retail Sales",
+      "Cash Handling",
+      "Customer Service",
+      "Stock Control",
+      "Merchandising",
+      "Bookkeeping"
+    ],
+    "opportunityQueries": [
+      "business",
+      "sales"
+    ]
+  },
+  "Mobile money agent": {
+    "tradeId": "mobile-money",
+    "description": "Handle deposits, withdrawals and transfers for customers.",
+    "skillNames": [
+      "Mobile Banking",
+      "Cash Handling",
+      "Cash Management",
+      "Customer Service",
+      "Bookkeeping",
+      "Record Keeping"
+    ],
+    "opportunityQueries": [
+      "financial",
+      "money"
+    ]
+  },
+  "General labourer": {
+    "tradeId": "labourer",
+    "description": "Dig, carry, pave, plaster and paint on building sites.",
+    "skillNames": [
+      "Construction",
+      "Paving",
+      "Plastering",
+      "Painting",
+      "Excavation",
+      "Cargo Loading",
+      "Material Handling",
+      "Hand Tools",
+      "Masonry",
+      "Demolition"
+    ],
+    "opportunityQueries": [
+      "construction"
     ]
   }
 }

@@ -9,39 +9,13 @@
 
 const {quoteInSource,noInventedNumbers,lengthOk,noBannedClaims,resolveSkill,dedupe}=require('./validate.js');
 const {ProviderError}=require('./providers/errors.js');
+const {buildSkillMenu}=require('./cv/menu.js'); // moved to server/cv/menu.js; re-exported here until Task 16
 
 const MAX_EXPERIENCE=4;
 const MAX_SKILLS=3;
-const CREDENTIAL_LIKE=/certif|licens|diploma|degree/i;
 
 function str(value){return value==null?'':String(value);}
 function isPlainObject(value){return value!==null&&typeof value==='object'&&!Array.isArray(value);}
-function isUnavailable(err){return err?.code==='yoma_unavailable'||err?.name==='YomaUnavailable';}
-function menuEntry(item){return {id:item.id,name:item.name,infoURL:item.infoURL??null};}
-
-async function buildSkillMenu(role,{yoma,roleSkills}={}){
-  const names=Array.isArray(roleSkills?.[role]?.skillNames)?roleSkills[role].skillNames:[];
-  if(!names.length||!yoma||typeof yoma.skillByName!=='function')return {menu:[],source:'none'};
-  const results=await Promise.allSettled(names.map(name=>yoma.skillByName(name)));
-  const menu=[],seen=new Set();
-  let answered=0,fromCache=false;
-  for(const result of results){
-    if(result.status==='rejected'){
-      if(isUnavailable(result.reason))continue;
-      throw result.reason; // yoma_bad_request or an unexpected failure is a programming error: surface it
-    }
-    answered++;
-    const {item,source}=result.value||{};
-    if(source==='cache')fromCache=true;
-    if(!item||!item.id||!item.name)continue;
-    if(CREDENTIAL_LIKE.test(item.name))continue;
-    if(seen.has(item.id))continue;
-    seen.add(item.id);
-    menu.push(menuEntry(item));
-  }
-  if(!answered)return {menu:[],source:'none'};
-  return {menu,source:fromCache?'cache':'live'};
-}
 
 function cleanInput(input){
   return {role:str(input?.role),experience:str(input?.experience),context:str(input?.context),dates:str(input?.dates)};

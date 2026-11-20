@@ -8,7 +8,7 @@ const path=require('node:path');
 const {loadConfig}=require('../server/config.js');
 const {createProvider}=require('../server/providers/index.js');
 const {createYomaClient}=require('../server/yoma.js');
-const {buildSkillMenu}=require('../server/generation.js');
+const {buildSkillMenu}=require('../server/cv/menu.js');
 const {draftEntries}=require('../server/cv/draft.js');
 const {createAccountSource}=require('../server/card/account.js');
 const {runDraft,validateSelfDeclared,evidenceList}=require('../server/card/draft.js');
@@ -27,6 +27,7 @@ const {entry}=JSON.parse(fs.readFileSync(path.join(__dirname,'fixtures','cv-than
 test('live model: a CV bullet for Thandi\'s braiding keeps her number and hedge',{skip:skipModel},async(t)=>{
  const provider=createProvider(config,core),yoma=createYomaClient({baseUrl:config.yomaBase});
  const {menu}=await buildSkillMenu('Hairdresser',{yoma,roleSkills});
+ assert.ok(menu.length>0,'the Hairdresser menu resolves on the live taxonomy');
  const {entries,generation}=await draftEntries({role:'Hairdresser',entries:[entry],provider,menu});
  t.diagnostic('provider '+generation.provider+', model '+generation.model);
  assert.equal(generation.mode,'live');
@@ -62,12 +63,15 @@ test('live model: Thandi’s YoCard draft cites only her evidence and keeps the 
  });
 });
 
-test('live Yoma: skill lookup resolves Customer Service to its known id',{skip:liveYoma},async()=>{
+test('live Yoma: skill lookup resolves Customer Service to its known id',{skip:liveYoma},async(t)=>{
  const yoma=createYomaClient({baseUrl:config.yomaBase});
  const {item}=await yoma.skillByName('Customer Service');
  assert.ok(item);
  assert.equal(item.id,'448bb36e-6e5a-4c5a-9150-78703666c37a');
  assert.match(item.infoURL,/lightcast\.io\/open-skills/);
+ await t.test('every role menu name resolves exactly in the taxonomy',async()=>{
+  for(const r of Object.values(roleSkills))for(const name of r.skillNames)assert.ok((await yoma.skillByName(name)).item,name);
+ });
 });
 
 test('live Yoma: learning opportunities for Retail assistant return a clean state',{skip:liveYoma},async()=>{

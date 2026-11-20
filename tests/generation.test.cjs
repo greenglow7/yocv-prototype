@@ -4,7 +4,7 @@ const core=require('../core.js');
 const {YomaUnavailable}=require('../server/yoma.js');
 const {ProviderError,createLocalProvider}=require('../server/providers/index.js');
 let generation={}; try {generation=require('../server/generation.js')}catch{}
-const {buildSkillMenu,runGeneration}=generation;
+const {runGeneration}=generation;
 
 const experience='I helped customers find products and packed orders at my aunt’s shop.\nI counted the cash at the end of the day.';
 const input={role:'Retail assistant',experience,context:'Family shop',dates:'School holidays, 2025'};
@@ -33,30 +33,6 @@ const good={
  ]
 };
 const bullet=(n,quote='helped customers find products')=>({text:'Did task number '+'x'.repeat(n)+'.',sourceQuote:quote,reason:'r'});
-
-test('buildSkillMenu keeps exact Yoma matches, drops credential-style names and unmatched names',async()=>{
- assert.equal(typeof buildSkillMenu,'function');
- const yoma=fakeYoma();
- const {menu,source}=await buildSkillMenu('Retail assistant',{yoma,roleSkills});
- assert.deepEqual(menu,[table['Customer Service'],table['Cash Handling']]);
- assert.equal(source,'live');
- assert.deepEqual(yoma.calls.sort(),['Cash Handling','Customer Service','Customer Service Certification','Teamwork']);
- assert.ok(menu.every(entry=>!/certif|licens|diploma|degree/i.test(entry.name)));
-});
-test('buildSkillMenu reports cache when any lookup came from cache',async()=>{
- const {menu,source}=await buildSkillMenu('Retail assistant',{yoma:fakeYoma({source:'cache'}),roleSkills});
- assert.equal(menu.length,2);
- assert.equal(source,'cache');
-});
-test('buildSkillMenu returns an empty menu with source none when Yoma is unavailable',async()=>{
- const {menu,source}=await buildSkillMenu('Retail assistant',{yoma:fakeYoma({fail:true}),roleSkills});
- assert.deepEqual(menu,[]);
- assert.equal(source,'none');
-});
-test('buildSkillMenu lets a Yoma bad request (programming error) propagate',async()=>{
- const yoma={async skillByName(){const err=new Error('bad');err.code='yoma_bad_request';throw err;}};
- await assert.rejects(buildSkillMenu('Retail assistant',{yoma,roleSkills}),{code:'yoma_bad_request'});
-});
 
 test('runGeneration shapes grounded output into claims with Yoma skills attached',async()=>{
  assert.equal(typeof runGeneration,'function');
