@@ -110,6 +110,15 @@ test('components follow the Yoma shapes',()=>{
  const print=css.match(/@media print\{[\s\S]*$/)[0];
  assert.ok(/#page-band/.test(print),'band hidden in print');
  assert.ok(/\.cv-paper\{border:0;border-radius:0;padding:0\}/.test(print),'flat CV in print');
+ assert.ok(/\.cv-paper\{[^}]*font-family:Arial,Helvetica,"Liberation Sans",sans-serif/.test(css));
+ assert.ok(/\.cv-paper\{[^}]*font-size:11pt;line-height:1\.3/.test(css));
+ assert.ok(/@page\{margin:18mm\}/.test(css)&&!css.includes('@page{size:A4;margin:15mm}'));
+ assert.ok(!/@media print\{[^\n]*\.cv-bullet\{font-size:12px\}/.test(css)); // the print block is one line, which holds an @page rule
+ // YoCard print is unchanged: its own @page rule, loaded after styles.css, and no new unscoped hide selector.
+ assert.ok(read('card.css').includes('@media print{@page{size:A4;margin:15mm}}'));
+ const OLD_HIDE='.topbar,#page-band,.sidebar,.app-footer,.form-footer,.evidence-record,#toast,dialog,.skip-link,.review-heading,.print-hide,.step-line,.lead,.export-actions,.sample-preview,.opportunities,.action-row,.primary,.secondary,.text-button,.back-link';
+ const hide=css.match(/@media print\{[\s\S]*?\{display:none!important\}/)[0].match(/\}([^{}]*)\{display:none!important\}$/)[1].split(',');
+ for(const sel of hide)assert.ok(OLD_HIDE.split(',').includes(sel)||sel.startsWith('body.yocv-app '),sel);
 });
 
 test('YoCard components follow the same shapes',()=>{

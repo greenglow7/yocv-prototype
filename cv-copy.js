@@ -59,7 +59,17 @@
     errSession:'Your session ended. Open your Yoma record again.',
     errYoma:'Yoma could not be reached. Try again in a moment.',
     errBusy:'The server is busy, try again in a moment.',
-    cvExperience:'Experience',cvSkills:'Skills',cvEducation:'Education',cvReferences:'References available on request'
+    cvExperience:'Experience',cvSkills:'Skills',cvEducation:'Education',cvReferences:'References available on request',
+    cvMonthsRange:'{start} to {end}',cvMonthsOpen:'{start} to now',cvSkillLine:'{name} ({label})',cvOptionalLine:'{label}: {value}',
+    cvDateOfBirth:'Date of birth',cvIdNumber:'ID number',cvStateOfOrigin:'State of origin',cvPhotoAlt:'Photo of {name}',
+    recordTitle:'YoCV evidence record',recordMade:'Made on {date}.',recordGeneration:'Provider {provider}, model {model}, {ms} ms.',recordNoModel:'none',
+    recordAccountToken:'Read from a Yoma account with an access token.',recordAccountNone:'No Yoma record was read. The CV was made offline.',
+    recordAnswers:'Answers',recordNumbers:'Numbers the person typed',recordConfirm:'Who could confirm this',
+    recordLinked:'Linked Yoma completion: {title}, {organisation}.',recordProposals:'Suggestions',recordRejected:'Refused suggestions',
+    recordRejectedLine:'{text} Refused: {reason} ({code})',recordFinal:'On the CV: {text}',recordQuote:'Quote: {quote}',recordFields:'Drawn from: {fields}',
+    recordProfile:'Profile line',recordSkills:'Skills and their sources',recordSource:'{label} ({kind} {ref})',recordLearningSkills:'Skills: {skills}',recordNone:'None.',
+    originModel:'Suggested by the model',originTemplate:'Built from the answers',
+    decision_accepted:'Accepted',decision_edited:'Edited',decision_left_out:'Left out',decision_pending:'Not reviewed yet'
   }};
   if(typeof module!=='undefined'&&module.exports)module.exports=COPY;else root.YoCVCopy=COPY;
 })(typeof globalThis!=='undefined'?globalThis:this);

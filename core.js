@@ -302,6 +302,127 @@
     const text=r+' with '+(parts.length>1?parts.slice(0,-1).join(', ')+' and ':'')+parts[parts.length-1]+'.';
     return len(text)<40?null:{text,months};
   }
-  const api={labels,credential,MONTHS,WEEKDAYS,escapeHTML,shortQuote,setCredential,localExperienceClaims,evidenceClaims,generateClaims,reviewClaim,canExport,buildTextCV,buildEvidence,contactsIn,numbersIn,allowedNumbers,properNouns,maskNames,restoreNames,checkCvText,monthLabel,monthsBetween,templateBullet,profileLine};
+  // Spec 10 and 11: the one-column CV, its text version and the evidence record. Every printed string comes from copy.
+  const fill=(t,v={})=>String(t??'').replace(/\{(\w+)\}/g,(m,k)=>v[k]==null?'':String(v[k]));
+  const trim=v=>String(v??'').trim();
+  const CONFIRM_KINDS=['none','person','completion','vouch'];
+  const draftFor=(state,i)=>(state.review?.entries||[]).find(d=>d.index===i)||null;
+  const decisionOf=(state,key)=>state.decisions?.[key]||{decision:'pending'};
+  // The wording an accepted or edited item prints: its own text, or the edit's text. Anything else prints nothing.
+  const chosenText=(d,text)=>d.decision==='accepted'?trim(text)||null:d.decision==='edited'&&typeof d.text==='string'?trim(d.text)||null:null;
+  function monthsText(months,copy){
+    const start=monthLabel(months?.start),end=monthLabel(months?.end);
+    return !start?'':!end?fill(copy.cvMonthsOpen,{start}):start===end?start:fill(copy.cvMonthsRange,{start,end});
+  }
+  // One line per ticked opportunity, in record order; a ticked credential replaces its linked completion (plan Deviations 7).
+  function learningItems(state,copy){
+    const r=state.record||{},inc=state.include||{},creds=(r.credentials||[]).filter(c=>(inc.credentials||[]).includes(c.id)),used=new Set(),out=[];
+    const cred=c=>{used.add(c.id);out.push({line:fill(copy.learningCredential,{title:c.title,issuer:c.issuer||copy.issuerNotStated,month:c.month}),skills:[...(c.skills||[])]});};
+    for(const c of r.completions||[]){
+      const w=creds.find(x=>x.completionId===c.evidenceId);
+      if(w)cred(w);else if((inc.completions||[]).includes(c.evidenceId))out.push({line:fill(copy.learningCompletion,{title:c.title,organisation:c.organizationName,month:c.month}),skills:(c.skills||[]).map(s=>s?.name??String(s))});
+    }
+    for(const c of creds)if(!used.has(c.id))cred(c);
+    return out;
+  }
+  // Newest first by end month: an open end first, an entry with no months last.
+  const endKey=m=>ym(m?.start)==null?-Infinity:trim(m?.end)===''?Infinity:ym(m.end)??-Infinity;
+  function buildCv(state,copy){
+    const c=state.contact||{},o=state.optional||{},pd=decisionOf(state,'profile');
+    const experience=(state.entries||[]).map((e,i)=>({e,bullets:(draftFor(state,i)?.proposals||[]).map((p,j)=>chosenText(decisionOf(state,i+':'+j),p.text)).filter(Boolean)}))
+      .filter(x=>x.bullets.length).sort((a,b)=>endKey(b.e.months)-endKey(a.e.months)||0)
+      .map(({e,bullets})=>({title:trim(e.title),place:trim(e.place),months:monthsText(e.months,copy),bullets}));
+    return {
+      name:trim(c.name),contact:{phone:trim(c.phone),email:trim(c.email),town:trim(c.town)},
+      profile:chosenText(pd,state.profile?.text),experience,
+      skills:(state.skills||[]).filter(s=>decisionOf(state,'skill:'+s.name).decision==='accepted').map(s=>({name:s.name,label:s.label})),
+      learning:learningItems(state,copy).map(l=>l.line),education:trim(c.education),
+      optional:{photo:trim(o.photo),dateOfBirth:trim(o.dateOfBirth),idNumber:trim(o.idNumber),stateOfOrigin:trim(o.stateOfOrigin)},
+      sample:state.record?.source!=='token'
+    };
+  }
+  const contactLine=cv=>[cv.contact.phone,cv.contact.email,cv.contact.town].filter(Boolean).join(' · ');
+  const optionalLines=(cv,copy)=>[['cvDateOfBirth','dateOfBirth'],['cvIdNumber','idNumber'],['cvStateOfOrigin','stateOfOrigin']].filter(([,k])=>cv.optional[k]).map(([l,k])=>fill(copy.cvOptionalLine,{label:copy[l],value:cv.optional[k]}));
+  const metaLine=e=>[e.place,e.months].filter(Boolean).join(' · ');
+  // No table, no columns: headings, paragraphs and lists, every value escaped.
+  function renderCvHtml(cv,copy,{headingLevel=1}={}){
+    const E=escapeHTML,h=(n,t,cls)=>'<h'+(headingLevel+n)+(cls?' class="'+cls+'"':'')+'>'+E(t)+'</h'+(headingLevel+n)+'>',ul=items=>'<ul>'+items.map(t=>'<li>'+E(t)+'</li>').join('')+'</ul>';
+    const photo=/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(cv.optional.photo)?'<img class="cv-photo" src="'+E(cv.optional.photo)+'" alt="'+E(fill(copy.cvPhotoAlt,{name:cv.name}))+'">':'';
+    const contact=contactLine(cv);
+    let s='<article class="cv-paper">'+photo+h(0,cv.name,'cv-name')+(contact?'<p class="cv-contact">'+E(contact)+'</p>':'')+optionalLines(cv,copy).map(l=>'<p class="cv-contact">'+E(l)+'</p>').join('');
+    if(cv.profile)s+='<p class="cv-profile">'+E(cv.profile)+'</p>';
+    if(cv.experience.length)s+=h(1,copy.cvExperience)+cv.experience.map(e=>'<div class="cv-entry">'+h(2,e.title)+(metaLine(e)?'<p class="cv-dates">'+E(metaLine(e))+'</p>':'')+ul(e.bullets)+'</div>').join('');
+    if(cv.skills.length)s+=h(1,copy.cvSkills)+ul(cv.skills.map(k=>fill(copy.cvSkillLine,k)));
+    if(cv.learning.length)s+=h(1,copy.learningHeading)+ul(cv.learning);
+    if(cv.education)s+=h(1,copy.cvEducation)+'<p>'+E(cv.education)+'</p>';
+    s+='<p class="cv-references">'+E(copy.cvReferences)+'</p>';
+    if(cv.sample)s+='<p class="cv-sample-note">'+E(copy.cvSampleFooter)+'</p>';
+    return s+'</article>';
+  }
+  function buildCvText(cv,copy){
+    const blocks=[[cv.name,contactLine(cv),...optionalLines(cv,copy)].filter(Boolean)];
+    if(cv.profile)blocks.push([cv.profile]);
+    if(cv.experience.length)blocks.push([copy.cvExperience,...cv.experience.flatMap((e,k)=>[...(k?['']:[]),e.title,...(metaLine(e)?[metaLine(e)]:[]),...e.bullets.map(b=>'- '+b)])]);
+    if(cv.skills.length)blocks.push([copy.cvSkills,...cv.skills.map(k=>'- '+fill(copy.cvSkillLine,k))]);
+    if(cv.learning.length)blocks.push([copy.learningHeading,...cv.learning.map(l=>'- '+l)]);
+    if(cv.education)blocks.push([copy.cvEducation,cv.education]);
+    blocks.push([copy.cvReferences]);
+    if(cv.sample)blocks.push([copy.cvSampleFooter]);
+    return blocks.map(b=>b.join('\n')).join('\n\n');
+  }
+  // The evidence record: the name's first word in the number notes, never the phone, email, town or an optional field.
+  function buildCvRecord(state,copy){
+    const g=state.generation||null,r=state.record||null;
+    const first=trim(r?.user?.firstName)||trim(state.contact?.name).split(/\s+/)[0],note=raw=>raw+' ('+fill(copy.statedBy,{first})+')';
+    const entries=(state.entries||[]).map((e,i)=>{
+      const d=draftFor(state,i),n=e.number||null,c=e.confirm||{kind:'none'},notes=[];
+      if(n&&trim(n.value)!=='')notes.push(note([n.hedge,n.value,n.unit].map(trim).filter(Boolean).join(' ')));
+      for(const k of ['what','outcome'])for(const x of numbersIn(e[k]))if(x.value!=null)notes.push(note(x.raw));
+      const lc=c.kind==='completion'?(r?.completions||[]).find(x=>x.evidenceId===c.completionId):null;
+      return {index:i,title:trim(e.title),place:trim(e.place),months:{start:trim(e.months?.start),end:trim(e.months?.end)},
+        answers:{what:trim(e.what),forWhom:trim(e.forWhom),frequency:trim(e.frequency),number:n?{...n}:null,outcome:trim(e.outcome)},
+        numberNotes:notes,linkedCompletion:lc?{evidenceId:lc.evidenceId,title:lc.title,organizationName:lc.organizationName}:null,confirm:{...c},
+        proposals:(d?.proposals||[]).map((p,j)=>{const dec=decisionOf(state,i+':'+j);return {text:p.text,origin:p.origin,templateWording:!!p.templateWording,decision:dec.decision,finalText:chosenText(dec,p.text),sourceQuote:p.sourceQuote,sourceFields:[...(p.sourceFields||[])]};}),
+        rejected:(d?.rejected||[]).map(x=>({...x}))};
+    });
+    const pd=state.decisions?.profile;
+    return {
+      title:copy.recordTitle,createdAt:new Date().toISOString(),
+      modeLabel:g?.mode==='live'?fill(copy.modeLive,{model:g.model||g.provider}):g?.mode==='sample-offline'?copy.modeOffline:copy.modeSample,
+      generation:g?{...g}:null,account:{source:r?.source??null,fictional:r?r.fictional===true:true},notice:copy.recordNotice,entries,
+      profile:{text:pd?.text??state.profile?.text??null,decision:pd?.decision??'pending'},
+      skills:(state.skills||[]).filter(s=>decisionOf(state,'skill:'+s.name).decision==='accepted').map(s=>JSON.parse(JSON.stringify(s))),
+      learning:learningItems(state,copy)
+    };
+  }
+  // Every source is its own line; no total of vouches or sources is printed (AGENTS rule 6).
+  function renderRecordHtml(record,copy){
+    const E=escapeHTML,p=(t,cls)=>'<p'+(cls?' class="'+cls+'"':'')+'>'+E(t)+'</p>',li=t=>'<li>'+t+'</li>',ul=items=>items.length?'<ul>'+items.join('')+'</ul>':p(copy.recordNone);
+    const g=record.generation,a=record.account||{};
+    let s='<article class="cv-record">'+p(record.modeLabel,'mode-label')+'<h1>'+E(record.title)+'</h1>'+p(record.notice)+p(fill(copy.recordMade,{date:record.createdAt}));
+    if(g)s+=p(fill(copy.recordGeneration,{provider:g.provider,model:g.model||copy.recordNoModel,ms:g.durationMs}));
+    s+=p(a.source==='token'?copy.recordAccountToken:a.source?copy.cvSampleFooter+'.':copy.recordAccountNone);
+    s+='<h2>'+E(copy.cvExperience)+'</h2>';
+    for(const e of record.entries||[]){
+      const x=e.answers||{},n=x.number,meta=[e.place,monthsText(e.months,copy)].filter(Boolean).join(' · ');
+      s+='<section class="record-row"><h3>'+E(e.title)+'</h3>'+(meta?p(meta):'')+'<h4>'+E(copy.recordAnswers)+'</h4><dl>'
+        +[[copy.qWhat,x.what],[copy.qForWhom,x.forWhom],[copy.qOften,[x.frequency,monthsText(e.months,copy)].filter(Boolean).join(', ')],
+          [copy.qNumber,n?[n.hedge,n.value,n.unit].map(trim).filter(Boolean).join(' '):''],[copy.qBetter,x.outcome]]
+          .map(([q,v])=>'<dt>'+E(q)+'</dt><dd>'+E(v||copy.recordNone)+'</dd>').join('')+'</dl>'
+        +'<h4>'+E(copy.recordNumbers)+'</h4>'+ul(e.numberNotes.map(t=>li(E(t))))
+        +'<h4>'+E(copy.recordConfirm)+'</h4>'+p(copy.confirmChips[CONFIRM_KINDS.indexOf(e.confirm?.kind)]||copy.recordNone)
+        +(e.linkedCompletion?p(fill(copy.recordLinked,{title:e.linkedCompletion.title,organisation:e.linkedCompletion.organizationName})):'')
+        +'<h4>'+E(copy.recordProposals)+'</h4>'+ul(e.proposals.map(x=>li(p(x.text)
+          +p([x.origin==='model'?copy.originModel:copy.originTemplate,x.templateWording?copy.templateWording:'',copy['decision_'+x.decision]||x.decision].filter(Boolean).join(' · '))
+          +(x.finalText?p(fill(copy.recordFinal,{text:x.finalText})):'')+p(fill(copy.recordQuote,{quote:x.sourceQuote}))+p(fill(copy.recordFields,{fields:x.sourceFields.join(', ')})))))
+        +'<h4>'+E(copy.recordRejected)+'</h4>'+ul(e.rejected.map(x=>li(E(fill(copy.recordRejectedLine,{text:x.text,reason:copy['reason_'+x.reason]||x.reason,code:x.reason})))))+'</section>';
+    }
+    const pr=record.profile||{};
+    s+='<h2>'+E(copy.recordProfile)+'</h2>'+p(pr.text||copy.recordNone)+p(copy['decision_'+pr.decision]||pr.decision);
+    s+='<h2>'+E(copy.recordSkills)+'</h2>'+ul((record.skills||[]).map(k=>li(E(fill(copy.cvSkillLine,k))+ul((k.sources||[]).map(x=>li(E(fill(copy.recordSource,x))+(x.quote?' '+E(fill(copy.recordQuote,{quote:x.quote})):'')))))));
+    s+='<h2>'+E(copy.learningHeading)+'</h2>'+ul((record.learning||[]).map(l=>li(E(l.line)+(l.skills.length?' '+E(fill(copy.recordLearningSkills,{skills:l.skills.join(', ')})):''))));
+    return s+'</article>';
+  }
+  const api={labels,credential,MONTHS,WEEKDAYS,escapeHTML,shortQuote,setCredential,localExperienceClaims,evidenceClaims,generateClaims,reviewClaim,canExport,buildTextCV,buildEvidence,contactsIn,numbersIn,allowedNumbers,properNouns,maskNames,restoreNames,checkCvText,monthLabel,monthsBetween,templateBullet,profileLine,buildCv,renderCvHtml,buildCvText,buildCvRecord,renderRecordHtml};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.YoCV=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
