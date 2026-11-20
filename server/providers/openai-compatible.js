@@ -4,6 +4,7 @@
 // Azure adapter reuses, so retry, timeout and error mapping exist once.
 const {ProviderError,messages}=require('./errors.js');
 const {buildSchema,validateOutput,buildMessages,menuNamesOf}=require('./schema.js');
+const {matchesSchema}=require('./schema-check.js');
 
 const RETRY_DELAY_MS=1500;
 const RETRY_STATUSES=new Set([429,500,502,503,504]);
@@ -83,8 +84,19 @@ function completionToOutput(json,menuNames){
   return output;
 }
 
+// json_object mode (spec 8): the schema goes into the first system message,
+// or into a new one at the front when the chat has none.
+const SCHEMA_PROMPT='Reply with one JSON object only. It must match this JSON Schema:\n';
+function withSchemaPrompt(chat,schema){
+  const text=SCHEMA_PROMPT+JSON.stringify(schema);
+  const at=chat.findIndex(message=>message?.role==='system');
+  if(at<0)return [{role:'system',content:text},...chat];
+  return chat.map((message,i)=>i===at?{...message,content:message.content+'\n'+text}:message);
+}
+
 // Builds a provider around a URL, header set and optional body extras.
-function createChatProvider({name,model,url,headers,bodyExtra={}},{fetch=globalThis.fetch,sleep=defaultSleep,timeoutMs=20000}={}){
+// structuredOutput 'json_object' is for endpoints without json_schema support.
+function createChatProvider({name,model,url,headers,bodyExtra={},structuredOutput='json_schema'},{fetch=globalThis.fetch,sleep=defaultSleep,timeoutMs=20000}={}){
   return {
     name,
     model,
@@ -104,15 +116,18 @@ function createChatProvider({name,model,url,headers,bodyExtra={}},{fetch=globalT
     // the messages and the strict schema; this only transports and parses.
     async complete({schemaName,schema,messages:chat,maxTokens=900,temperature=0.2}={},{signal}={}){
       if(typeof schemaName!=='string'||!schemaName||!schema||typeof schema!=='object'||!Array.isArray(chat))throw new TypeError('complete() needs schemaName, schema and messages');
+      const asObject=structuredOutput==='json_object';
       const body={
         ...bodyExtra,
-        messages:chat,
-        response_format:{type:'json_schema',json_schema:{name:schemaName,strict:true,schema}},
+        messages:asObject?withSchemaPrompt(chat,schema):chat,
+        response_format:asObject?{type:'json_object'}:{type:'json_schema',json_schema:{name:schemaName,strict:true,schema}},
         temperature,
         max_tokens:maxTokens
       };
       const json=await callChatCompletions({url,headers,body,fetch,sleep,timeoutMs,signal});
-      return completionToJson(json);
+      const output=completionToJson(json);
+      if(asObject&&!matchesSchema(output,schema).ok)throw new ProviderError('provider_bad_output',messages.provider_bad_output,{retryable:true,status:200});
+      return output;
     }
   };
 }
@@ -126,7 +141,8 @@ function createOpenAICompatibleProvider(openaiConfig,deps={}){
     model,
     url:baseUrl+'/chat/completions',
     headers:{authorization:'Bearer '+openaiConfig.apiKey,'content-type':'application/json','user-agent':'YoCV-prototype'},
-    bodyExtra:{model}
+    bodyExtra:{model},
+    structuredOutput:openaiConfig.structuredOutput
   },deps);
 }
 

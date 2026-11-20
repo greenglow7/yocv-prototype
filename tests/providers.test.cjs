@@ -7,29 +7,12 @@ try{azure=require('../server/providers/azure-openai.js');}catch{}
 try{compat=require('../server/providers/openai-compatible.js');}catch{}
 try{local=require('../server/providers/local.js');}catch{}
 try{index=require('../server/providers/index.js');}catch{}
+const {KEY,azureConfig,openaiConfig,completion,fakeFetch,fakeSleep,hangUntilAbort}=require('./helpers/providers.cjs');
+const {matchesSchema}=require('../server/providers/schema-check.js');
 
-const KEY='sk-super-secret-key-ABC123';
 const menu=['Customer Service','Cash Handling','Teamwork'];
 const input={role:'Retail assistant',context:'Family shop',dates:'School holidays, 2025',experience:'I helped customers find products at my aunt’s shop.\nI packed orders and kept the shelves organised.',menuNames:menu};
 const goodOutput={experience:[{text:'Helped customers find products in a family shop.',sourceQuote:'I helped customers find products at my aunt’s shop.',reason:'Reworded from your text; check it is accurate.'}],skills:[{name:'Customer Service',sourceQuote:'I helped customers find products',reason:'Evidence of serving customers; include only if it fits.'}]};
-const azureConfig={endpoint:'https://my-resource.openai.azure.com',apiKey:KEY,deployment:'gpt-4.1-mini',apiVersion:'2024-10-21'};
-const openaiConfig={baseUrl:'https://api.openai.com/v1',apiKey:KEY,model:'gpt-4.1-mini'};
-
-function completion(output,extra={}){return {choices:[{finish_reason:'stop',message:{role:'assistant',content:typeof output==='string'?output:JSON.stringify(output)},...extra}]};}
-function jsonResponse(status,body){return new Response(typeof body==='string'?body:JSON.stringify(body),{status,headers:{'content-type':'application/json'}});}
-function fakeFetch(steps){
- const calls=[];
- const fetch=async(url,init)=>{
-  calls.push({url:String(url),init});
-  const step=steps[Math.min(calls.length-1,steps.length-1)];
-  if(typeof step==='function')return step(url,init);
-  if(step instanceof Error)throw step;
-  return jsonResponse(step.status,step.body);
- };
- return {fetch,calls};
-}
-function fakeSleep(){const calls=[];const sleep=async(ms)=>{calls.push(ms);};return {sleep,calls};}
-const hangUntilAbort=(url,init)=>new Promise((_,reject)=>{init.signal.addEventListener('abort',()=>reject(init.signal.reason),{once:true});});
 
 test('ProviderError carries code, retryable and status',()=>{
  assert.equal(typeof errors.ProviderError,'function');
@@ -361,4 +344,56 @@ test('the local provider has no complete()',()=>{
  const provider=local.createLocalProvider(require('../core.js'));
  assert.equal(typeof provider.complete,'undefined');
  assert.equal(typeof provider.generate,'function');
+});
+
+const SCHEMA={type:'object',properties:{text:{type:'string'},n:{type:['number','null']}},required:['text','n'],additionalProperties:false};
+test('json_object mode puts the schema in the prompt and asks for a JSON object',async()=>{
+  const {fetch,calls}=fakeFetch(()=>completion({text:'hi',n:null}));
+  const p=compat.createOpenAICompatibleProvider({...openaiConfig,structuredOutput:'json_object'},{fetch,sleep:fakeSleep().sleep});
+  assert.deepEqual(await p.complete({schemaName:'t',schema:SCHEMA,messages:[{role:'system',content:'S'},{role:'user',content:'U'}]}),{text:'hi',n:null});
+  const body=JSON.parse(calls[0].init.body);
+  assert.deepEqual(body.response_format,{type:'json_object'});
+  assert.equal(body.messages[0].content,'S\nReply with one JSON object only. It must match this JSON Schema:\n'+JSON.stringify(SCHEMA));
+});
+test('json_object mode refuses a reply that breaks the schema',async()=>{
+  const {fetch}=fakeFetch(()=>completion({text:7,n:null}));
+  const p=compat.createOpenAICompatibleProvider({...openaiConfig,structuredOutput:'json_object'},{fetch,sleep:fakeSleep().sleep});
+  await assert.rejects(p.complete({schemaName:'t',schema:SCHEMA,messages:[{role:'user',content:'U'}]}),{code:'provider_bad_output',retryable:true});
+});
+test('json_object mode prepends a system message when the chat has none',async()=>{
+  const {fetch,calls}=fakeFetch(()=>completion({text:'hi',n:1}));
+  const messages=[{role:'user',content:'U'}];
+  await compat.createOpenAICompatibleProvider({...openaiConfig,structuredOutput:'json_object'},{fetch,sleep:fakeSleep().sleep}).complete({schemaName:'t',schema:SCHEMA,messages});
+  assert.deepEqual(JSON.parse(calls[0].init.body).messages,[{role:'system',content:'Reply with one JSON object only. It must match this JSON Schema:\n'+JSON.stringify(SCHEMA)},{role:'user',content:'U'}]);
+  assert.deepEqual(messages,[{role:'user',content:'U'}]);
+});
+test('json_schema stays the default and the Azure adapter ignores the flag',async()=>{
+  const messages=[{role:'system',content:'S'},{role:'user',content:'U'}];
+  const plain=fakeFetch(()=>completion({text:'hi',n:null}));
+  await compat.createOpenAICompatibleProvider(openaiConfig,{fetch:plain.fetch,sleep:fakeSleep().sleep}).complete({schemaName:'t',schema:SCHEMA,messages});
+  const az=fakeFetch(()=>completion({text:'hi',n:null}));
+  await azure.createAzureProvider({...azureConfig,structuredOutput:'json_object'},{fetch:az.fetch,sleep:fakeSleep().sleep}).complete({schemaName:'t',schema:SCHEMA,messages});
+  for(const {calls} of [plain,az]){
+    const body=JSON.parse(calls[0].init.body);
+    assert.deepEqual(body.response_format,{type:'json_schema',json_schema:{name:'t',strict:true,schema:SCHEMA}});
+    assert.deepEqual(body.messages,messages);
+  }
+  const off=fakeFetch(()=>completion({text:7,n:null}));
+  assert.deepEqual(await compat.createOpenAICompatibleProvider(openaiConfig,{fetch:off.fetch,sleep:fakeSleep().sleep}).complete({schemaName:'t',schema:SCHEMA,messages}),{text:7,n:null});
+});
+test('matchesSchema covers type lists, enum, required, additionalProperties and items',()=>{
+  assert.deepEqual(matchesSchema({text:'a',n:1},SCHEMA),{ok:true});
+  assert.deepEqual(matchesSchema({text:'a'},SCHEMA),{ok:false,path:'$.n'});
+  assert.deepEqual(matchesSchema({text:'a',n:null,x:1},SCHEMA),{ok:false,path:'$.x'});
+  assert.deepEqual(matchesSchema({a:['x','y']},{type:'object',properties:{a:{type:'array',items:{type:'string',enum:['x']}}},required:['a'],additionalProperties:false}),{ok:false,path:'$.a[1]'});
+});
+test('matchesSchema tells integer from number and arrays from objects, and names the nested path',()=>{
+  const s={type:'object',properties:{bullets:{type:'array',items:{type:'object',properties:{text:{type:'string'},count:{type:['integer','null']}},required:['text','count'],additionalProperties:false}}},required:['bullets'],additionalProperties:false};
+  assert.deepEqual(matchesSchema({bullets:[{text:'a',count:2},{text:'b',count:null}]},s),{ok:true});
+  assert.deepEqual(matchesSchema({bullets:[{text:'a',count:2.5}]},s),{ok:false,path:'$.bullets[0].count'});
+  assert.deepEqual(matchesSchema({bullets:[{text:1,count:2}]},s),{ok:false,path:'$.bullets[0].text'});
+  assert.deepEqual(matchesSchema({bullets:{}},s),{ok:false,path:'$.bullets'});
+  assert.deepEqual(matchesSchema([],s),{ok:false,path:'$'});
+  assert.deepEqual(matchesSchema(null,s),{ok:false,path:'$'});
+  assert.deepEqual(matchesSchema({bullets:[]},s),{ok:true});
 });
