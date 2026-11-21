@@ -7,7 +7,7 @@ const {CV_SCHEMA_NAME,buildCvSchema,buildCvMessages}=require('./schema.js');
 const {matchesSchema}=require('./schema-check.js');
 
 const RETRY_DELAY_MS=1500;
-const RETRY_STATUSES=new Set([429,500,502,503,504]);
+const RETRY_STATUSES=new Set([429,500,502,503,504,529]); // 529: Anthropic overloaded_error
 const defaultSleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 
 function stripSlash(url){return String(url??'').replace(/\/+$/,'');}

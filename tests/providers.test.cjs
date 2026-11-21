@@ -280,3 +280,7 @@ test('matchesSchema tells integer from number and arrays from objects, and names
   assert.deepEqual(matchesSchema(null,s),{ok:false,path:'$'});
   assert.deepEqual(matchesSchema({bullets:[]},s),{ok:true});
 });
+
+test('createProvider names all four providers when the kind is unknown',()=>{
+ assert.throws(()=>index.createProvider({provider:'nope'},{}),err=>err.message==='Unknown provider "nope"; expected azure-openai, anthropic, openai-compatible or local.');
+});
