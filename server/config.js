@@ -8,6 +8,8 @@ const DEFAULTS={
   azureApiVersion:'2024-10-21',
   openaiBaseUrl:'https://api.openai.com/v1',
   model:'gpt-4.1-mini',
+  anthropicModel:'claude-opus-5-5',
+  anthropicBaseUrl:'https://api.anthropic.com',
   yomaBase:'https://api.yoma.world/api/v3',
   port:4173,
   host:'127.0.0.1'
@@ -19,7 +21,7 @@ const ORG_KEY=/^YOVOUCH_ORG_KEY_([A-Z0-9_]+)$/;
 const orgNameOf=suffix=>suffix.split('_').filter(Boolean).map(w=>w[0]+w.slice(1).toLowerCase()).join(' ');
 // A configuration that cannot start: main() prints the message and exits with code 1.
 const invalid=message=>Object.assign(new Error(message),{code:'config_invalid'});
-const SELECTORS=['azure','openai','local'],STRUCTURED=['json_schema','json_object'];
+const SELECTORS=['azure','anthropic','openai','local'],STRUCTURED=['json_schema','json_object'];
 
 function loadConfig({env=process.env,cwd=process.cwd()}={}){
   const file=loadEnvFile(path.join(cwd,'.env'));
@@ -30,14 +32,16 @@ function loadConfig({env=process.env,cwd=process.cwd()}={}){
     return trimmed;
   };
   const azureEndpoint=get('AZURE_OPENAI_ENDPOINT'),azureKey=get('AZURE_OPENAI_API_KEY'),azureDeployment=get('AZURE_OPENAI_DEPLOYMENT');
-  const openaiKey=get('OPENAI_API_KEY');
-  // MODEL_PROVIDER wins when set; empty keeps the order Azure, then OpenAI-compatible, then local (spec 8).
+  const openaiKey=get('OPENAI_API_KEY'),anthropicKey=get('ANTHROPIC_API_KEY');
+  // MODEL_PROVIDER wins when set; empty keeps the order Azure, then Anthropic, then OpenAI-compatible, then local
+  // (spec 8 and the Anthropic provider spec), so a leftover OPENAI_API_KEY=ollama never beats a Claude key.
   const selector=get('MODEL_PROVIDER'),structuredOutput=get('OPENAI_STRUCTURED_OUTPUT')||'json_schema';
-  if(selector&&!SELECTORS.includes(selector))throw invalid('MODEL_PROVIDER must be azure, openai or local.');
+  if(selector&&!SELECTORS.includes(selector))throw invalid('MODEL_PROVIDER must be azure, anthropic, openai or local.');
   if(!STRUCTURED.includes(structuredOutput))throw invalid('OPENAI_STRUCTURED_OUTPUT must be json_schema or json_object.');
   const azureReady=Boolean(azureEndpoint&&azureKey&&azureDeployment);
-  const kind=selector||(azureReady?'azure':openaiKey?'openai':'local');
+  const kind=selector||(azureReady?'azure':anthropicKey?'anthropic':openaiKey?'openai':'local');
   if(kind==='azure'&&!azureReady)throw invalid('MODEL_PROVIDER=azure needs AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY and AZURE_OPENAI_DEPLOYMENT.');
+  if(kind==='anthropic'&&!anthropicKey)throw invalid('MODEL_PROVIDER=anthropic needs ANTHROPIC_API_KEY.');
   if(kind==='openai'&&!openaiKey)throw invalid('MODEL_PROVIDER=openai needs OPENAI_API_KEY (any value for a local server, such as ollama).');
   const transcribeDeployment=get('AZURE_OPENAI_TRANSCRIBE_DEPLOYMENT'),transcribeModel=get('TRANSCRIBE_MODEL');
   const portRaw=Number.parseInt(get('PORT'),10);
@@ -72,13 +76,17 @@ function loadConfig({env=process.env,cwd=process.cwd()}={}){
   };
   if(kind==='azure'){
     const azure={endpoint:stripSlashes(azureEndpoint),apiKey:azureKey,deployment:azureDeployment,apiVersion:get('AZURE_OPENAI_API_VERSION')||DEFAULTS.azureApiVersion};
-    return {provider:'azure-openai',model:azure.deployment,azure,openai:null,...base};
+    return {provider:'azure-openai',model:azure.deployment,azure,anthropic:null,openai:null,...base};
+  }
+  if(kind==='anthropic'){
+    const anthropic={apiKey:anthropicKey,model:get('ANTHROPIC_MODEL')||DEFAULTS.anthropicModel,baseUrl:stripSlashes(get('ANTHROPIC_BASE_URL')||DEFAULTS.anthropicBaseUrl)};
+    return {provider:'anthropic',model:anthropic.model,anthropic,azure:null,openai:null,...base};
   }
   if(kind==='openai'){
     const openai={baseUrl:stripSlashes(get('OPENAI_BASE_URL')||DEFAULTS.openaiBaseUrl),apiKey:openaiKey,model:get('OPENAI_MODEL')||DEFAULTS.model,structuredOutput};
-    return {provider:'openai-compatible',model:openai.model,azure:null,openai,...base};
+    return {provider:'openai-compatible',model:openai.model,azure:null,anthropic:null,openai,...base};
   }
-  return {provider:'local',model:null,azure:null,openai:null,...base};
+  return {provider:'local',model:null,azure:null,anthropic:null,openai:null,...base};
 }
 
 module.exports={loadConfig,DEFAULTS};

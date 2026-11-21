@@ -1,4 +1,4 @@
-/* Live smoke tests. The model tests are skipped unless model credentials (AZURE_OPENAI_* or OPENAI_API_KEY)
+/* Live smoke tests. The model tests are skipped unless model credentials (AZURE_OPENAI_*, ANTHROPIC_API_KEY or OPENAI_API_KEY)
    are configured in the environment or .env. The two Yoma tests call YOMA_API_BASE (api.yoma.world by
    default) on every run; skip them with YOCV_LIVE_YOMA=0.
    Run: npm test  (or node --test tests/live.test.cjs). */
@@ -20,7 +20,7 @@ const chipSkills=require('../data/chip-skills.json');
 
 const config=loadConfig({cwd:path.join(__dirname,'..')});
 const hasModel=config.provider!=='local';
-const skipModel=hasModel?false:'no AZURE_OPENAI_* or OPENAI_API_KEY configured';
+const skipModel=hasModel?false:'no AZURE_OPENAI_*, ANTHROPIC_API_KEY or OPENAI_API_KEY configured';
 const hasTranscribe=Boolean(config.transcribe);
 const liveYoma=process.env.YOCV_LIVE_YOMA==='0'?'YOCV_LIVE_YOMA=0':false;
 const {entry}=JSON.parse(fs.readFileSync(path.join(__dirname,'fixtures','cv-thandi.json'),'utf8'));

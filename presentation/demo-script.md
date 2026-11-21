@@ -6,7 +6,15 @@
 2. Run `node scripts/seed-demo.js`. It publishes Thandi's card and adds her three customer vouches with sample numbers.
 3. Run `npm start` and open `http://127.0.0.1:4173`. Note the mode label in the header: **Live AI · <model>** or **Sample mode**. Say which one you are in.
 4. Open a second tab on `http://127.0.0.1:4173/demo/cv-rejected`, the prepared refused suggestion.
-5. Keep these `.env` lines ready for the Ollama switch, from the local model block in `.env.example`, with `ollama serve` running and the model pulled. This beat is unverified on the build laptop: the only model run there, `qwen3.5:9b`, timed out at the adapter's fixed 20 s (testing log rows 8 and 9), and `qwen2.5:3b-instruct` was never pulled. The model must answer inside 20 s, so it needs an instruct model with no reasoning pass. Rehearse before the demo: start the server with these lines, open the app, run one entry through **Continue to review** (or `POST /api/cv/review` once) and keep the server up only if the banner reads **Live AI** and a line comes back. If it does not, drop the beat and show a saved evidence record instead: the `json_object` and `json_schema` runs of Thandi's entry under `reports/2026-11-19-task-20-live-runs/`, which name the provider and the model.
+5. Keep these `.env` lines ready for the live-model switch. The first choice is Claude: it needs only a key, and `effort` is set low for the 20 s deadline. It has not been run live on the build laptop, so rehearse it as described below. The banner then reads **Live AI · claude-haiku-5-5**.
+
+```
+MODEL_PROVIDER=anthropic
+ANTHROPIC_API_KEY=<key>
+ANTHROPIC_MODEL=claude-haiku-5-5
+```
+
+   The alternative is the Ollama switch, from the local model block in `.env.example`, with `ollama serve` running and the model pulled. The Ollama beat is unverified on the build laptop: the only model run there, `qwen3.5:9b`, timed out at the adapter's fixed 20 s (testing log rows 8 and 9), and `qwen2.5:3b-instruct` was never pulled. The model must answer inside 20 s, so it needs an instruct model with no reasoning pass. Rehearse whichever configuration you use before the demo: start the server with its lines, open the app, run one entry through **Continue to review** (or `POST /api/cv/review` once) and keep the server up only if the banner reads **Live AI** and a line comes back. If it does not, drop the beat and show a saved evidence record instead: the `json_object` and `json_schema` runs of Thandi's entry under `reports/2026-11-19-task-20-live-runs/`, which name the provider and the model.
 
 ```
 MODEL_PROVIDER=openai
@@ -48,11 +56,11 @@ OPENAI_STRUCTURED_OUTPUT=json_object
 
 **Say:** "Nothing reaches the CV without an Accept. The sample account carries one small footer line on the paper. The evidence record keeps her answers, every suggestion, every refusal and the model that wrote them."
 
-## 4:30 to 5:30: The same entry on a local model
+## 4:30 to 5:30: The same entry on a live model
 
-**Do:** only if the rehearsal in Preparation step 5 passed: stop the server, add the Ollama lines to `.env` so `MODEL_PROVIDER` is `openai`, and run `npm start` again. Repeat the one entry. Show the banner, **Live AI · <the model you pulled>**, and the evidence record naming provider `openai-compatible` and the local model. Otherwise open a saved evidence record from `reports/2026-11-19-task-20-live-runs/` and say it was recorded earlier, on this laptop, with the deadline raised.
+**Do:** only if the rehearsal in Preparation step 5 passed: stop the server, add the Claude lines to `.env` so `MODEL_PROVIDER` is `anthropic`, and run `npm start` again. Repeat the one entry. Show the banner, **Live AI · claude-haiku-5-5**, and the evidence record naming provider `anthropic` and the model. With the Ollama alternative instead, `MODEL_PROVIDER` is `openai`, the banner reads **Live AI · <the model you pulled>** and the evidence record names provider `openai-compatible` and the local model. Otherwise open a saved evidence record from `reports/2026-11-19-task-20-live-runs/` and say it was recorded earlier, on this laptop, with the deadline raised.
 
-**Say:** "The model sits behind one interface. Azure, any OpenAI-compatible server or a model on this laptop. The checks do not change."
+**Say:** "The model sits behind one interface. Azure, Claude, any OpenAI-compatible server or a model on this laptop. The checks do not change."
 
 ## 5:30 to 6:00: Where it goes in Yoma
 
@@ -60,7 +68,7 @@ OPENAI_STRUCTURED_OUTPUT=json_object
 
 **Say:** "The integration pack follows Yoma's own patterns. It shows where this CV replaces the coming soon tile. Not operated by Yoma or UNICEF."
 
-If the model call fails live (the app shows `provider_timeout` or "The server did not answer in time"): take the Ollama lines out of `.env`, restart in sample mode, say which mode the label shows, and show a saved evidence record from `reports/` for the live beat. The checks are the same in both modes.
+If the model call fails live (the app shows `provider_timeout` or "The server did not answer in time"): take the Claude or Ollama lines out of `.env`, restart in sample mode, say which mode the label shows, and show a saved evidence record from `reports/` for the live beat. The checks are the same in both modes.
 
 ---
 

@@ -77,6 +77,8 @@ Frequency, the number, its unit and its hedge pass to the model unmasked, so `CV
 
 `OpenAICompatibleClient` uses Flurl. It sends `POST {BaseUrl}/chat/completions`. On Azure's `/openai/v1/` path it sends the key in an `api-key` header; elsewhere it sends `Authorization: Bearer`. `AuthHeaderName` overrides both. `StructuredOutput` picks `json_schema` (the default) or `json_object`, for servers that do not honour `json_schema`. With `json_object` the schema goes in the prompt and the same checks run on the result.
 
+The prototype also carries an Anthropic Messages API adapter (`server/providers/anthropic.js`) behind the same interface, which shows that a second wire format fits without a change to the service; the pack keeps the OpenAI-compatible client because it also covers Azure and local servers.
+
 `LanguageModelOptions` holds `Provider`, `BaseUrl`, `ApiKey`, `AuthHeaderName`, `Model`, `RequestTimeoutSeconds`, `MaxOutputTokens`, `Temperature` and `StructuredOutput`, bound from the section `LanguageModel`.
 
 ### The controller

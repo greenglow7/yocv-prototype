@@ -21,7 +21,7 @@ The three share one server, the grounding checks and the Yoma client. YoCard is 
 | YoCV | `index.html`, `app.js`, `core.js`, `server/cv/` | Four steps to a reviewed first CV. **Your Yoma record**: read the person's completions and wallet credentials (fictional sample accounts unless `YOMA_ACCESS_TOKEN` is set), tick what goes on the CV and choose a role. **Your work**: six short questions per piece of work, answered in the person's own words, and the contact line. **Review**: a model, or the local template, suggests one or two lines per piece of work; every line is checked against the person's own words before it is shown, every skill shows its evidence, and nothing goes on the CV without an Accept. **Your CV**: a printable page, a text download, a separate evidence record and live learning opportunities from Yoma's public API. |
 | YoCard | `card.html`, `card.js`, `server/card/` | Connect a Yoma account, describe your work, review a draft split into **Confirmed from Yoma** and **Stated by <first name>, not checked**, publish a short link, a QR card and a public page with **Check now**. Records are signed ES256 by YoCard, not by Yoma. |
 | YoVouch | `server/card/vouch*.js`, `sms.js`, `wa.js`, `reply*.js` | Rotating-code vouches (scan, typed, SMS, call-back), worker-to-worker vouches, organisation referrals, request links, and **Reply by Voice**: a six-line reply to a job post built from the card, confirmed by the worker, translated with back-translation. SMS, WhatsApp and the call-back are simulated in this build. |
-| Server | `server.js`, `server/` | Node 20 built-ins only. Model adapters (Azure OpenAI, OpenAI-compatible, local templates), grounding validators, the Yoma public API client, signing, the file store and the server-rendered flow pages. |
+| Server | `server.js`, `server/` | Node 20 built-ins only. Model adapters (Azure OpenAI, Anthropic Messages API, OpenAI-compatible, local templates), grounding validators, the Yoma public API client, signing, the file store and the server-rendered flow pages. |
 
 Design specs and plans live in `docs/superpowers/`. Research briefs that shaped YoVouch are in `docs/research/`.
 
@@ -48,17 +48,17 @@ npm start
 
 Then open `http://127.0.0.1:4173`. Without credentials the server runs in **sample mode**: the generator uses local templates, Yoma data is still live.
 
-To enable **live AI mode**, copy `.env.example` to `.env` and pick the provider with `MODEL_PROVIDER`. Set to `azure`, `openai` or `local`, it wins, and the server refuses to start without that provider's values. Left empty, the order is Azure if its three values are set, else the OpenAI-compatible endpoint if `OPENAI_API_KEY` is set, else the local templates (sample mode). So switching from Azure to a model on the laptop is a one-line change, and the Azure block can stay filled in.
+To enable **live AI mode**, copy `.env.example` to `.env` and pick the provider with `MODEL_PROVIDER`. Set to `azure`, `anthropic`, `openai` or `local`, it wins, and the server refuses to start without that provider's values. Left empty, the order is Azure if its three values are set, else Anthropic (Claude) if `ANTHROPIC_API_KEY` is set, else the OpenAI-compatible endpoint if `OPENAI_API_KEY` is set, else the local templates (sample mode). So a leftover `OPENAI_API_KEY=ollama` never beats a Claude key. So switching from Azure to a model on the laptop is a one-line change, and the Azure block can stay filled in.
 
-The two configurations side by side (`.env.example` holds both; the local block is commented out):
+The three configurations side by side (`.env.example` holds all three; the local block is commented out):
 
-| | Azure OpenAI | A local model (Ollama) |
-| --- | --- | --- |
-| Selector | `MODEL_PROVIDER=azure` | `MODEL_PROVIDER=openai` |
-| Endpoint | `AZURE_OPENAI_ENDPOINT=https://<resource>.openai.azure.com` | `OPENAI_BASE_URL=http://localhost:11434/v1` |
-| Key | `AZURE_OPENAI_API_KEY=<key>` | `OPENAI_API_KEY=ollama` (any value) |
-| Model | `AZURE_OPENAI_DEPLOYMENT=gpt-4.1-mini` | `OPENAI_MODEL=<a small instruct model>` (`.env.example` names `qwen2.5:3b-instruct`) |
-| Output | `AZURE_OPENAI_API_VERSION=2024-10-21` (or `v1` for the newer `/openai/v1` path) | `OPENAI_STRUCTURED_OUTPUT=json_object` |
+| | Azure OpenAI | Claude (Anthropic) | A local model (Ollama) |
+| --- | --- | --- | --- |
+| Selector | `MODEL_PROVIDER=azure` | `MODEL_PROVIDER=anthropic` | `MODEL_PROVIDER=openai` |
+| Endpoint | `AZURE_OPENAI_ENDPOINT=https://<resource>.openai.azure.com` | `ANTHROPIC_BASE_URL=https://api.anthropic.com` (the default, may be left out) | `OPENAI_BASE_URL=http://localhost:11434/v1` |
+| Key | `AZURE_OPENAI_API_KEY=<key>` | `ANTHROPIC_API_KEY=<key>` | `OPENAI_API_KEY=ollama` (any value) |
+| Model | `AZURE_OPENAI_DEPLOYMENT=gpt-4.1-mini` | `ANTHROPIC_MODEL=claude-opus-5-5` (`claude-haiku-5-5` for a cheap demo) | `OPENAI_MODEL=<a small instruct model>` (`.env.example` names `qwen2.5:3b-instruct`) |
+| Output | `AZURE_OPENAI_API_VERSION=2024-10-21` (or `v1` for the newer `/openai/v1` path) | Structured output is built in (`json_schema`), effort `low` | `OPENAI_STRUCTURED_OUTPUT=json_object` |
 
 Without an Azure key, the Ollama run and the unit-tested Azure adapter are what is shown.
 
@@ -78,10 +78,13 @@ Every variable the code reads (`server/config.js` reads `.env` from the working 
 | `YOMA_ACCESS_TOKEN` | empty | YoCard and YoCV: a bearer token switches the account source from sample personas to a real Yoma account. YoCV then also searches that account's wallet for its credentials |
 | `YOCARD_PUBLIC_URL` | `http://HOST:PORT` | Base URL embedded in card links, share text and the QR code (must start with `http://` or `https://`) |
 | `YOCV_LIVE_YOMA` | unset | Tests only, shell environment not `.env`: `YOCV_LIVE_YOMA=0 npm test` skips the two live Yoma tests in `tests/live.test.cjs` |
-| `MODEL_PROVIDER` | empty | `azure`, `openai` or `local`. Set, it picks the provider, and the server refuses to start without that provider's values. Empty: Azure if its three values are set, else OpenAI-compatible if `OPENAI_API_KEY` is set, else local templates |
+| `MODEL_PROVIDER` | empty | `azure`, `anthropic`, `openai` or `local`. Set, it picks the provider, and the server refuses to start without that provider's values. Empty: Azure if its three values are set, else Anthropic if `ANTHROPIC_API_KEY` is set, else OpenAI-compatible if `OPENAI_API_KEY` is set, else local templates |
 | `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_DEPLOYMENT` | empty | All three together select the Azure OpenAI provider (live AI mode) when `MODEL_PROVIDER` is empty or `azure` |
 | `AZURE_OPENAI_API_VERSION` | `2024-10-21` | Azure API version; `v1` selects the newer `/openai/v1` path |
-| `OPENAI_API_KEY` | empty | Selects the OpenAI-compatible provider when Azure is not configured, or with `MODEL_PROVIDER=openai`. Any value for a local server, such as `ollama` |
+| `ANTHROPIC_API_KEY` | empty | Selects the Anthropic (Claude) provider when Azure is not configured, or with `MODEL_PROVIDER=anthropic` |
+| `ANTHROPIC_MODEL` | `claude-opus-5-5` | Claude model name; `claude-haiku-5-5` is the cheap option for a demo |
+| `ANTHROPIC_BASE_URL` | `https://api.anthropic.com` | Base URL of the Messages API; the adapter sends `POST <base>/v1/messages` |
+| `OPENAI_API_KEY` | empty | Selects the OpenAI-compatible provider when neither Azure nor Anthropic is configured, or with `MODEL_PROVIDER=openai`. Any value for a local server, such as `ollama` |
 | `OPENAI_BASE_URL` | `https://api.openai.com/v1` | Base URL of that endpoint |
 | `OPENAI_MODEL` | `gpt-4.1-mini` | Model name sent to that endpoint |
 | `OPENAI_STRUCTURED_OUTPUT` | `json_schema` | `json_schema` asks that endpoint for strict structured output. `json_object` puts the schema in the prompt, asks for a JSON object and checks the reply against the same schema |
@@ -105,7 +108,7 @@ You can also open `index.html` straight from disk. The app then runs in **sample
 npm test
 ```
 
-`tests/live.test.cjs` holds two credential-gated model smoke tests (a YoCV CV line for Thandi's braiding and the YoCard draft) that run against whichever provider is configured, print the provider and model, and are skipped without a model key. It also holds two Yoma tests that call `YOMA_API_BASE` on every run and need internet; the first has a subtest that resolves every role menu name and chip skill name in the live taxonomy. `YOCV_LIVE_YOMA=0 npm test` skips those two when offline (POSIX shells; on Windows set the variable first).
+`tests/live.test.cjs` holds two credential-gated model smoke tests (a YoCV CV line for Thandi's braiding and the YoCard draft) that run against whichever provider is configured (Azure OpenAI, Anthropic or OpenAI-compatible), print the provider and model, and are skipped without a model key (`AZURE_OPENAI_*`, `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`). It also holds two Yoma tests that call `YOMA_API_BASE` on every run and need internet; the first has a subtest that resolves every role menu name and chip skill name in the live taxonomy. `YOCV_LIVE_YOMA=0 npm test` skips those two when offline (POSIX shells; on Windows set the variable first).
 
 ### 🎬 Demonstrate it
 
@@ -138,8 +141,8 @@ YoVouch: run `npm run seed:demo`, then `YOVOUCH_SIM=1 npm start`, and open the p
 
 | Element | Status |
 | --- | --- |
-| CV line suggestions | Real model call when configured (Azure OpenAI, or any OpenAI-compatible endpoint, a local Ollama server included). The local template otherwise. The mode label, `Live AI · <model>`, `Sample mode` or `Sample mode (offline)`, is in the header and in the evidence record. |
-| Provider actually tested live | Ollama on the build laptop, `qwen3.5:9b` through the OpenAI-compatible adapter, on 2026-11-19. With the shipped 20-second client deadline it timed out (`provider_timeout`) with `json_object` and with `json_schema`, because the model reasons before it answers. In a test harness with the deadline raised to 120 seconds and the reasoning turned off, it answered in 14 to 28 seconds across runs in both modes, and both of its lines for Thandi passed every check. Azure OpenAI: not run, no key. Both adapters are unit-tested with an injected `fetch` (success, retry on 429/5xx, timeout, auth errors, content filter, refusal, truncated and malformed output). The smoke test prints the provider and model it used. |
+| CV line suggestions | Real model call when configured (Azure OpenAI, Anthropic's Claude, or any OpenAI-compatible endpoint, a local Ollama server included). The local template otherwise. The mode label, `Live AI · <model>`, `Sample mode` or `Sample mode (offline)`, is in the header and in the evidence record. |
+| Provider actually tested live | Ollama on the build laptop, `qwen3.5:9b` through the OpenAI-compatible adapter, on 2026-11-19. With the shipped 20-second client deadline it timed out (`provider_timeout`) with `json_object` and with `json_schema`, because the model reasons before it answers. In a test harness with the deadline raised to 120 seconds and the reasoning turned off, it answered in 14 to 28 seconds across runs in both modes, and both of its lines for Thandi passed every check. Azure OpenAI: not run, no key. Both adapters are unit-tested with an injected `fetch` (success, retry on 429/5xx, timeout, auth errors, content filter, refusal, truncated and malformed output). The smoke test prints the provider and model it used. Anthropic: unit-tested with an injected fetch; not run live until a key is set. |
 | Grounding checks | Real, server-side in `server/cv/validate.js`, and the same core checks run in the browser offline. A CV line is refused when it holds a number the person did not give (digits or words) or drops their hedge, a name or place they did not give, a phone number or an email, an inflation word or a role upgrade, a weak opening, a quote that is not in their answers, fewer than 40 or more than 180 characters, more than one sentence or an exclamation mark, or when it repeats another line. Refusals and their reasons are listed in the evidence record. When every line for an entry is refused, the template version is shown, labelled `template wording`. The person's own edit runs the same checks. |
 | Skill evidence (S1 to S4) | Real methodology, in-repo. Each skill carries its sources and the strongest one's label: `Confirmed from Yoma` (a ticked completion or credential), `Vouched by a customer, confirmed by them, not by Yoma` (a live, shown YoVouch line on the person's card), `From your own account` (shown in an interview answer), `Self-stated`. A skill is never shown as confirmed on the strength of the person's own words. |
 | Templates and the provider switch | Real, in-repo: the template wording, the CV paper, the text download, the evidence record and `MODEL_PROVIDER` |
@@ -221,7 +224,7 @@ Safety rules built in: adults only (self-declared date of birth under 18 is refu
 - `server.js`: HTTP server, static allowlist, routes `GET /api/status` and `GET /api/yoma/opportunities`; mounts `server/cv/routes.js` and `server/card/routes.js`
 - `server/cv/`: the YoCV server side. `routes.js`: `GET /api/cv/config|menu`, `POST /api/cv/record|review|check|skills|docx`, `POST /api/cv/draft` (only with `YOCV_SERVICE_SECRET`) and `/demo/cv-rejected` (only with `YOVOUCH_SIM=1`); in-memory sessions, 30 minutes from their last use. `record.js`: the Yoma record (completions, wallet credentials, self-added skills). `draft.js`: mask, provider call, restore, check, template fallback. `validate.js`: the CV line and profile checks. `skills.js`: the evidence levels S1 to S4 and the vouch read. `menu.js`: the role menu checked against Yoma's taxonomy. `copy.js`: server access to the catalogue
 - `server/config.js`, `server/env.js`: configuration from `.env` and the environment
-- `server/providers/`: model adapters (`azure-openai.js`, `openai-compatible.js`, `local.js`), strict JSON schema and prompt (`schema.js`)
+- `server/providers/`: model adapters (`azure-openai.js`, `anthropic.js`, `openai-compatible.js`, `local.js`), strict JSON schema and prompt (`schema.js`)
 - `server/validate.js`: the shared grounding validators (YoCard, YoVouch and the CV checks reuse them unchanged)
 - `server/yoma.js`: Yoma public API client with a TTL cache
 - `data/role-skills.json`: Yoma skill names and opportunity queries per role (checked 2026-11-12)

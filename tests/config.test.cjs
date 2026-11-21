@@ -118,6 +118,7 @@ const empty=tmpDir();
 const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8');
 const LOCAL={OPENAI_API_KEY:'ollama',OPENAI_BASE_URL:'http://localhost:11434/v1/',OPENAI_MODEL:'qwen2.5:3b-instruct',OPENAI_STRUCTURED_OUTPUT:'json_object'};
 const AZURE={AZURE_OPENAI_ENDPOINT:'https://r.openai.azure.com',AZURE_OPENAI_API_KEY:'k',AZURE_OPENAI_DEPLOYMENT:'d'};
+const CLAUDE={ANTHROPIC_API_KEY:'sk-ant-test'};
 test('MODEL_PROVIDER wins over the configured order; empty keeps today\'s order',()=>{
   const c=loadConfig({env:{...AZURE,...LOCAL,MODEL_PROVIDER:'openai'},cwd:empty});
   assert.equal(c.provider,'openai-compatible');
@@ -125,11 +126,27 @@ test('MODEL_PROVIDER wins over the configured order; empty keeps today\'s order'
   assert.equal(loadConfig({env:{...AZURE,...LOCAL,MODEL_PROVIDER:'local'},cwd:empty}).provider,'local');
   assert.equal(loadConfig({env:{...AZURE,...LOCAL},cwd:empty}).provider,'azure-openai');
 });
+test('loadConfig picks anthropic from its key, after Azure and before OpenAI-compatible',()=>{
+  const cfg=loadConfig({env:{...CLAUDE,...LOCAL},cwd:empty});
+  assert.equal(cfg.provider,'anthropic');assert.equal(cfg.model,'claude-opus-5-5');
+  assert.deepEqual(cfg.anthropic,{apiKey:'sk-ant-test',model:'claude-opus-5-5',baseUrl:'https://api.anthropic.com'});
+  assert.equal(cfg.openai,null);assert.equal(cfg.azure,null);
+  assert.equal(loadConfig({env:{...AZURE,...CLAUDE},cwd:empty}).provider,'azure-openai');
+  assert.equal(loadConfig({env:{...LOCAL},cwd:empty}).anthropic,null);
+});
+test('ANTHROPIC_MODEL and ANTHROPIC_BASE_URL are honoured and the base URL loses its trailing slash',()=>{
+  const cfg=loadConfig({env:{...CLAUDE,ANTHROPIC_MODEL:'claude-haiku-5-5',ANTHROPIC_BASE_URL:'https://proxy.example/'},cwd:empty});
+  assert.equal(cfg.model,'claude-haiku-5-5');assert.equal(cfg.anthropic.baseUrl,'https://proxy.example');
+});
+test('MODEL_PROVIDER=anthropic wins and needs the key',()=>{
+  assert.equal(loadConfig({env:{...AZURE,...CLAUDE,MODEL_PROVIDER:'anthropic'},cwd:empty}).provider,'anthropic');
+  assert.throws(()=>loadConfig({env:{...AZURE,MODEL_PROVIDER:'anthropic'},cwd:empty}),err=>err.code==='config_invalid'&&err.message==='MODEL_PROVIDER=anthropic needs ANTHROPIC_API_KEY.');
+});
 test('a selector without its values, an unknown selector and an unknown flag refuse to start',()=>{
   const bad=(env,message)=>assert.throws(()=>loadConfig({env,cwd:empty}),{code:'config_invalid',message});
   bad({MODEL_PROVIDER:'azure'},'MODEL_PROVIDER=azure needs AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY and AZURE_OPENAI_DEPLOYMENT.');
   bad({MODEL_PROVIDER:'openai'},'MODEL_PROVIDER=openai needs OPENAI_API_KEY (any value for a local server, such as ollama).');
-  bad({MODEL_PROVIDER:'ollama'},'MODEL_PROVIDER must be azure, openai or local.');
+  bad({MODEL_PROVIDER:'ollama'},'MODEL_PROVIDER must be azure, anthropic, openai or local.');
   bad({OPENAI_API_KEY:'x',OPENAI_STRUCTURED_OUTPUT:'yaml'},'OPENAI_STRUCTURED_OUTPUT must be json_schema or json_object.');
 });
 test('structuredOutput defaults to json_schema and YOCV_SERVICE_SECRET is read',()=>{
@@ -143,6 +160,6 @@ test('the banner prints the provider and the model',()=>{
 });
 test('.env.example carries the selector, the flag, the secret and the commented local block',()=>{
   const ex=read('.env.example');
-  for(const line of ['MODEL_PROVIDER=','YOCV_SERVICE_SECRET=','# MODEL_PROVIDER=openai','# OPENAI_BASE_URL=http://localhost:11434/v1','# OPENAI_API_KEY=ollama','# OPENAI_MODEL=qwen2.5:3b-instruct','# OPENAI_STRUCTURED_OUTPUT=json_object'])
+  for(const line of ['MODEL_PROVIDER=','YOCV_SERVICE_SECRET=','# MODEL_PROVIDER=openai','# OPENAI_BASE_URL=http://localhost:11434/v1','# OPENAI_API_KEY=ollama','# OPENAI_MODEL=qwen2.5:3b-instruct','# OPENAI_STRUCTURED_OUTPUT=json_object','ANTHROPIC_API_KEY=','ANTHROPIC_MODEL=claude-opus-5-5','# ANTHROPIC_MODEL=claude-haiku-5-5'])
     assert.ok(ex.split('\n').some(l=>l.trim().startsWith(line)),line);
 });
