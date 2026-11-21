@@ -45,6 +45,7 @@ test('loadConfig defaults to local provider with documented defaults',()=>{
  assert.equal(cfg.model,null);
  assert.equal(cfg.azure,null);
  assert.equal(cfg.openai,null);
+ assert.equal(cfg.anthropic,null);
  assert.equal(cfg.yomaBase,'https://api.yoma.world/api/v3');
  assert.equal(cfg.port,4173);
  assert.equal(cfg.host,'127.0.0.1');

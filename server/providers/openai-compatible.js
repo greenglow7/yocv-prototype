@@ -1,7 +1,7 @@
 'use strict';
 // OpenAI-compatible chat completions adapter (spec §5.4) and the shared HTTP
-// logic (callChatCompletions, createChatProvider) that the Azure adapter
-// reuses, so retry, timeout and error mapping exist once.
+// logic (callChatCompletions, createChatProvider) that the Azure and Anthropic
+// adapters reuse, so retry, timeout and error mapping exist once.
 const {ProviderError,messages}=require('./errors.js');
 const {CV_SCHEMA_NAME,buildCvSchema,buildCvMessages}=require('./schema.js');
 const {matchesSchema}=require('./schema-check.js');

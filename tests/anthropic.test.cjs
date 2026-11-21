@@ -101,3 +101,38 @@ test('createProvider dispatches anthropic',()=>{
  const provider=index.createProvider({provider:'anthropic',anthropic:{apiKey:KEY}},{},{fetch:fakeFetch([]).fetch});
  assert.equal(provider.name,'anthropic');
 });
+test('forAnthropicSchema turns a nested type array into anyOf and leaves other schemas equal',()=>{
+ const original={type:'object',properties:{offer:{type:'object',properties:{priceFrom:{type:['number','null'],description:'d'},tags:{type:'array',items:{type:['string','null']}},either:{anyOf:[{type:['integer','null']},{type:'string'}]}},required:['priceFrom']}},required:['offer'],additionalProperties:false};
+ const copy=JSON.parse(JSON.stringify(original));
+ const out=anthropic.forAnthropicSchema(original);
+ assert.deepEqual(original,copy);
+ assert.deepEqual(out.properties.offer.properties.priceFrom,{anyOf:[{type:'number'},{type:'null'}],description:'d'});
+ assert.deepEqual(out.properties.offer.properties.tags.items,{anyOf:[{type:'string'},{type:'null'}]});
+ assert.deepEqual(out.properties.offer.properties.either.anyOf[0],{anyOf:[{type:'integer'},{type:'null'}]});
+ assert.equal(out.properties.offer.type,'object');
+ assert.deepEqual(out.properties.offer.required,['priceFrom']);
+ assert.deepEqual(anthropic.forAnthropicSchema(input.schema),input.schema);
+ assert.notEqual(anthropic.forAnthropicSchema(input.schema),input.schema);
+});
+test('the body for a schema with a type array carries the anyOf form; the reply is checked against the original',async()=>{
+ const typed={type:'object',properties:{priceFrom:{type:['number','null']}},required:['priceFrom'],additionalProperties:false};
+ const {fetch,calls}=fakeFetch([{status:200,body:reply({priceFrom:null})}]);
+ const provider=anthropic.createAnthropicProvider(anthropicConfig,{fetch,sleep:fakeSleep().sleep});
+ assert.deepEqual(await provider.complete({...input,schema:typed}),{priceFrom:null});
+ const body=JSON.parse(calls[0].init.body);
+ assert.deepEqual(body.output_config.format.schema.properties.priceFrom,{anyOf:[{type:'number'},{type:'null'}]});
+ assert.deepEqual(typed.properties.priceFrom,{type:['number','null']});
+});
+test('maxTokens and temperature from the caller are ignored',async()=>{
+ const {fetch,calls}=fakeFetch([{status:200,body:reply({ok:true})}]);
+ const provider=anthropic.createAnthropicProvider(anthropicConfig,{fetch,sleep:fakeSleep().sleep});
+ await provider.complete({...input,maxTokens:50,temperature:0.9});
+ const body=JSON.parse(calls[0].init.body);
+ assert.equal(body.max_tokens,4096);
+ assert.equal('temperature' in body,false);
+});
+test('a 200 reply that breaks the schema is provider_bad_output, retryable, with the default check',async()=>{
+ const {fetch}=fakeFetch([{status:200,body:reply({ok:'yes'})}]);
+ const provider=anthropic.createAnthropicProvider(anthropicConfig,{fetch,sleep:fakeSleep().sleep});
+ await assert.rejects(provider.complete(input),err=>{assert.equal(err.code,'provider_bad_output');assert.equal(err.retryable,true);return true;});
+});

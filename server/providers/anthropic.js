@@ -20,6 +20,28 @@ const DEFAULT_BASE_URL='https://api.anthropic.com';
 function stripSlash(url){return String(url??'').replace(/\/+$/,'');}
 const bad=(retryable=true)=>new ProviderError('provider_bad_output',messages.provider_bad_output,{retryable,status:200});
 
+// A deep copy of the schema for output_config: a type list such as
+// ['number','null'] becomes anyOf of single types, the form the Messages API
+// structured-output limits document. Other keywords stay beside the anyOf.
+// The caller's schema is untouched and replies are checked against it.
+function forAnthropicSchema(schema){
+  if(Array.isArray(schema))return schema.map(forAnthropicSchema);
+  if(!schema||typeof schema!=='object')return schema;
+  // A node that has both a type list and its own anyOf keeps its type list:
+  // no schema in the repo does this, and merging the two would change meaning.
+  const rewrite=Array.isArray(schema.type)&&schema.anyOf===undefined;
+  const out=rewrite?{anyOf:schema.type.map(type=>({type}))}:{};
+  for(const [key,value] of Object.entries(schema)){
+    if(rewrite&&key==='type')continue;
+    if(key==='properties'&&value&&typeof value==='object'&&!Array.isArray(value)){
+      out.properties={};
+      for(const [name,child] of Object.entries(value))out.properties[name]=forAnthropicSchema(child);
+    }else if(key==='items'||key==='anyOf')out[key]=forAnthropicSchema(value);
+    else out[key]=value&&typeof value==='object'?structuredClone(value):value;
+  }
+  return out;
+}
+
 // Every system message goes into the top-level system string, in order; a
 // system role never reaches messages, which the API would reject.
 function toAnthropicBody({model,schema,messages:chat}){
@@ -31,7 +53,7 @@ function toAnthropicBody({model,schema,messages:chat}){
   const body={model,max_tokens:MAX_TOKENS};
   if(system.length)body.system=system.join('\n\n');
   body.messages=rest;
-  body.output_config={effort:'low',format:{type:'json_schema',schema}};
+  body.output_config={effort:'low',format:{type:'json_schema',schema:forAnthropicSchema(schema)}};
   body.fallbacks='default';
   return body;
 }
@@ -84,4 +106,4 @@ function createAnthropicProvider(anthropicConfig,{fetch=globalThis.fetch,sleep,t
   return provider;
 }
 
-module.exports={createAnthropicProvider,toAnthropicBody,messageToJson};
+module.exports={createAnthropicProvider,toAnthropicBody,messageToJson,forAnthropicSchema};
