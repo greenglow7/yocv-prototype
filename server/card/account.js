@@ -104,7 +104,7 @@ function createAccountSource({config,yoma,fetch=globalThis.fetch,now=Date.now,pe
   function listPersonas(){
     if(kind!=='sample')return [];
     const at=toDate(now);
-    return personas.map(p=>({id:p.id,displayName:p.displayName,trade:p.trade,city:p.city,age:ageAt(p.dateOfBirth,at)}));
+    return personas.map(p=>({id:p.id,displayName:p.displayName,firstName:str(p.firstName??String(p.displayName??'').split(/\s+/)[0]),trade:p.trade,city:p.city,age:ageAt(p.dateOfBirth,at)}));
   }
 
   async function readPersona(id){

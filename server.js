@@ -30,6 +30,7 @@ const STATIC={
   '/cv-copy.js':'cv-copy.js',
   '/cv-rules.js':'cv-rules.js',
   '/app.js':'app.js',
+  '/yoid.js':'yoid.js',
   '/card.html':'card.html',
   '/card.js':'card.js',
   '/card.css':'card.css',

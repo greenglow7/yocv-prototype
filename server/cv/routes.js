@@ -190,7 +190,7 @@ function createCvRouter({config,provider,core,yoma,roleSkills,accountSource,card
   function cvConfig(res){
     const sample=accountSource.kind==='sample';
     sendJSON(res,200,{copy:COPY,rules:RULES,roles:roleList(roleSkills),
-      accounts:{source:accountSource.kind,personas:sample?accountSource.listPersonas().map(p=>({id:p.id,displayName:p.displayName,trade:p.trade,city:p.city??null})):[]},
+      accounts:{source:accountSource.kind,personas:sample?accountSource.listPersonas().map(p=>({id:p.id,displayName:p.displayName,firstName:p.firstName??null,trade:p.trade,city:p.city??null})):[]},
       mode:{mode:live?'live':'sample',provider:live?str(provider.name):'local',model:live?(provider.model??null):null}});
   }
 

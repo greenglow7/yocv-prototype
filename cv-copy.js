@@ -114,8 +114,43 @@
     oppHeading:'Learning opportunities on Yoma for this role',oppIntro:'These come from a keyword search of the public Yoma list for {role}, not from your record.',
     oppLoading:'Looking for learning opportunities on Yoma.',oppUnavailable:'Yoma opportunities are unavailable right now.',oppEmpty:'No Yoma learning opportunities matched this role yet.',
     oppOpen:'Open on Yoma (yoma.world)',oppLive:'Live from Yoma',oppCached:'From Yoma (cached)',oppUnreachable:'Yoma unreachable',
-    resetTitle:'Reset this demo?',resetCopy:'This clears your record, your answers and your contact details in this browser session.',
-    resetAction:'Reset demo',resetDone:'Demo reset.'
+    resetTitle:'Reset your CV draft?',resetCopy:'This clears your answers, your contact details and your review in this browser. You stay signed in.',
+    resetAction:'Reset',resetDone:'Draft cleared.',
+    // The Yo-ID shell (spec 2026-11-22-yoid-shell-design.md, sections 5, 6 and 8). Yoma's own sentences
+    // are reused where that spec quotes them, without dashes.
+    tabs:[
+      {label:'Overview',route:'#/',emoji:'💳',blurb:'Your wallet, passport, skills and opportunities in one place.'},
+      {label:'Wallet',route:'#/wallet',emoji:'💸',blurb:'ZLTO you earn by completing opportunities. Spend it in the marketplace.'},
+      {label:'Passport',route:'#/passport',emoji:'🌐',blurb:'Verified credentials for every opportunity you complete.'},
+      {label:'Opportunities',route:'#/opportunities',emoji:'🏆',blurb:'What you have completed, submitted, had declined or saved for later.'},
+      {label:'Skills',route:'#/skills',emoji:'⚡',blurb:'Skills you have earned by completing opportunities.'},
+      {label:'CV',route:'#/cv',emoji:'📄',blurb:'A CV built from your Yo-ID.'}
+    ],
+    greetingMorning:'Good morning, {first}',greetingAfternoon:'Good afternoon, {first}',greetingEvening:'Good evening, {first}',greetingNoName:'Good morning',
+    heroCvNone:'Open CV to build a CV from your Yo-ID',heroCvDraft:'Your CV draft is at step {n} of 4',
+    whatIsYoid:'What is Yo-ID?',
+    cvTileTitle:'CV',cvTileNote:'A CV built from your Yo-ID.',cvTileDraft:'Draft at step {n} of 4 · {k} lines accepted',cvTileReady:'Ready to print or download',
+    openWallet:'Open Wallet',openPassport:'Open Passport',openOpportunities:'Open Opportunities',openSkills:'Open Skills',openCv:'Open CV',
+    continueCvTile:'Continue CV',
+    breadcrumbRoot:'Yo-ID',
+    walletSetup:'Wallet being set up',
+    walletSetupBody:'Your wallet is still being set up. It usually takes less than 24 hours. Any ZLTO you earn in the meantime is safe and will show here once it is ready.',
+    walletHow:'How ZLTO works',
+    walletHowBullets:['Every verified opportunity pays the ZLTO shown on its page.','Pending rewards arrive within 24 hours.','Spend it in the marketplace; purchases appear under My Products.'],
+    passportIntro:'Verified credentials for every opportunity you complete. A new credential can take up to 24 hours to appear.',
+    passportEmpty:'No credentials yet',passportEmptyBody:'Complete an opportunity to get a verified credential: proof of what you did.',
+    oppsIntro:'Completed opportunities from your Yo-ID.',
+    oppsEmpty:'No opportunities yet',oppsEmptyBody:'Save one for later or complete one, and it shows up here.',
+    skillsIntro:'Skills you have earned by completing opportunities.',
+    skillsEmpty:'No skills yet',skillsEmptyBody:'Each opportunity you complete adds the skills it taught you.',
+    statusIssued:'Issued',viewCredential:'View credential',viewOpportunity:'View opportunity',
+    issuedByPartner:'Issued by {issuer}',selfAttested:'Self-attested',skillIssuedBy:'Skill issued by {n} partner',completedBadge:'Completed',
+    signedOutTitle:'Welcome back!',signedOutBody:'This content is just a click away. Please log in to continue.',logIn:'Log in',signOut:'Sign out',
+    switchAccount:'Switch account',switchTitle:'Switch account?',switchCopy:'Your CV draft will be cleared.',
+    footerFictional:'The people shown are fictional sample accounts.',footerPrototype:'Independent student prototype. Not operated by Yoma or UNICEF.',
+    aboutPrototype:'About this prototype',sourceLink:'Source',
+    menuHome:'Home',menuAbout:'About Us',menuOpportunities:'Opportunities',menuMarketplace:'Marketplace',menuYoid:'Yo-ID',menuYocard:'My work card (YoCard)',
+    openMenu:'Open main menu',closeMenu:'Close',languageOnly:'English only',drawerAccount:'Your account'
   }};
   if(typeof module!=='undefined'&&module.exports)module.exports=COPY;else root.YoCVCopy=COPY;
 })(typeof globalThis!=='undefined'?globalThis:this);

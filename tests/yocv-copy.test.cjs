@@ -7,7 +7,8 @@ const read=file=>fs.readFileSync(path.join(__dirname,'..',file),'utf8');
 
 const SPEC=read('docs/superpowers/specs/2026-11-19-yocv-credential-cv-design.md');
 const section=n=>SPEC.split('\n## '+n+'.')[1].split('\n## ')[0];
-const values=Object.values(COPY.en).flat().map(v=>v.replace(/\{[^}]+\}/g,'§'));
+const strings=v=>typeof v==='string'?[v]:Array.isArray(v)?v.flatMap(strings):v&&typeof v==='object'?Object.values(v).flatMap(strings):[];
+const values=strings(COPY.en).map(v=>v.replace(/\{[^}]+\}/g,'§'));
 test('every backticked string in spec section 12 is in the catalogue, verbatim',()=>{
   const wanted=[...section(12).matchAll(/`([^`]+)`/g)].map(m=>m[1]).filter(s=>s!=='data/yocv-copy.json').map(s=>s.replace(/<[^>]+>/g,'§'));
   for(const s of wanted)assert.ok(values.includes(s),'missing: '+s);
@@ -42,3 +43,25 @@ test('the YoCV footer and About dialog say Not operated by Yoma or UNICEF and ke
   assert.ok(foot.includes('Independent student prototype')&&about.includes('No UNICEF or Yoma endorsement is implied'));
 });
 test('no YoCV string says verified by Yoma',()=>assert.ok(!/verified by Yoma/i.test(JSON.stringify(COPY))));
+test('the Yo-ID shell copy exists and matches the spec wording',()=>{
+  const c=COPY.en;
+  assert.deepEqual(c.tabs.map(t=>t.label),['Overview','Wallet','Passport','Opportunities','Skills','CV']);
+  assert.deepEqual(c.tabs.map(t=>t.route),['#/','#/wallet','#/passport','#/opportunities','#/skills','#/cv']);
+  assert.deepEqual(c.tabs.map(t=>t.emoji),['💳','💸','🌐','🏆','⚡','📄']);
+  assert.equal(c.tabs[2].blurb,'Verified credentials for every opportunity you complete.');
+  assert.equal(c.greetingMorning,'Good morning, {first}');assert.equal(c.greetingAfternoon,'Good afternoon, {first}');assert.equal(c.greetingEvening,'Good evening, {first}');
+  assert.equal(c.greetingNoName,'Good morning');
+  assert.equal(c.cvTileNote,'A CV built from your Yo-ID.');assert.equal(c.cvTileDraft,'Draft at step {n} of 4 · {k} lines accepted');assert.equal(c.cvTileReady,'Ready to print or download');
+  assert.equal(c.walletSetup,'Wallet being set up');
+  assert.equal(c.walletSetupBody,'Your wallet is still being set up. It usually takes less than 24 hours. Any ZLTO you earn in the meantime is safe and will show here once it is ready.');
+  assert.equal(c.passportEmpty,'No credentials yet');assert.equal(c.passportEmptyBody,'Complete an opportunity to get a verified credential: proof of what you did.');
+  assert.equal(c.oppsEmpty,'No opportunities yet');assert.equal(c.oppsEmptyBody,'Save one for later or complete one, and it shows up here.');
+  assert.equal(c.skillsEmpty,'No skills yet');assert.equal(c.skillsEmptyBody,'Each opportunity you complete adds the skills it taught you.');
+  assert.equal(c.signedOutTitle,'Welcome back!');assert.equal(c.signedOutBody,'This content is just a click away. Please log in to continue.');assert.equal(c.logIn,'Log in');assert.equal(c.signOut,'Sign out');
+  assert.equal(c.switchAccount,'Switch account');assert.equal(c.switchTitle,'Switch account?');assert.equal(c.switchCopy,'Your CV draft will be cleared.');
+  assert.equal(c.footerFictional,'The people shown are fictional sample accounts.');assert.equal(c.footerPrototype,'Independent student prototype. Not operated by Yoma or UNICEF.');
+  assert.equal(c.whatIsYoid,'What is Yo-ID?');
+  for(const k of ['openWallet','openPassport','openOpportunities','openSkills','openCv','continueCv','breadcrumbRoot','passportIntro','skillsIntro','oppsIntro','walletHow','walletHowBullets','statusIssued','viewCredential','viewOpportunity','issuedByPartner','selfAttested','skillIssuedBy','completedBadge','aboutPrototype','sourceLink','resetAction','menuHome','menuAbout','menuOpportunities','menuMarketplace','menuYoid','menuYocard','openMenu','closeMenu','languageOnly','drawerAccount'])assert.ok(k in c,k);
+  assert.equal(c.breadcrumbRoot,'Yo-ID');assert.equal(c.statusIssued,'Issued');assert.equal(c.resetAction,'Reset');
+  assert.ok(!/verified by Yoma/i.test(JSON.stringify(c)));
+});

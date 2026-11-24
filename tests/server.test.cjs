@@ -145,7 +145,7 @@ test('static allowlist serves the app files with content types',async()=>{
  const css=await fetch(base+'/styles.css');
  assert.equal(css.status,200);
  assert.match(css.headers.get('content-type'),/text\/css/);
- for(const file of ['/core.js','/app.js']){
+ for(const file of ['/core.js','/app.js','/yoid.js']){
   const js=await fetch(base+file);
   assert.equal(js.status,200,file);
   assert.match(js.headers.get('content-type'),/javascript/);

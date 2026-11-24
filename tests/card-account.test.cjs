@@ -111,7 +111,7 @@ test('createAccountSource defaults to the sample kind and lists every persona wi
  assert.deepEqual(listed.map(p=>p.id),['thandi','brian','amara','sipho','lerato','bongani']);
  const lerato=listed.find(p=>p.id==='lerato');
  assert.equal(lerato.age,17);
- assert.deepEqual(Object.keys(listed[0]).sort(),['age','city','displayName','id','trade']);
+ assert.deepEqual(Object.keys(listed[0]).sort(),['age','city','displayName','firstName','id','trade']);
  assert.equal(listed[0].displayName,'Thandi Mokoena');
  assert.ok(!('phoneNumber' in listed[0]));
 });

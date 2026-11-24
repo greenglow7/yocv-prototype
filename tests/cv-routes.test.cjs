@@ -20,6 +20,8 @@ test('config carries the copy, the rules, fifteen roles and the six personas',as
   const c=await get(base,'/api/cv/config');
   assert.equal(c.copy.stepRecord,'Your Yoma record'); assert.equal(c.rules.inflation.length,8);
   assert.equal(c.roles.length,15); assert.equal(c.accounts.personas.length,6);
+  assert.equal(c.accounts.personas[0].firstName,'Thandi');
+  for(const p of c.accounts.personas)assert.equal(typeof p.firstName,'string');
 });
 test('record then review gives Thandi\'s skills with their levels and a checked bullet',async()=>{
   const {base,dir}=await bootVouch({yoma:skillYoma(),env:{sim:true}});
