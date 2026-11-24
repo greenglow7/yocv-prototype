@@ -99,8 +99,8 @@ const allDecided=()=>bulletKeys().every(k=>decisionOf(k)!=='pending')&&state.ski
 const acceptedSkillNames=()=>state.skills.filter(s=>decisionOf('skill:'+s.name)==='accepted').map(s=>s.name);
 const marked=(text,h)=>Array.isArray(h)&&h[1]>h[0]?E(text.slice(0,h[0]))+'<mark>'+E(text.slice(h[0],h[1]))+'</mark>'+E(text.slice(h[1])):E(text);
 function decisionButtons(key,{edit=true}={}){
- const d=decisionOf(key),b=(decision,label)=>`<button class="${d===decision?'primary':'secondary'} small" data-decide="${E(key)}" data-decision="${decision}" aria-pressed="${d===decision}">${E(label)}</button>`;
- return `<div class="claim-actions">${b('accepted',copy.accept)}${edit?`<button class="${d==='edited'?'primary':'secondary'} small" data-edit="${E(key)}" aria-pressed="${d==='edited'}">${E(copy.edit)}</button>`:''}${b('left_out',copy.leaveOut)}<span class="tag neutral">${E(copy['decision_'+d])}</span></div>`;
+ const d=decisionOf(key),b=(decision,label)=>`<button type="button" class="pill" data-decide="${E(key)}" data-decision="${decision}" aria-pressed="${d===decision}">${E(label)}</button>`;
+ return `<div class="claim-actions">${b('accepted',copy.accept)}${edit?`<button type="button" class="pill" data-edit="${E(key)}" aria-pressed="${d==='edited'}">${E(copy.edit)}</button>`:''}${b('left_out',copy.leaveOut)}<span class="tag neutral">${E(copy['decision_'+d])}</span></div>`;
 }
 function editHTML(key){
  return `<div class="edit-area"><label class="field-label" for="edit-text">${E(copy.editLabel)}</label><textarea id="edit-text" class="short" data-edit-text maxlength="400">${E(ui.editText)}</textarea>`

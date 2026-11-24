@@ -136,3 +136,43 @@ test('YoCard components follow the same shapes',()=>{
  assert.ok(/\.trade\{[^}]*border-radius:16px/.test(css));
  assert.ok(!/border:1px solid var\(--line\)/.test(css.replace(/img\{[^}]*\}/g,'')),'no bordered boxes except logos');
 });
+
+test('the CV steps wear the shell cards, pills and buttons (shell spec section 6, plan Task 4)',()=>{
+ const css=read('styles.css'),app=read('app.js');
+ const screen=stripPrint(css);
+ // Buttons: round green primary with the darker green hover; white secondary with the green border. Scoped to the
+ // shell so YoCard's purple primary is untouched.
+ assert.ok(/body\.yocv-app \.primary\{background:var\(--green\)[^}]*color:#ffffff/.test(screen),'green primary');
+ assert.ok(/body\.yocv-app \.primary:hover\{background:var\(--recorded\)/.test(screen),'darker green hover');
+ assert.ok(/\.secondary\{[^}]*border:1px solid var\(--green\)/.test(css),'secondary keeps the green border');
+ assert.ok(/\.primary\{background:var\(--accent\)/.test(css),'YoCard keeps the purple primary');
+ // Cards: white, the shadow token, 12 px radius, 16 px padding, 24 px from 768 px.
+ assert.ok(/#view>\.form-section,\.claim-card\{[^}]*background:var\(--panel\)[^}]*box-shadow:var\(--shadow\)[^}]*border-radius:12px[^}]*padding:16px/.test(screen),'cards');
+ assert.ok(/@media\(min-width:768px\)\{[^\n]*#view>\.form-section,\.claim-card\{padding:24px\}/.test(screen),'24px from 768px');
+ assert.ok(/body\.yocv-app #view>\.evidence-list\{[^}]*box-shadow:var\(--shadow\)[^}]*border-radius:12px/.test(screen),'evidence list card');
+ assert.ok(/\.evidence-record\{[^}]*box-shadow:var\(--shadow\)[^}]*border-radius:12px/.test(screen),'evidence record card');
+ // Step pills above the step title, the current one green; they wrap on phones.
+ assert.ok(/\.step-pills\{[^}]*flex-wrap:wrap/.test(css),'pills wrap');
+ assert.ok(/\.step-pills \.pill\[aria-current="step"\]\{background:var\(--green\)/.test(css),'current step green');
+ assert.ok(app.indexOf('stepPills()+`<h2 class="step-title"')>0,'pills before the step title');
+ // The review's Accept, Edit and Leave out are pills, the pressed one green.
+ const decide=app.match(/function decisionButtons[\s\S]*?\n\}/)[0];
+ assert.ok(decide.includes('class="pill"')&&!/'primary':'secondary'/.test(decide),'decision buttons are pills');
+ assert.ok(/\.claim-actions \.pill\[aria-pressed="true"\]\{background:var\(--green\)/.test(css),'pressed pill green');
+ // Evidence chips keep their tints at 14 px.
+ assert.ok(/\.tag\{[^}]*font-size:14px/.test(css));
+ for(const t of ['recorded','awaiting','stated'])assert.ok(new RegExp('\\.tag\\.'+t+'[,{]').test(css),'tag '+t);
+ // Inputs: the hairline border and 8 px radius inside the shell; the interview chips are pills, not skill chips.
+ assert.ok(/body\.yocv-app :is\(input,textarea,select\)\{border-color:var\(--line\)\}/.test(screen),'hairline inputs');
+ assert.ok(/input,textarea\{[^}]*border-radius:8px/.test(css));
+ assert.ok(/\.chips \.chip\{[^}]*border:1px solid var\(--line\)/.test(css)&&/\.chips \.chip\.selected\{background:var\(--green\)/.test(css),'interview chips');
+ // The opportunities block is a list of cards.
+ assert.ok(/body\.yocv-app \.opp-item\{[^}]*box-shadow:var\(--shadow\)[^}]*border-radius:12px/.test(screen),'opportunity cards');
+ // The paper keeps its typography with the card radius; print flattens it and hides the shell.
+ assert.ok(/\.cv-paper\{[^}]*border-radius:12px/.test(screen),'paper radius');
+ const print=css.match(/@media print\{[\s\S]*$/)[0];
+ assert.ok(/\.cv-paper\{border:0;border-radius:0;padding:0\}/.test(print)&&/@page\{margin:18mm\}/.test(print));
+ assert.ok(!/body\.yocv-app[^{},]*\.cv-paper/.test(css),'no shell rule outranks the flat print paper');
+ // Phones: cards keep 16 px padding and the primary fills the form footer.
+ assert.ok(/@media\(max-width:640px\)\{[^\n]*\.form-footer \.primary\{width:100%\}/.test(css));
+});
