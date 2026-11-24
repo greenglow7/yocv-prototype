@@ -10,7 +10,7 @@ const $=s=>document.querySelector(s);
 const ROUTES=['#/','#/wallet','#/passport','#/opportunities','#/skills','#/cv'],DEADLINE_MS=30000;
 let copy=window.YoCVCopy.en;
 // person: {id, displayName, firstName, town, trade}. signedOut keeps the token account for Log in while hiding it.
-const S={cfg:null,person:null,record:null,selector:null,tab:null,offline:false,signedOut:false,busy:false,list:false,open:{}};
+const S={cfg:null,person:null,record:null,selector:null,tab:null,step:0,offline:false,signedOut:false,busy:false,list:false,open:{}};
 let cv=null,pendingAction=null,toastTimer;
 const sample=()=>S.cfg?.accounts?.source==='sample';
 const who=()=>S.signedOut?null:S.person;
@@ -21,6 +21,8 @@ const draft=()=>window.YoCVApp?.draftStatus?.()||{step:0,accepted:0,ready:false,
 const tradeLabel=id=>S.cfg?.roles?.find(r=>r.tradeId&&r.tradeId===id)?.name||'';
 function route(){
  const h=location.hash||'#/',m=/^#\/cv(?:\/([2-4]))?$/.exec(h);
+ /* A fragment that is not a route (the skip link's #main) is in-page navigation: keep the tab and the step. */
+ if(!h.startsWith('#/')&&S.tab)return {tab:S.tab,step:S.step||0};
  if(m)return {tab:'#/cv',step:m[1]?Number(m[1])-1:0};
  return {tab:ROUTES.includes(h)?h:'#/',step:0};
 }
@@ -48,7 +50,7 @@ const PATHS={
 const icon=(name,size)=>svg(PATHS[name],size);
 const initials=name=>String(name??'').trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase();
 function hashHue(name){let h=0;for(const ch of String(name??''))h=(h*31+ch.codePointAt(0))%360;return h;}
-const avatarHTML=(p,size)=>p?`<span class="avatar-face" style="background:hsl(${hashHue(p.displayName)} 45% 35%);width:${size}px;height:${size}px;font-size:${Math.max(14,Math.round(size*0.36))}px">${E(initials(p.displayName))}</span>`
+const avatarHTML=(p,size)=>p?`<span class="avatar-face" style="background:hsl(${hashHue(p.displayName)} 45% 30%);width:${size}px;height:${size}px;font-size:${Math.max(14,Math.round(size*0.36))}px">${E(initials(p.displayName))}</span>`
  :`<span class="avatar-face generic" style="width:${size}px;height:${size}px">${icon('user',Math.round(size*0.55))}</span>`;
 /* The greeting by local hour; the first name in orange; no name on a cold offline start. */
 function greetingHTML(){
@@ -149,7 +151,7 @@ function notify(text){const el=$('#toast');el.textContent=text;el.classList.add(
 function modeLabel(){const m=S.cfg?.mode||{};return S.offline?copy.modeOffline:m.mode==='live'?fill(copy.modeLive,{model:m.model||m.provider}):copy.modeSample;}
 /* Rendering. The whole shell on a route or person change; the draft bits alone on a CV state change. */
 function render(){
- const {tab,step}=route(),changed=S.tab!==null&&S.tab!==tab;S.tab=tab;
+ const {tab,step}=route(),changed=S.tab!==null&&S.tab!==tab;S.tab=tab;S.step=step;
  const p=who(),av=$('#avatar-button'),login=$('#login-button');
  av.hidden=S.signedOut;av.innerHTML=avatarHTML(p,44);av.setAttribute('aria-label',p?p.displayName:copy.drawerAccount);
  login.hidden=!S.signedOut;login.innerHTML=icon('login',18)+E(copy.logIn);

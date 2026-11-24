@@ -55,3 +55,24 @@ test('the shell styles are scoped and YoCard keeps its rules',()=>{
   assert.ok(card.includes('.topbar{min-height:72px')&&card.includes('#page-band{background:var(--accent)')&&card.includes('.app-shell{display:grid'),'the old header, band and rail live in card.css');
   assert.ok(!css.includes('#page-band{')&&!css.includes('.sidebar{'),'and not in styles.css');
 });
+test('avatar initials keep 4.5:1 on every hue the name hash can give',()=>{
+  const m=js.match(/background:hsl\(\$\{hashHue\([^)]*\)\} (\d+)% (\d+)%\)/);assert.ok(m,'avatar colour is hsl(hue s% l%)');
+  const s=Number(m[1])/100,l=Number(m[2])/100;
+  const lin=c=>c<=0.03928?c/12.92:((c+0.055)/1.055)**2.4;
+  let worst=Infinity;
+  for(let h=0;h<360;h++){
+    const a=s*Math.min(l,1-l),f=n=>{const k=(n+h/30)%12;return l-a*Math.max(-1,Math.min(k-3,9-k,1));};
+    const lum=0.2126*lin(f(0))+0.7152*lin(f(8))+0.0722*lin(f(4));
+    worst=Math.min(worst,1.05/(lum+0.05));
+  }
+  assert.ok(worst>=4.5,'white on the worst hue is '+worst.toFixed(2)+':1');
+});
+test('a hash that is not a route (the skip link #main) keeps the current tab',()=>{
+  const src=js.match(/function route\(\)\{[\s\S]*?\n\}/)[0];
+  const run=(hash,S)=>new Function('location','S','ROUTES',src+';return route();')({hash},S,['#/','#/wallet','#/passport','#/opportunities','#/skills','#/cv']);
+  assert.deepEqual(run('#main',{tab:'#/cv',step:2}),{tab:'#/cv',step:2},'skip link on the CV tab');
+  assert.deepEqual(run('#main',{tab:null}),{tab:'#/',step:0},'first load with #main');
+  assert.deepEqual(run('#/nowhere',{tab:'#/cv',step:1}),{tab:'#/',step:0},'an unknown route still falls back to the overview');
+  assert.deepEqual(run('#/cv/3',{tab:'#/'}),{tab:'#/cv',step:2});
+  assert.deepEqual(run('',{tab:'#/wallet'}),{tab:'#/',step:0});
+});
