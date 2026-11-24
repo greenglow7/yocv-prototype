@@ -10,7 +10,7 @@ const $=s=>document.querySelector(s);
 const ROUTES=['#/','#/wallet','#/passport','#/opportunities','#/skills','#/cv'],DEADLINE_MS=30000;
 let copy=window.YoCVCopy.en;
 // person: {id, displayName, firstName, town, trade}. signedOut keeps the token account for Log in while hiding it.
-const S={cfg:null,person:null,record:null,selector:null,tab:null,step:0,offline:false,signedOut:false,busy:false,list:false,open:{}};
+const S={cfg:null,person:null,record:null,selector:null,tab:null,step:0,offline:false,signedOut:false,busy:false,list:false,open:{},filter:'all',sub:'completed'};
 let cv=null,pendingAction=null,toastTimer;
 const sample=()=>S.cfg?.accounts?.source==='sample';
 const who=()=>S.signedOut?null:S.person;
@@ -45,6 +45,8 @@ const PATHS={
  ring:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5M12 16v5M3 12h5M16 12h5"/>',
  login:'<path d="M10 17l5-5-5-5M15 12H3M13 3h6v18h-6"/>',
  check:'<path d="M5 12l4 4L19 6"/>',
+ clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+ bookmark:'<path d="M6 3h12v18l-6-4-6 4z"/>',
  globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>'
 };
 const icon=(name,size)=>svg(PATHS[name],size);
@@ -64,44 +66,97 @@ function heroLine(){
  const d=draft();return d.step>0?fill(copy.heroCvDraft,{n:d.step+1}):copy.heroCvNone;
 }
 const pillsHTML=()=>copy.tabs.map(t=>`<a class="pill${t.route===S.tab?' current':''}" href="${E(t.route)}" ${t.route===S.tab?'aria-current="page"':''}><span aria-hidden="true">${t.emoji}</span>${E(t.label)}</a>`).join('');
-/* Views: pure functions of the record (and the draft status), so tests can run them in Node. Task 3 fills the five
-   tab pages; this task renders the Overview and a first version of the other four. */
+/* Views: pure functions of the record (and the draft status or the sub-tab), so tests can run them in Node. Every
+   count comes from the record; the record holds no ZLTO figure and no identity credential, so none is shown. */
 const empty={completions:[],credentials:[],selfAttested:[],wallet:null};
+const list=v=>Array.isArray(v)?v:[];
+/* Skills from completions first, then self-attested ones, de-duplicated by name in first-seen order. partners counts
+   the organisations whose completions taught the skill. */
 function skillsOf(record){
  const seen=new Map();
- for(const c of record.completions||[])for(const s of c.skills||[])if(s?.name&&!seen.has(s.name))seen.set(s.name,{name:s.name,source:'completion',issuer:c.organizationName||''});
- for(const a of record.selfAttested||[])if(a?.name&&!seen.has(a.name))seen.set(a.name,{name:a.name,source:'self',issuer:''});
+ for(const c of list(record?.completions))for(const s of list(c.skills))if(s?.name){
+  const org=c.organizationName||'',hit=seen.get(s.name);
+  if(!hit)seen.set(s.name,{name:s.name,source:'completion',issuer:org,partners:org?[org]:[]});
+  else if(hit.source==='completion'&&org&&!hit.partners.includes(org))hit.partners.push(org);
+ }
+ for(const a of list(record?.selfAttested))if(a?.name&&!seen.has(a.name))seen.set(a.name,{name:a.name,source:'self',issuer:'',partners:[]});
  return [...seen.values()];
 }
+const first=s=>{const ch=[...String(s??'').trim()][0];return ch?ch.toUpperCase():'';};
 const crumb=(label,count)=>`<nav class="breadcrumb" aria-label="Breadcrumb"><a href="#/">${E(copy.breadcrumbRoot)}</a><span aria-hidden="true">›</span><span>${E(label)}${count!=null?` <span class="count">${count}</span>`:''}</span></nav>`;
 const intro=text=>`<div class="card intro">${icon('info')}<p>${E(text)}</p></div>`;
 const emptyHTML=(title,body,ic='ring')=>`<div class="empty"><span class="empty-icon">${icon(ic,28)}</span><h2>${E(title)}</h2><p>${E(body)}</p></div>`;
+const emptyInline=(title,body)=>`<p class="empty-title">${E(title)}</p><p class="muted">${E(body)}</p>`;
 const openLink=(route,label)=>`<a class="section-link" href="${E(route)}">${E(label)}${icon('arrow',16)}</a>`;
+const oppCounts=r=>({completed:list(r.completions).length,pending:0,declined:0,saved:0});
+/* The four circles: a green disc in a 2 px orange border, with an orange ring for the share of all four counts. The
+   count and its label sit under the disc in ink, because white 14 px text on the green falls short of 4.5:1. */
+function circlesHTML(r){
+ const n=oppCounts(r),total=n.completed+n.pending+n.declined+n.saved;
+ const items=[['completed','check',copy.circleCompleted],['pending','clock',copy.circlePending],['declined','close',copy.circleDeclined],['saved','bookmark',copy.circleSaved]];
+ return `<ul class="circles">${items.map(([k,ic,label])=>{const pct=total?Math.round(n[k]/total*100):0;
+  return `<li><span class="circle" style="background:conic-gradient(var(--orange) 0 ${pct}%,var(--green) 0)"><span class="circle-face">${icon(ic,24)}</span></span><span class="circle-count">${n[k]}</span><span class="circle-label">${E(label)}</span></li>`;}).join('')}</ul>`;
+}
 const SECTIONS={
- wallet:r=>({tint:'gold',ic:'wallet',title:copy.tabs[1].label,count:null,preview:copy.walletSetup,body:`<p class="muted">${E(copy.walletSetupBody)}</p>`,route:'#/wallet',link:copy.openWallet}),
- passport:r=>{const n=r.credentials.length;return {tint:'lilac',ic:'passport',title:copy.tabs[2].label,count:n,preview:n?`${n} Learning`:copy.passportEmpty,
-  body:n?`<div class="chip-row"><span class="type-pill"><span class="dot learning" aria-hidden="true"></span>Learning <strong>${n}</strong></span></div>`:`<p class="muted">${E(copy.passportEmptyBody)}</p>`,route:'#/passport',link:copy.openPassport};},
- opportunities:r=>{const n=r.completions.length;return {tint:'blue',ic:'trophy',title:copy.tabs[3].label,count:null,preview:`${n} completed · 0 pending · 0 declined · 0 saved`,
-  body:n?`<ul class="counts"><li><strong>${n}</strong> completed</li><li><strong>0</strong> pending</li><li><strong>0</strong> declined</li><li><strong>0</strong> saved</li></ul>`:`<p class="muted">${E(copy.oppsEmptyBody)}</p>`,route:'#/opportunities',link:copy.openOpportunities};},
- skills:r=>{const list=skillsOf(r);return {tint:'mint',ic:'bolt',title:copy.tabs[4].label,count:list.length,preview:list.length?list.slice(0,3).map(s=>s.name).join(' · '):copy.skillsEmpty,
-  body:list.length?`<div class="chip-row">${list.slice(0,8).map(s=>`<span class="skill-chip">${E(s.name)}</span>`).join('')}</div>`:`<p class="muted">${E(copy.skillsEmptyBody)}</p>`,route:'#/skills',link:copy.openSkills};}
+ wallet:()=>({tint:'gold',ic:'wallet',title:copy.tabs[1].label,count:null,preview:copy.walletSetup,body:`<p class="muted">${E(copy.walletSetupBody)}</p>`,route:'#/wallet',link:copy.openWallet}),
+ passport:r=>{const n=list(r.credentials).length;return {tint:'lilac',ic:'passport',title:copy.tabs[2].label,count:n,preview:n?fill(copy.passportPreview,{n}):copy.passportEmpty,
+  body:n?`<div class="chip-row"><span class="type-pill"><span class="dot learning" aria-hidden="true"></span>${E(copy.typeLearning)} <strong>${n}</strong></span></div>`:emptyInline(copy.passportEmpty,copy.passportEmptyBody),route:'#/passport',link:copy.openPassport};},
+ opportunities:r=>{const n=oppCounts(r);return {tint:'blue',ic:'trophy',title:copy.tabs[3].label,count:null,preview:fill(copy.oppsPreview,{c:n.completed,p:n.pending,d:n.declined,s:n.saved}),
+  body:n.completed?circlesHTML(r):emptyInline(copy.oppsEmpty,copy.oppsEmptyBody),route:'#/opportunities',link:copy.openOpportunities};},
+ skills:r=>{const all=skillsOf(r);return {tint:'mint',ic:'bolt',title:copy.tabs[4].label,count:all.length,preview:all.length?all.slice(0,3).map(s=>s.name).join(' · '):copy.skillsEmpty,
+  body:all.length?`<div class="chip-row">${all.slice(0,8).map(s=>`<span class="skill-chip">${E(s.name)}</span>`).join('')}</div>`:emptyInline(copy.skillsEmpty,copy.skillsEmptyBody),route:'#/skills',link:copy.openSkills};}
 };
 function sectionCard(key,record,open,prefix='ov'){
- const s=SECTIONS[key](record),id=`${prefix}-${key}-body`;
+ const s=SECTIONS[key](record||empty),id=`${prefix}-${key}-body`;
  return `<div class="section-card" data-section="${key}" ${open?'open':''}><button class="section-head" aria-expanded="${!!open}" aria-controls="${id}" data-toggle="${key}"><span class="icon-square ${s.tint}">${icon(s.ic)}</span><span class="section-text"><span class="section-title">${E(s.title)}${s.count!=null?` <span class="count">· ${s.count}</span>`:''}</span><span class="section-preview">${E(s.preview)}</span></span><span class="chevron">${icon('chevron',16)}</span></button><div class="section-body" id="${id}">${s.body}${openLink(s.route,s.link)}</div></div>`;
 }
 function cvCard(d){
- const ready=d.ready,drafting=!ready&&d.step>0;
- const note=ready?copy.cvTileReady:drafting?fill(copy.cvTileDraft,{n:d.step+1,k:d.accepted}):copy.cvTileNote,label=drafting?copy.continueCvTile:copy.openCv;
+ const ready=!!d?.ready,drafting=!ready&&d?.step>0;
+ const note=ready?copy.cvTileReady:drafting?fill(copy.cvTileDraft,{n:d.step+1,k:d.accepted||0}):copy.cvTileNote,label=drafting?copy.continueCvTile:copy.openCv;
  return `<div class="section-card cv-card span-2" open><div class="section-head static"><span class="icon-square ${ready||drafting?'lilac':'grey'}">${icon('doc')}</span><span class="section-text"><span class="section-title">${E(copy.cvTileTitle)}</span><span class="section-preview">${E(note)}</span></span>${openLink('#/cv',label)}</div></div>`;
+}
+const yomaOpp=id=>`https://yoma.world/opportunities/${encodeURIComponent(id)}`;
+/* The pill rows of the Passport filter and the Opportunities sub-tabs: buttons with aria-pressed. */
+const pillRow=(label,items)=>`<div class="pill-row" role="group" aria-label="${E(label)}">${items.map(i=>`<button class="pill${i.on?' current':''}" aria-pressed="${i.on}" ${i.data}>${i.dot?'<span class="dot learning" aria-hidden="true"></span>':''}${E(i.label)} ${i.n}</button>`).join('')}</div>`;
+const band=issuer=>`<div class="cred-band"><span class="issuer-mark" aria-hidden="true">${first(issuer)?E(first(issuer)):icon('passport',22)}</span></div>`;
+function credCard(c){
+ return `<div class="cred-card">${band(c.issuer)}<div class="cred-body"><div class="cred-top"><span class="type-chip">${E(copy.typeLearning)}</span><span class="status-pill">${E(c.status||copy.statusIssued)}</span></div>`
+  +`<h3 class="cred-title">${E(c.title)}</h3><p class="cred-issuer">${E(c.issuer||copy.issuerNotStated)}</p>${c.month?`<p class="muted">${E(fill(copy.issuedOn,{month:c.month}))}</p>`:''}`
+  +`<button class="cred-button" data-credential="${E(c.id)}" aria-haspopup="dialog">${E(copy.viewCredential)}</button></div></div>`;
+}
+function oppCard(c){
+ const skills=list(c.skills).filter(s=>s?.name);
+ return `<div class="cred-card">${band(c.organizationName)}<div class="cred-body"><div class="cred-top"><span class="type-chip">${E(copy.typeLearning)}</span><span class="tag recorded">${E(copy.completedBadge)}</span></div>`
+  +`<h3 class="cred-title">${E(c.title)}</h3><p class="cred-issuer">${E(c.organizationName||copy.issuerNotStated)}</p>${c.month?`<p class="muted">${E(c.month)}</p>`:''}`
+  +(skills.length?`<p class="cred-sub">${E(copy.skillsDeveloped)}</p><div class="chip-row">${skills.map(s=>`<span class="chip">${E(s.name)}</span>`).join('')}</div>`:'')
+  +(c.opportunityId?`<a class="cred-button" href="${E(yomaOpp(c.opportunityId))}" rel="noopener">${E(copy.viewOpportunity)}</a>`:'')+`</div></div>`;
 }
 const views={
  skillsOf,
  overview:(record,d,open={})=>`<div class="grid-2">${Object.keys(SECTIONS).map(k=>sectionCard(k,record,open[k])).join('')}${cvCard(d)}</div>`,
- wallet:()=>crumb(copy.tabs[1].label)+`<div class="grid-2"><div class="card"><h2 class="card-title">${E(copy.walletSetup)}</h2><p class="muted">${E(copy.walletSetupBody)}</p></div><div class="card"><h2 class="card-title">${E(copy.walletHow)}</h2><ul class="bullets">${copy.walletHowBullets.map(b=>`<li>${icon('check',18)}<span>${E(b)}</span></li>`).join('')}</ul></div></div>`,
- passport:r=>{const n=r.credentials.length;return crumb(copy.tabs[2].label,n)+intro(copy.passportIntro)+(n?`<div class="cred-grid">${r.credentials.map(c=>`<div class="card cred-card"><span class="status-pill">${E(copy.statusIssued)}</span><p class="cred-title">${E(c.title)}</p><p class="muted">${E(fill(copy.issuedByPartner,{issuer:c.issuer||copy.issuerNotStated}))}${c.month?` · ${E(c.month)}`:''}</p></div>`).join('')}</div>`:emptyHTML(copy.passportEmpty,copy.passportEmptyBody,'passport'));},
- opportunities:r=>{const n=r.completions.length;return crumb(copy.tabs[3].label,n)+intro(copy.oppsIntro)+(n?`<div class="cred-grid">${r.completions.map(c=>`<div class="card cred-card"><span class="tag recorded">${E(copy.completedBadge)}</span><p class="cred-title">${E(c.title)}</p><p class="muted">${E([c.organizationName,c.month].filter(Boolean).join(' · '))}</p>${c.opportunityId?`<a class="secondary small" href="https://yoma.world/opportunities/${encodeURIComponent(c.opportunityId)}" rel="noopener">${E(copy.viewOpportunity)}</a>`:''}</div>`).join('')}</div>`:emptyHTML(copy.oppsEmpty,copy.oppsEmptyBody,'trophy'));},
- skills:r=>{const list=skillsOf(r);return crumb(copy.tabs[4].label,list.length)+intro(copy.skillsIntro)+(list.length?`<div class="skill-grid">${list.map(s=>`<div class="card skill-tile"><p class="cred-title">${E(s.name)}</p><p class="muted">${E(s.source==='self'?copy.selfAttested:fill(copy.skillIssuedBy,{n:1}))}</p></div>`).join('')}</div>`:emptyHTML(copy.skillsEmpty,copy.skillsEmptyBody,'bolt'));}
+ wallet:()=>crumb(copy.tabs[1].label)+`<div class="grid-2"><div class="card"><h2 class="card-title">${E(copy.walletMine)}</h2><p class="muted">${E(copy.walletMineNote)}</p><div class="wallet-pending"><span class="icon-square gold">${icon('wallet')}</span><div><p class="empty-title">${E(copy.walletSetup)}</p><p class="muted">${E(copy.walletSetupBody)}</p></div></div></div>`
+  +`<div class="card"><h2 class="card-title">${E(copy.walletHow)}</h2><p class="muted">${E(copy.walletHowNote)}</p><ul class="bullets">${copy.walletHowBullets.map(b=>`<li>${icon('check',18)}<span>${E(b)}</span></li>`).join('')}</ul></div></div>`,
+ passport:(r,filter='all')=>{const creds=list(r.credentials),n=creds.length;
+  if(!n)return crumb(copy.tabs[2].label,0)+intro(copy.passportIntro)+emptyHTML(copy.passportEmpty,copy.passportEmptyBody,'passport');
+  return crumb(copy.tabs[2].label,n)+intro(copy.passportIntro)
+   +pillRow(copy.tabs[2].label,[{label:copy.filterAll,n,on:filter!=='learning',data:'data-filter="all"'},{label:copy.typeLearning,n,on:filter==='learning',data:'data-filter="learning"',dot:true}])
+   +`<div class="cred-grid">${creds.map(credCard).join('')}</div>`;},
+ credentialDetail:(r,id)=>{
+  const c=list(r?.credentials).find(x=>x.id===id);if(!c)return '';
+  const done=list(r.completions).find(x=>x.evidenceId&&x.evidenceId===c.completionId),skills=list(c.skills).filter(Boolean);
+  const rows=[[copy.detailStatus,c.status||copy.statusIssued],[copy.detailIssuer,c.issuer||copy.issuerNotStated],[copy.detailDate,c.month||''],[copy.detailSkills,skills.join(', ')]].filter(([,v])=>v);
+  return `<p class="cred-title">${E(c.title)}</p><span class="type-chip">${E(copy.typeLearning)}</span><dl class="detail-rows">${rows.map(([k,v])=>`<div><dt>${E(k)}</dt><dd>${E(v)}</dd></div>`).join('')}</dl>`
+   +(done?.opportunityId?`<a class="section-link" href="${E(yomaOpp(done.opportunityId))}" rel="noopener">${E(copy.openOnYoma)}${icon('arrow',16)}</a>`:'');
+ },
+ opportunities:(r,sub='completed')=>{const n=oppCounts(r),keys=['completed','pending','declined','saved'],labels=[copy.oppsCompleted,copy.oppsPending,copy.oppsDeclined,copy.oppsSaved];
+  const cur=keys.includes(sub)?sub:'completed';
+  const body=cur==='completed'&&n.completed?`<div class="cred-grid">${list(r.completions).map(oppCard).join('')}</div>`:emptyHTML(copy.oppsEmpty,copy.oppsEmptyBody,'trophy');
+  return crumb(copy.tabs[3].label,n.completed)+intro(copy.oppsIntro)+pillRow(copy.tabs[3].label,keys.map((k,i)=>({label:labels[i],n:n[k],on:k===cur,data:`data-subtab="${k}"`})))+body;},
+ skills:r=>{const all=skillsOf(r);
+  if(!all.length)return crumb(copy.tabs[4].label,0)+intro(copy.skillsIntro)+emptyHTML(copy.skillsEmpty,copy.skillsEmptyBody,'bolt');
+  return crumb(copy.tabs[4].label,all.length)+intro(copy.skillsIntro)+`<div class="skill-grid">${all.map(s=>{const k=s.partners.length;
+   const by=s.source==='self'?`<span>${E(copy.selfAttested)}</span>`:`<span class="issuer-dots" aria-hidden="true">${s.partners.map(p=>`<span class="issuer-dot">${E(first(p))}</span>`).join('')}</span><span>${E(fill(k>1?copy.skillIssuedByMany:copy.skillIssuedBy,{n:k||1}))}</span>`;
+   return `<div class="skill-tile"><p class="skill-name">${E(s.name)}</p><p class="skill-by">${by}</p></div>`;}).join('')}</div>`;}
 };
 const signedOutHTML=()=>`<div class="card signed-out"><span class="empty-icon">${icon('ring',28)}</span><h2>${E(copy.signedOutTitle)}</h2><p>${E(copy.signedOutBody)}</p><button class="primary" data-action="login">${E(copy.logIn)}</button></div>`;
 function tabViewHTML(tab){
@@ -111,8 +166,8 @@ function tabViewHTML(tab){
  if(!S.record)return S.busy?`<div class="card" role="status">${E(copy.reading)}</div>`:emptyHTML(label,copy.recordOffline);
  switch(tab){
   case '#/wallet':return views.wallet(S.record);
-  case '#/passport':return views.passport(S.record);
-  case '#/opportunities':return views.opportunities(S.record);
+  case '#/passport':return views.passport(S.record,S.filter);
+  case '#/opportunities':return views.opportunities(S.record,S.sub);
   case '#/skills':return views.skills(S.record);
   default:return views.overview(S.record,draft(),S.open);
  }
@@ -180,6 +235,11 @@ function renderDraftBits(){
  const card=$('#tab-view .cv-card');if(card)card.outerHTML=cvCard(draft());
  renderFooter();
 }
+/* The credential detail dialog: Status, Issuer, Date issued, Skills and the Yoma link when the record holds one. */
+function openDetail(id){
+ const body=views.credentialDetail(S.record,id);if(!body)return;
+ $('#detail-title').textContent=copy.credentialTitle;$('#detail-body').innerHTML=body;$('#detail-dialog').showModal();
+}
 /* Server access, with the 30 s deadline app.js uses. */
 async function post(path,body){
  const ac=new AbortController(),t=setTimeout(()=>ac.abort(),DEADLINE_MS);let res;
@@ -198,7 +258,7 @@ async function signIn(id){
  const personas=S.cfg.accounts.personas||[],persona=sample()?(personas.find(p=>p.id===id)||personas[0]||null):null;
  if(sample()&&!persona){S.person=null;render();return;}
  const selector=sample()?{persona:persona.id}:{};
- Object.assign(S,{signedOut:false,busy:true,record:null,selector,list:false,open:{}});
+ Object.assign(S,{signedOut:false,busy:true,record:null,selector,list:false,open:{},filter:'all',sub:'completed'});
  if(persona){S.person=personOf(persona);store(persona.id);}
  window.YoCVApp.clearDraft();
  render();
@@ -256,6 +316,8 @@ function bind(){
   const button=t.closest('button');if(!button||button.disabled)return;
   const d=button.dataset;
   if(d.account!==undefined){chooseAccount(d.account);return;}
+  if(d.credential!==undefined){openDetail(d.credential);return;}
+  if(d.filter||d.subtab){if(d.filter)S.filter=d.filter;else S.sub=d.subtab;$('#tab-view').innerHTML=tabViewHTML(S.tab);$(`#tab-view [data-${d.filter?'filter':'subtab'}="${d.filter||d.subtab}"]`)?.focus();return;}
   if(d.toggle){const card=button.closest('.section-card'),key=(card.closest('dialog')?'d-':'')+d.toggle,open=!S.open[key];S.open[key]=open;card.toggleAttribute('open',open);button.setAttribute('aria-expanded',String(open));return;}
   switch(d.action){
    case 'login':S.list=true;openDrawer('#user-drawer');break;
