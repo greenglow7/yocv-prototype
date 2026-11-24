@@ -17,15 +17,15 @@ test('reviewPayload never carries the name, contacts, the place or the optional 
   assert.deepEqual(knownWords,['Khayelitsha','Thandi','Mokoena']);
   assert.ok(!/Thandi|Mokoena|\+27|example\.org|Khayelitsha|Matric|data:image|2002-03-15|0203150000000|"place"/.test(p));
 });
+// The record read and the mode label belong to the shell (tests/yoid-shell.test.cjs).
 test('app.js runs Steps 1 and 2 on the new routes and copy, not the old flow',()=>{
   const s=read('app.js');
-  for(const route of ['/api/cv/config','/api/cv/record','/api/cv/menu'])assert.ok(s.includes(route),route);
+  for(const route of ['/api/cv/config','/api/cv/menu'])assert.ok(s.includes(route),route);
   assert.ok(!s.includes('/api/generate')&&!s.includes('sample-credential')&&!s.includes('Amina'));
   for(const k of ['copy.stepRecord','copy.stepWork','copy.stepReview','copy.stepCv','copy.recordOffline','copy.roleOffline'])assert.ok(s.includes(k),k);
   assert.ok(/wallet\s*===\s*'unavailable'/.test(s)&&s.includes('copy.walletUnavailable'),'Wallet not available is shown');
   assert.ok(s.includes('window.YoCVCopy')&&s.includes('window.YoCVRules'),'the offline start reads the browser files');
   assert.ok(!s.includes('Start the YoCV server with npm start'));
-  for(const k of ['copy.modeLive','copy.modeSample','copy.modeOffline'])assert.ok(s.includes(k),k);
   assert.ok(!/marital|religion/i.test(s),'never collected (spec 10)');
   assert.ok(s.includes('copy.labelYoma'),'Step 1 heading Confirmed from Yoma');
   assert.ok(s.includes('credential.skills')||s.includes('.skills.map'),'spec 6 rule 6: each credential lists its skills');

@@ -1,6 +1,7 @@
-/* YoCV prototype: the four-step shell (spec 5). Step 1 reads the Yoma record, Step 2 holds the work interview and the
-   contact form. The state lives in this tab only. The copy, the rules, the roles and the accounts come from
-   /api/cv/config; with no server the app starts offline on the browser copies of the catalogue and the rules. */
+/* YoCV prototype: the four CV steps (spec 5), mounted by the Yo-ID shell (yoid.js) into the CV tab. Step 1 shows the
+   record the shell read under Confirmed from Yoma, Step 2 holds the work interview and the contact form. The state
+   lives in this tab only. The copy, the rules, the roles and the accounts come from the /api/cv/config answer the shell
+   hands to mount(); with no server the app runs offline on the browser copies of the catalogue and the rules. */
 (()=>{
 'use strict';
 const C=window.YoCV,E=C.escapeHTML;
@@ -10,9 +11,9 @@ const KINDS=['none','person','completion','vouch'],SCREENS=7,MAX_ENTRIES=3,PHOTO
 const len=s=>[...String(s??'')].length,ym=v=>{const m=/^(\d{4})-(0[1-9]|1[0-2])$/.exec(v);return m?+m[1]*12+(+m[2]-1):null;};
 const thisMonth=()=>{const d=new Date();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2);};
 let cfg=null,copy=window.YoCVCopy.en,rules=window.YoCVRules.RULES;
-let state=C.newCvState(),ui=freshUi(),pendingAction=null,toastTimer;
-const view=document.querySelector('#view'),steps=document.querySelector('#steps'),pill=document.querySelector('#mode-pill');
-function freshUi(menus={}){return {persona:'',busy:false,error:'',entry:0,screen:0,forms:[],menus,optionalOpen:false,
+let state=C.newCvState(),ui=freshUi();
+let view=null,api=null; // set by mount(): the CV tab's container and the shell's {copy, cfg, offline, confirm, notify}
+function freshUi(menus={}){return {busy:false,error:'',entry:0,screen:0,forms:[],menus,optionalOpen:false,
  reviewed:null,reviewSession:null,reviewAbort:null,retry:false,reviewMenu:[],editing:null,editText:'',editError:'',addSkill:'',profileNote:'',profileRun:0,opps:null};}
 const blankForm=()=>({title:'',place:'',what:'',forWhomChip:'',forWhomText:'',frequency:'',start:'',end:'',value:'',unit:'',hedge:'',outcome:'',confirm:'',completionId:''});
 // An Entry (plan Shared shapes) from the form: forWhom is the free text when given, else the chip.
@@ -20,23 +21,16 @@ const toEntry=f=>({title:f.title.trim(),place:f.place.trim(),what:f.what.trim(),
   months:{start:f.start,end:f.end},number:f.value.trim()===''?null:{value:Number(f.value),unit:f.unit,hedge:f.hedge},outcome:f.outcome.trim(),
   confirm:f.confirm==='completion'?{kind:'completion',completionId:f.completionId}:{kind:f.confirm}});
 function sync(){state.entries=ui.forms.map(toEntry);}
-function notify(text){const el=document.querySelector('#toast');el.textContent=text;el.classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('visible'),3200);}
-function confirmAction(title,text,label,fn){pendingAction=fn;document.querySelector('#confirm-title').textContent=title;document.querySelector('#confirm-copy').textContent=text;document.querySelector('#confirm-action').textContent=label;document.querySelector('#confirm-dialog').showModal();}
+const notify=text=>api.notify(text);
+const confirmAction=(title,text,label,fn)=>api.confirm(title,text,label,fn);
 const errorHTML=()=>ui.error?`<div class="error-message" role="alert" id="step-error" tabindex="-1">${E(ui.error)}</div>`:'';
 const opt=()=>` <span class="optional">${E(copy.optionalTag)}</span>`;
-/* Mode label: copy.modeLive with the model (else the provider), copy.modeSample or copy.modeOffline. */
-function updatePill(){
- const m=cfg.mode,live=!state.offline&&m.mode==='live';
- pill.className='mode-label '+(state.offline?'offline':live?'live':'sample');
- pill.textContent=state.offline?copy.modeOffline:live?fill(copy.modeLive,{model:m.model||m.provider}):copy.modeSample;
-}
+/* The step pills above each step title: Step n of 4: name, the current one marked, those past maxStep disabled. */
 const stepNames=()=>[copy.stepRecord,copy.stepWork,copy.stepReview,copy.stepCv];
-function renderSteps(){const names=stepNames();steps.innerHTML=names.map((name,i)=>`<button class="step-button ${i===state.step?'active':i<state.step?'completed':''}" data-step="${i}" aria-label="${E(fill(copy.stepNav,{n:i+1,total:names.length,name}))}" ${i>state.maxStep?'disabled':''} ${i===state.step?'aria-current="step"':''}><span class="step-number">${i+1}</span><span>${E(name)}</span></button>`).join('');}
-const head=(n,title,lead)=>`<p class="step-line">${E(fill(copy.stepOf,{n,total:4}))}</p><h1 class="step-title" tabindex="-1">${E(title)}</h1>${lead?`<p class="lead">${E(lead)}</p>`:''}`;
+const stepPills=()=>{const names=stepNames();return `<ol class="step-pills" aria-label="Steps">${names.map((name,i)=>`<li><button type="button" class="pill${i===state.step?' current':''}" data-step="${i}" ${i===state.step?'aria-current="step"':''} ${i>state.maxStep?'disabled':''}>${E(fill(copy.stepNav,{n:i+1,total:names.length,name}))}</button></li>`).join('')}</ol>`;};
+const head=(n,title,lead)=>stepPills()+`<h2 class="step-title" tabindex="-1">${E(title)}</h2>${lead?`<p class="lead">${E(lead)}</p>`:''}`;
 const footer=(back,action,label,disabled)=>`<div class="form-footer">${back?`<button class="back-link" data-action="back">${E(copy.back)}</button>`:'<span></span>'}${action?`<button class="primary" data-action="${action}" ${disabled?'disabled':''}>${E(label)}</button>`:''}</div>`;
-/* Step 1: the record under Confirmed from Yoma, ticked to include, never edited; then the target role. */
-const tradeLabel=id=>cfg.roles.find(r=>r.tradeId&&r.tradeId===id)?.name||id;
-const personaHTML=p=>`<button class="choice ${p.id===ui.persona?'selected':''}" data-persona="${E(p.id)}" aria-pressed="${p.id===ui.persona}"><span class="radio" aria-hidden="true"></span><span class="choice-text"><strong>${E(p.displayName)}</strong><small>${E([tradeLabel(p.trade),p.city].filter(Boolean).join(' · '))}</small></span></button>`;
+/* Step 1: the record the shell read, under Confirmed from Yoma, ticked to include, never edited; then the target role. */
 function tick(kind,id,title,meta,skills){
  const on=state.include[kind].includes(id);
  return `<li><label class="checkbox-label"><input type="checkbox" id="inc-${E(kind)}-${E(id)}" data-include="${E(kind)}" value="${E(id)}" ${on?'checked':''}><span class="choice-text"><strong>${E(title)}</strong>${meta?`<small>${E(meta)}</small>`:''}${skills.length?`<small>${E(fill(copy.skillsLine,{skills:skills.join(', ')}))}</small>`:''}</span></label></li>`;
@@ -45,7 +39,7 @@ const tickList=items=>items.length?`<ul class="record-list">${items.join('')}</u
 function recordHTML(r){
  const credentials=r.wallet==='unavailable'?`<p class="notice">${E(copy.walletUnavailable)}</p>`
   :tickList(r.credentials.map(credential=>tick('credentials',credential.id,credential.title,[fill(copy.issuedBy,{issuer:credential.issuer||copy.issuerNotStated}),credential.month].filter(Boolean).join(', '),credential.skills||[])));
- return `<section class="form-section" aria-labelledby="record-title"><h2 id="record-title">${E(copy.labelYoma)}</h2><p class="field-help">${E(copy.recordTick)}</p>`
+ return `<section class="form-section" aria-label="${E(copy.labelYoma)}"><p class="field-help">${E(copy.recordTick)}</p>`
   +`<h3>${E(copy.recordCompletions)}</h3>${tickList(r.completions.map(c=>tick('completions',c.evidenceId,c.title,[c.organizationName,c.month].filter(Boolean).join(', '),c.skills.map(s=>s.name))))}`
   +`<h3>${E(copy.recordCredentials)}</h3>${credentials}`
   +(r.selfAttested.length?`<h3>${E(copy.recordSelfAttested)} <span class="tag stated">${E(copy.labelSelf)}</span></h3>${tickList(r.selfAttested.map(a=>tick('selfAttested',a.evidenceId,a.name,'',[])))}`:'')+'</section>';
@@ -57,11 +51,9 @@ function roleHTML(){
 }
 function recordStep(){
  if(state.offline)return head(1,copy.stepRecord)+`<div class="notice">${E(copy.recordOffline)}</div><section class="form-section"><label class="field-label" for="role-offline">${E(copy.roleOffline)}</label><input id="role-offline" data-role-text maxlength="60" value="${E(state.role)}"></section>${errorHTML()}${footer(false,'to-work',copy.continueWork)}`;
- const sample=cfg.accounts.source==='sample',r=state.record;
- return head(1,copy.stepRecord,sample?copy.recordLeadSample:copy.recordLeadToken)
-  +(sample?`<h2>${E(copy.chooseAccount)}</h2><div class="choice-list" role="group" aria-label="${E(copy.chooseAccount)}">${cfg.accounts.personas.map(personaHTML).join('')}</div>`:'')
-  +`<div class="action-row"><button class="${r?'secondary':'primary'}" data-action="read-record" ${ui.busy||(sample&&!ui.persona)?'disabled':''}>${E(ui.busy?copy.reading:sample?copy.readSample:copy.readToken)}</button></div>${errorHTML()}`
-  +(r?recordHTML(r)+roleHTML():'')+footer(false,'to-work',copy.continueWork,!r||!state.role);
+ const r=state.record;
+ if(!r)return head(1,copy.labelYoma)+`<p class="busy-note" role="status">${E(copy.reading)}</p>`;
+ return head(1,copy.labelYoma)+recordHTML(r)+roleHTML()+errorHTML()+footer(false,'to-work',copy.continueWork,!state.role);
 }
 /* Step 2: up to three entries, each a title and place then the six questions (one screen each on a phone), then contact. */
 const chips=(f,field,values,labels=values)=>`<div class="chips">${values.map((v,i)=>`<button type="button" class="chip${f[field]===v?' selected':''}" data-chip="${field}" data-value="${E(v)}" aria-pressed="${f[field]===v}">${E(labels[i])}</button>`).join('')}</div>`;
@@ -145,7 +137,7 @@ function reviewStep(){
   +errorHTML()+(ui.retry?`<div class="action-row"><button class="secondary" data-action="retry-review">${E(copy.retry)}</button></div>`:'')
   +(ready||!state.review?'':`<p class="field-help">${E(copy.reviewPending)}</p>`)+footer(true,'to-cv',copy.continueCv,!ready||ui.busy);
 }
-/* Step 4: the paper (one h1 on the page, in the band), the downloads, and the Yoma learning opportunities for the role. */
+/* Step 4: the paper (heading level 2; the page's one h1 is the shell's greeting), the downloads, and the Yoma learning opportunities for the role. */
 const safeUrl=u=>/^https:\/\//i.test(String(u??''))?String(u):'';
 function oppsHTML(){
  const o=ui.opps;if(state.offline||!o)return '';
@@ -188,9 +180,18 @@ function focusSnapshot(){
  }catch{return null;}
 }
 function focusRestore(f){if(!f)return;try{const el=view.querySelector(f.sel);if(!el||el.disabled)return;el.focus({preventScroll:true});if(f.range)el.setSelectionRange(...f.range);}catch{}}
-function setBand(){const band=document.querySelector('#page-band');if(!band)return;band.innerHTML='';const line=view.querySelector('.step-line'),h=view.querySelector('h1.step-title');if(line)band.appendChild(line);if(h)band.appendChild(h);}
-function render(){if(!cfg)return;const f=focusSnapshot();renderSteps();view.innerHTML=[recordStep,workStep,reviewStep,cvStep][state.step]();setBand();view.setAttribute('aria-busy',String(ui.busy));focusRestore(f);}
-function go(step){if(step<2)cancelReview();state.step=step;state.maxStep=Math.max(step,state.maxStep);ui.error='';render();window.scrollTo({top:0,behavior:'instant'});document.querySelector('#page-band h1')?.focus({preventScroll:true});}
+// Every render tells the shell where the draft stands (the Overview CV card, the hero line and the footer mode label).
+function announce(){document.dispatchEvent(new CustomEvent('yocv:draft',{detail:{...draftStatus(),offline:state.offline}}));}
+function render(){if(!cfg)return;const f=focusSnapshot();view.innerHTML=[recordStep,workStep,reviewStep,cvStep][state.step]();view.setAttribute('aria-busy',String(ui.busy));focusRestore(f);announce();}
+// A step change writes the hash (#/cv, #/cv/2 to #/cv/4) so Back works; the shell's hashchange then finds the step
+// already shown. fromHash is the shell calling back for a hash it read, so nothing is written again.
+function go(step,{fromHash=false}={}){
+ const first=!view.innerHTML;
+ if(step<2)cancelReview();state.step=step;state.maxStep=Math.max(step,state.maxStep);ui.error='';render();
+ if(!fromHash){const h=step?'#/cv/'+(step+1):'#/cv';if(location.hash!==h)location.hash=h;}
+ if(first)return;
+ window.scrollTo({top:0,behavior:'instant'});view.querySelector('h2.step-title')?.focus({preventScroll:true});
+}
 function showError(message,id){ui.error=message;render();(id&&document.getElementById(id)||document.querySelector('#step-error'))?.focus();}
 function rerender(){const y=window.scrollY;render();window.scrollTo({top:y,behavior:'instant'});}
 /* Server access. Every request ends after 30 s (as card.js does): a timeout is a retryable error with its own copy,
@@ -214,7 +215,7 @@ async function post(path,body,{signal}={}){
  if(!res.ok)throw Object.assign(new Error(data.error?.message||copy.errServer),{code:data.error?.code||'',status:res.status,retryable:!!data.error?.retryable});
  return data;
 }
-function goOffline(){state.offline=true;updatePill();}
+function goOffline(){state.offline=true;announce();}
 // A session call. On 410 session_expired: re-open the record with the same selector, keep the entries, the ticks and
 // the decisions, and retry once. check and skills read the entries the last review stored, so those are stored again first.
 async function cvPost(path,body,opts={}){
@@ -349,20 +350,39 @@ async function loadMenu(role){
  catch{ui.menus[role]={menu:[],source:'none'};}
  if(state.step===0&&state.role===role)render();
 }
-async function readRecord(){
- ui.busy=true;ui.error='';render();
- const selector=cfg.accounts.source==='sample'?{persona:ui.persona}:{};
- try{
-  const {sessionId,record}=await post('/api/cv/record',selector),u=record.user;
-  Object.assign(state,{sessionId,selector,record,
-   include:{completions:record.completions.map(c=>c.evidenceId),credentials:record.credentials.map(c=>c.id),selfAttested:record.selfAttested.map(a=>a.evidenceId)},
-   contact:{...state.contact,name:u.displayName??'',phone:u.phoneNumber??'',town:u.city??''}});
-  for(const f of ui.forms)if(f.confirm==='completion'&&!state.include.completions.includes(f.completionId))f.completionId='';
-  const persona=cfg.accounts.personas.find(p=>p.id===ui.persona),match=cfg.roles.find(r=>r.tradeId&&r.tradeId===persona?.trade);
-  if(!state.role&&match)state.role=match.name;
-  sync();
- }catch(e){if(e.network)goOffline();else ui.error=e.message;}
- ui.busy=false;render();loadMenu(state.role);
+/* The record the shell read (or null on sign out): every item ticked, the contact line prefilled from the Yoma
+   profile, the role picked from the persona's trade when none is chosen yet. */
+function applyRecord(record,selector,sessionId){
+ Object.assign(state,{sessionId:sessionId??null,selector:selector??null,record:record??null});
+ if(!record){state.include={completions:[],credentials:[],selfAttested:[]};sync();return;}
+ const u=record.user||{};
+ Object.assign(state,{include:{completions:record.completions.map(c=>c.evidenceId),credentials:record.credentials.map(c=>c.id),selfAttested:record.selfAttested.map(a=>a.evidenceId)},
+  contact:{...state.contact,name:u.displayName??'',phone:u.phoneNumber??'',town:u.city??''}});
+ for(const f of ui.forms)if(f.confirm==='completion'&&!state.include.completions.includes(f.completionId))f.completionId='';
+ const persona=cfg.accounts.personas.find(p=>p.id===selector?.persona),match=cfg.roles.find(r=>r.tradeId&&r.tradeId===persona?.trade);
+ if(!state.role&&match)state.role=match.name;
+ sync();
+}
+function useRecord(record,selector,sessionId){applyRecord(record,selector,sessionId);ui.error='';render();loadMenu(state.role);}
+// Reset: the draft goes, the person stays. The record is applied again so Step 1 shows the ticks and the role.
+function clearDraft(){
+ cancelReview();
+ const {offline,record,selector,sessionId}=state;
+ state=C.newCvState();state.offline=offline;ui=freshUi(ui.menus);
+ applyRecord(record,selector,sessionId);
+ render();
+ if(/^#\/cv\//.test(location.hash))history.replaceState(null,'','#/cv');
+}
+function draftStatus(){
+ return {step:state.step,accepted:Object.values(state.decisions).filter(d=>d.decision==='accepted'||d.decision==='edited').length,ready:C.readyForCv(state),
+  dirty:state.step>0||state.entries.some(e=>e.title||e.what)};
+}
+// The shell read step n from the hash: shown when the draft allows it, else Step 1 and the hash corrected.
+function showStep(n){
+ const target=n<=state.maxStep?n:0;
+ if(target!==n)history.replaceState(null,'',target?'#/cv/'+(target+1):'#/cv');
+ if(state.step===target&&view.innerHTML)return;
+ if(target<2)go(target,{fromHash:true});else enter(target);
 }
 function readPhoto(file){
  if(!file)return;
@@ -371,18 +391,14 @@ function readPhoto(file){
  reader.onload=()=>{state.optional.photo=String(reader.result);ui.error='';render();};
  reader.readAsDataURL(file);
 }
-async function start(){
- try{
-  const res=await fetch('/api/cv/config',{cache:'no-store'});
-  if(!res.ok)throw new Error('config '+res.status);
-  cfg=await res.json();
- }catch{
-  state.offline=true;
-  cfg={copy:window.YoCVCopy.en,rules:window.YoCVRules.RULES,roles:[],accounts:{source:null,personas:[]},mode:{mode:'sample',provider:'browser-local',model:null}};
- }
- copy=cfg.copy;rules=cfg.rules;
- updatePill();render();
+/* mount(container, api): the shell hands over the CV tab's container, the config it fetched (offline: the browser
+   copies), and its confirm and notify. Returns showStep for the hash and goOffline for a failed record read. */
+function mount(container,shell){
+ view=container;api=shell;cfg=shell.cfg;copy=cfg.copy||shell.copy||copy;rules=cfg.rules||rules;state.offline=!!shell.offline;
+ bindView();
+ return {showStep,goOffline:()=>{goOffline();render();}};
 }
+function bindView(){
 view.addEventListener('input',event=>{
  const el=event.target,f=ui.forms[ui.entry];
  if(el.dataset.e&&f){f[el.dataset.e]=el.value;sync();
@@ -404,14 +420,13 @@ view.addEventListener('toggle',event=>{if(event.target.id==='optional-fields')ui
 view.addEventListener('click',async event=>{
  const button=event.target.closest('button');if(!button||button.disabled)return;
  const f=ui.forms[ui.entry],d=button.dataset;
- if(d.persona!==undefined){ui.persona=d.persona;ui.error='';render();return;}
+ if(d.step!==undefined){enter(Number(d.step));return;}
  if(d.chip){f[d.chip]=f[d.chip]===d.value&&d.chip!=='confirm'?'':d.value;if(d.chip==='confirm'&&d.value!=='completion')f.completionId='';sync();render();return;}
  if(d.entry!==undefined){ui.entry=Number(d.entry);ui.screen=0;ui.error='';render();return;}
  if(d.decide){state=C.decide(state,d.decide,d.decision);if(ui.editing===d.decide)ui.editing=null;rerender();await refreshProfile();rerender();return;}
  if(d.edit){const k=d.edit,x=state.decisions[k];ui.editing=k;ui.editError='';ui.editText=x?.decision==='edited'?x.text:k==='profile'?state.profile.text:proposalOf(k).text;rerender();document.querySelector('#edit-text')?.focus();return;}
  if(d.save){await saveEdit(d.save);return;}
  const action=d.action;
- if(action==='read-record')await readRecord();
  if(action==='back')go(state.step-1);
  if(action==='to-work'){if(state.offline?!state.role:!state.record||!cfg.roles.some(r=>r.name===state.role)){showError(state.offline?copy.errRoleOffline:copy.errRole,state.offline?'role-offline':'role');return;}go(1);}
  if(action==='to-review')await enter(2);
@@ -429,12 +444,6 @@ view.addEventListener('click',async event=>{
  if(action==='next-q'||action==='prev-q'){ui.screen=Math.min(SCREENS-1,Math.max(0,ui.screen+(action==='next-q'?1:-1)));render();view.querySelector('.q.current input,.q.current textarea,.q.current button')?.focus();}
  if(action==='remove-photo'){state.optional.photo='';render();}
 });
-steps.addEventListener('click',event=>{const button=event.target.closest('button');if(!button||button.disabled)return;enter(Number(button.dataset.step));});
-document.querySelector('#about-button').onclick=()=>document.querySelector('#about-dialog').showModal();
-document.querySelector('#reset-button').onclick=()=>confirmAction(copy.resetTitle,copy.resetCopy,copy.resetAction,()=>{cancelReview();const offline=state.offline;state=C.newCvState();state.offline=offline;ui=freshUi(ui.menus);render();window.scrollTo({top:0,behavior:'instant'});notify(copy.resetDone);});
-document.querySelector('.brand').addEventListener('click',event=>{event.preventDefault();if(cfg)go(0);});
-document.querySelectorAll('.close-dialog').forEach(button=>button.onclick=()=>{button.closest('dialog').close();pendingAction=null;});
-document.querySelector('#confirm-action').onclick=()=>{document.querySelector('#confirm-dialog').close();const action=pendingAction;pendingAction=null;action?.();};
-document.querySelectorAll('dialog').forEach(dialog=>dialog.addEventListener('click',event=>{if(event.target===dialog){const r=dialog.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)dialog.close();}}));
-start();
+}
+window.YoCVApp={mount,useRecord,clearDraft,draftStatus};
 })();
