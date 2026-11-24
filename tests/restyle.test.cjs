@@ -165,7 +165,7 @@ test('the CV steps wear the shell cards, pills and buttons (shell spec section 6
  // Inputs: the hairline border and 8 px radius inside the shell; the interview chips are pills, not skill chips.
  assert.ok(/body\.yocv-app :is\(input,textarea,select\)\{border-color:var\(--line\)\}/.test(screen),'hairline inputs');
  assert.ok(/input,textarea\{[^}]*border-radius:8px/.test(css));
- assert.ok(/\.chips \.chip\{[^}]*border:1px solid var\(--line\)/.test(css)&&/\.chips \.chip\.selected\{background:var\(--green\)/.test(css),'interview chips');
+ assert.ok(/\.chips \.chip,\.entry-tabs \.chip\{[^}]*min-height:44px[^}]*border:1px solid var\(--line\)[^}]*cursor:pointer/.test(css)&&/\.chips \.chip\.selected,\.entry-tabs \.chip\.selected\{background:var\(--green\)/.test(css),'interview chips and step 2 entry tabs');
  // The opportunities block is a list of cards.
  assert.ok(/body\.yocv-app \.opp-item\{[^}]*box-shadow:var\(--shadow\)[^}]*border-radius:12px/.test(screen),'opportunity cards');
  // The paper keeps its typography with the card radius; print flattens it and hides the shell.
