@@ -54,6 +54,20 @@ test('the shell styles are scoped and YoCard keeps its rules',()=>{
   assert.ok(/\.hero\{[^}]*background:var\(--accent\)/.test(css));
   assert.ok(card.includes('.topbar{min-height:72px')&&card.includes('#page-band{background:var(--accent)')&&card.includes('.app-shell{display:grid'),'the old header, band and rail live in card.css');
   assert.ok(!css.includes('#page-band{')&&!css.includes('.sidebar{'),'and not in styles.css');
+  assert.ok(css.includes('body.yocv-app [hidden]{display:none!important}'),'the hidden attribute beats display rules in the shell (Log in, avatar)');
+  assert.equal((css.match(/:root\{/g)||[]).length,1,'one token block');
+  assert.match(css,/\.section-text\{[^}]*display:flex[^}]*flex-direction:column/,'section text stacks title over preview in every section card');
+});
+test('the greeting takes focus on a tab switch the person made, not on first paint',()=>{
+  const render=js.match(/function render\(opts=\{\}\)\{[\s\S]*?\n\}/);assert.ok(render,'render takes options');
+  assert.match(render[0],/changed=opts\.fromHash===true&&/,'focus is gated on a hashchange');
+  assert.match(render[0],/if\(changed\)\{[^\n]*getElementById\('greeting'\)\.focus\(/);
+  assert.ok(js.includes("addEventListener('hashchange',()=>render({fromHash:true}))"),'the hashchange path asks for focus');
+  const boot=js.match(/async function boot\(\)\{[\s\S]*?\n\}/)[0],signIn=js.match(/async function signIn\([^)]*\)\{[\s\S]*?\n\}/)[0];
+  for(const [name,src] of [['boot',boot],['signIn',signIn]]){
+    assert.ok(!src.includes('.focus('),name+' calls no focus');
+    assert.ok(!/render\(\{[^}]*fromHash/.test(src),name+' renders without the hashchange flag');
+  }
 });
 test('avatar initials keep 4.5:1 on every hue the name hash can give',()=>{
   const m=js.match(/background:hsl\(\$\{hashHue\([^)]*\)\} (\d+)% (\d+)%\)/);assert.ok(m,'avatar colour is hsl(hue s% l%)');

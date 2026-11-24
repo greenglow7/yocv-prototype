@@ -149,9 +149,10 @@ function closeDrawers(){for(const d of document.querySelectorAll('dialog.drawer[
 function confirm(title,text,label,fn){pendingAction=fn;$('#confirm-title').textContent=title;$('#confirm-copy').textContent=text;$('#confirm-action').textContent=label;$('#confirm-dialog').showModal();}
 function notify(text){const el=$('#toast');el.textContent=text;el.classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('visible'),3200);}
 function modeLabel(){const m=S.cfg?.mode||{};return S.offline?copy.modeOffline:m.mode==='live'?fill(copy.modeLive,{model:m.model||m.provider}):copy.modeSample;}
-/* Rendering. The whole shell on a route or person change; the draft bits alone on a CV state change. */
-function render(){
- const {tab,step}=route(),changed=S.tab!==null&&S.tab!==tab;S.tab=tab;S.step=step;
+/* Rendering. The whole shell on a route or person change; the draft bits alone on a CV state change. The greeting
+   takes focus only on a tab switch the person made (a hashchange), never on boot or a sign-in render. */
+function render(opts={}){
+ const {tab,step}=route(),changed=opts.fromHash===true&&S.tab!==null&&S.tab!==tab;S.tab=tab;S.step=step;
  const p=who(),av=$('#avatar-button'),login=$('#login-button');
  av.hidden=S.signedOut;av.innerHTML=avatarHTML(p,44);av.setAttribute('aria-label',p?p.displayName:copy.drawerAccount);
  login.hidden=!S.signedOut;login.innerHTML=icon('login',18)+E(copy.logIn);
@@ -237,7 +238,7 @@ function resolvePerson(){
  return [as,stored()].find(id=>id&&ids.includes(id))||ids[0]||null;
 }
 function bind(){
- window.addEventListener('hashchange',render);
+ window.addEventListener('hashchange',()=>render({fromHash:true}));
  document.addEventListener('yocv:draft',event=>{if(event.detail?.offline)S.offline=true;renderDraftBits();});
  $('#menu-button').onclick=()=>openDrawer('#menu-drawer');
  $('#avatar-button').onclick=()=>{S.list=false;openDrawer('#user-drawer');};
