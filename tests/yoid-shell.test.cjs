@@ -57,6 +57,10 @@ test('the shell styles are scoped and YoCard keeps its rules',()=>{
   assert.ok(css.includes('body.yocv-app [hidden]{display:none!important}'),'the hidden attribute beats display rules in the shell (Log in, avatar)');
   assert.equal((css.match(/:root\{/g)||[]).length,1,'one token block');
   assert.match(css,/\.section-text\{[^}]*display:flex[^}]*flex-direction:column/,'section text stacks title over preview in every section card');
+  // The bar's minimum width with the links shown is about 770 px, so the links wait for 800 px (not Yoma's 640).
+  assert.match(css,/\.top-links\{display:none/,'links hidden on phones');
+  assert.match(css,/@media\(min-width:800px\)\{[^}]*\.top-links\{display:flex\}/,'links from 800 px');
+  assert.ok(!/@media\(min-width:(640|768)px\)\{[^@]*\.top-links\{display:flex/.test(css),'and not from 640 or 768 px');
 });
 test('the greeting takes focus on a tab switch the person made, not on first paint',()=>{
   const render=js.match(/function render\(opts=\{\}\)\{[\s\S]*?\n\}/);assert.ok(render,'render takes options');

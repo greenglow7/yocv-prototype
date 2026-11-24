@@ -98,6 +98,9 @@ test('components follow the Yoma shapes',()=>{
  assert.ok(/\.primary,\.secondary\{[^}]*border-radius:9999px/.test(css),'pill buttons');
  assert.ok(/\.secondary\{[^}]*border:1px solid var\(--green\)/.test(css));
  assert.ok(/input,textarea\{[^}]*border:1px solid var\(--muted\)/.test(css),'input border');
+ assert.ok(/select\{[^}]*border:1px solid var\(--muted\)/.test(css),'select border');
+ // No shell rule may lighten the field border to the --line hairline: 1.33:1 on white is under the 3:1 floor for a control boundary (WCAG 1.4.11).
+ assert.ok(!/(input|textarea|select)[^{]*\{[^}]*border(-color)?:[^;}]*var\(--line\)/.test(css),'no --line field border');
  assert.ok(/\.tag\{[^}]*border-radius:9999px/.test(css),'tag pills');
  assert.ok(/\.tag\.ai\{background:var\(--accent-tint\);color:var\(--accent\)\}/.test(css));
  assert.ok(!/\.claim-card\{[^}]*border:1px/.test(css),'no card borders');
@@ -162,8 +165,9 @@ test('the CV steps wear the shell cards, pills and buttons (shell spec section 6
  // Evidence chips keep their tints at 14 px.
  assert.ok(/\.tag\{[^}]*font-size:14px/.test(css));
  for(const t of ['recorded','awaiting','stated'])assert.ok(new RegExp('\\.tag\\.'+t+'[,{]').test(css),'tag '+t);
- // Inputs: the hairline border and 8 px radius inside the shell; the interview chips are pills, not skill chips.
- assert.ok(/body\.yocv-app :is\(input,textarea,select\)\{border-color:var\(--line\)\}/.test(screen),'hairline inputs');
+ // Inputs: the --muted border (the final review measured the --line hairline at 1.33:1, under WCAG 1.4.11's 3:1) and
+ // the 8 px radius; the interview chips are pills, not skill chips.
+ assert.ok(!/body\.yocv-app :is\(input,textarea,select\)\{border-color:var\(--line\)\}/.test(screen),'no hairline inputs');
  assert.ok(/input,textarea\{[^}]*border-radius:8px/.test(css));
  assert.ok(/\.chips \.chip,\.entry-tabs \.chip\{[^}]*min-height:44px[^}]*border:1px solid var\(--line\)[^}]*cursor:pointer/.test(css)&&/\.chips \.chip\.selected,\.entry-tabs \.chip\.selected\{background:var\(--green\)/.test(css),'interview chips and step 2 entry tabs');
  // The opportunities block is a list of cards.
