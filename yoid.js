@@ -181,7 +181,9 @@ function menuDrawerHTML(){
   +(who()?`<div class="drawer-pad"><button class="secondary wide" data-action="signout">${E(copy.signOut)}</button></div>`:'')
   +`<div class="drawer-foot"><span>${E(copy.footerPrototype)}</span><button class="text-button" data-action="about">${E(copy.aboutPrototype)}</button></div>`;
 }
+// Offline, only the account read before going offline (spec section 5); none on a cold offline start.
 function accounts(){
+ if(S.offline)return S.person?[S.person]:[];
  if(sample())return S.cfg.accounts.personas.map(p=>({id:p.id,displayName:p.displayName,firstName:p.firstName,town:p.city,trade:tradeLabel(p.trade)}));
  return S.person?[S.person]:[];
 }
@@ -260,6 +262,10 @@ async function signIn(id){
  const selector=sample()?{persona:persona.id}:{};
  Object.assign(S,{signedOut:false,busy:true,record:null,selector,list:false,open:{},filter:'all',sub:'completed'});
  if(persona){S.person=personOf(persona);store(persona.id);}
+ // The record goes first, then the draft: clearDraft re-applies whatever record app.js holds, so clearing the
+ // draft alone would leave the previous person's ticks, role and contact name under the new name until the new
+ // record arrives, or for good when the read fails.
+ window.YoCVApp.useRecord(null,null,null);
  window.YoCVApp.clearDraft();
  render();
  try{
@@ -278,8 +284,8 @@ function signOut(){
  Object.assign(S,{signedOut:true,record:null,selector:null,list:false,open:{}});
  if(sample())S.person=null;
  store(null);
- window.YoCVApp.clearDraft();
  window.YoCVApp.useRecord(null,null,null);
+ window.YoCVApp.clearDraft();
  render();
 }
 function chooseAccount(id){
@@ -322,7 +328,9 @@ function bind(){
   switch(d.action){
    case 'login':S.list=true;openDrawer('#user-drawer');break;
    case 'signout':signOut();break;
-   case 'switch':S.list=!S.list;openDrawer('#user-drawer');break;
+   // openDrawer replaces the drawer's markup, which removes the pressed button; focus goes to the current (or first)
+   // account row when the list opens and back to the Switch account pill when it closes, so the keyboard stays in the dialog.
+   case 'switch':{S.list=!S.list;openDrawer('#user-drawer');const dr=$('#user-drawer');(S.list?dr.querySelector('.account-row.current')||dr.querySelector('.account-row'):dr.querySelector('[data-action="switch"]'))?.focus();break;}
    case 'about':closeDrawers();$('#about-dialog').showModal();break;
   }
  });
@@ -345,6 +353,6 @@ async function boot(){
  if(sample()&&!id){render();return;}
  await signIn(id);
 }
-window.YoID={signIn,signOut,openTab:r=>{location.hash=r;},render,person:()=>who(),record:()=>S.record,views};
+window.YoID={signIn,signOut,chooseAccount,openTab:r=>{location.hash=r;},render,person:()=>who(),record:()=>S.record,views};
 boot();
 })();
