@@ -178,3 +178,19 @@ Open issues from this pass:
 3. **Template wording joins badly for some openers.** With "a community group" and an answer that starts with a verb, the local sentence reads "Volunteered with a community group on did hair for free at church events …". When the answer already names the people ("for women in my street"), the line repeats them: "… mostly box braids and cornrows for customers a few times a week …". The template is the path every sample-mode and offline demo shows, so this is worth a fix before the pilot. Fixed in the final review: a clause with its own verb gets no opener, the lead-in (I, I'm, I used to) is stripped, and the people are named once, so Thandi's line now reads "... mostly box braids and cornrows a few times a week since March 2025, about 40 customers a week; Most of them come back every month." A clause that opens with a bare verb such as "did" or "got" is left as typed and the opening check refuses it, so the person is asked for an action verb instead of being shown a broken sentence.
 4. **The profile line lowercases the entry title.** With three entries it read "Hairdresser with cosmetics and customer service recorded on Yoma and 30 months of family shop." The longest entry drives the count, which is right; "of family shop" is not a phrase a person would write.
 5. **Accept after Edit drops the edit without asking.** On an Edited line, Accept replaces the person's wording with the original suggestion and marks it Accepted. Nothing is lost that the person cannot retype, but a confirm, or hiding Accept while an edit stands, would be kinder.
+
+# Yo-ID shell, 2026-11-22
+
+Branch `yoid-shell`, sample mode, port 4173. Rows marked "Left to the controller" are browser-pane checks the implementer of the documentation task could not run; the controller fills them in from the per-task browser checks.
+
+| # | Scenario | Result |
+| --- | --- | --- |
+| 1 | Suite, online: `npm test` | Pass. `ℹ tests 615`, `ℹ pass 613`, `ℹ fail 0`, `ℹ skipped 2` (the two live model tests, skipped without a model key; the two live Yoma tests ran against api.yoma.world). |
+| 2 | The six tabs (Overview, Wallet, Passport, Opportunities, Skills, CV) at 360 px and 1280 px, Thandi and Sipho: `scrollWidth === innerWidth`, the current pill marked, the greeting focused on a tab change, Sipho's empty states with no `undefined` text | Left to the controller. |
+| 3 | The menu drawer and the avatar drawer by keyboard: open with Enter, Tab stays inside, Escape closes and focus returns to the button that opened it | Left to the controller. |
+| 4 | Switch account with a CV draft in progress: one typed answer, then Switch account to Sipho; Cancel keeps the draft and the person, Switch clears the draft and reads Sipho's record | Left to the controller. |
+| 5 | Sign out and Log in: no name on the bar, the log-in card on every tab, `sessionStorage` empty; Log in opens the account list and signs in again | Left to the controller. |
+| 6 | The four CV steps inside the CV tab at 360 px and 1280 px (Thandi, Hairdresser, Braiding at home), with a reload on `#/cv/3` and no draft landing on step 1 | Left to the controller. |
+| 7 | Print measurement: the `@media print` rules applied by script as in the 2026-11-19 row 5, the shell hidden by the `body.yocv-app` selectors, the CV paper on one page at A4 and Letter | Left to the controller. |
+| 8 | Cold offline start: `index.html` with no server, `Good morning` with no name, the generic avatar, the offline notice on the five record tabs, the CV tab's typed-role path, `Sample mode (offline)` in the footer | Left to the controller. |
+| 9 | Offline after online: the server stopped after Thandi's record loaded; the tabs keep the record in memory, the CV review builds in the browser, the footer reads `Sample mode (offline)` | Left to the controller. |

@@ -4,7 +4,7 @@
 
 1. Put `YOVOUCH_SIM=1` in `.env`. The simulators and the `/demo` pages need it, and a gateway secret turns them off.
 2. Run `node scripts/seed-demo.js`. It publishes Thandi's card and adds her three customer vouches with sample numbers.
-3. Run `npm start` and open `http://127.0.0.1:4173`. Note the mode label in the header: **Live AI · <model>** or **Sample mode**. Say which one you are in.
+3. Run `npm start` and open `http://127.0.0.1:4173`. The page opens signed in as Thandi on the Yo-ID Overview. If another person is signed in, open the avatar menu, choose **Switch account** and pick **Thandi Mokoena**, or open `http://127.0.0.1:4173/?as=thandi`. Click **Reset** in the footer so no CV draft is left from a rehearsal. Note the mode label in the footer: **Live AI · <model>** or **Sample mode**. Say which one you are in.
 4. Open a second tab on `http://127.0.0.1:4173/demo/cv-rejected`, the prepared refused suggestion.
 5. Keep these `.env` lines ready for the live-model switch. The first choice is Claude: it needs only a key, and `effort` is set low for the 20 s deadline. It has not been run live on the build laptop, so rehearse it as described below. The banner then reads **Live AI · claude-haiku-5-5**.
 
@@ -26,9 +26,13 @@ OPENAI_STRUCTURED_OUTPUT=json_object
 
 6. Keep a clone of Yoma's public code open on `src/web/src/pages/yoid/index.tsx`, and this repository's `integration/yoma/README.md` beside it.
 
-## 0:00 to 0:45: Thandi's Yoma record
+## 0:00 to 0:45: Thandi's Yo-ID and her Yoma record
 
-**Do:** pick **Thandi Mokoena**, a fictional sample account. Show her Yoma record. Tick two completions, **Hair Styling: Blow-Dry, Cut, and Colour Like a Pro** and **Customer Care Skills and Telephone Etiquette**, and their two credentials. Choose **Hairdresser**.
+**Do:** start on the Overview, signed in as **Thandi Mokoena**, a fictional sample account. Point at the CV card under the four section cards.
+
+**Say:** "This is Thandi's Yo-ID. Yoma's own dashboard promises a CV built from it; here it is."
+
+**Do:** click **Open CV**. Step 1, **Confirmed from Yoma**, shows her record, already read. Tick two completions, **Hair Styling: Blow-Dry, Cut, and Colour Like a Pro** and **Customer Care Skills and Telephone Etiquette**, and their two credentials. Choose **Hairdresser**.
 
 **Say:** "This is a sample account. The CV is built from what Yoma records: completed opportunities and the credentials in the wallet. Nothing in the record can be edited here."
 
