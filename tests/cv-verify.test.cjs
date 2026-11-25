@@ -139,3 +139,23 @@ test('a changed stored check, an expired one and an unknown id each say so and s
   assert.equal(r.status,404); assert.ok(r.html.includes(copy.checkMissing));
   assert.equal((await fetch(base+'/cv-check/not-an-id')).status,404);
 });
+
+test('a hand-added skill reaches the check only once the skills call has stored it, as the page replays it after a lost session',async()=>{
+  const {base,sessionId,cv,review}=await reviewed();
+  const extra=(review.menu||[]).map(m=>m.name).find(n=>!review.skills.some(s=>s.name===n));
+  assert.ok(extra,'the menu has a skill the review did not return');
+  const withExtra={...cv,skills:[...cv.skills,{name:extra,label:copy.labelSelf}]};
+  const s=await ok(await raw(base,'/api/cv/skills',{sessionId,include,handAdded:[{name:extra}]}));
+  assert.equal(s.skills.find(k=>k.name===extra).level,'S4');
+  const v=await ok(await verify(base,{sessionId,cv:withExtra}));
+  const {html}=await pageOf(base,v.checkId);
+  assert.ok(section(html,copy.checkSelf).includes(extra),'self-declared: '+extra);
+  assert.ok(!section(html,copy.checkConfirmed).includes(extra));
+  // A fresh session after expiry: record and review alone do not hold the hand-added skill, the replayed skills call does.
+  const {sessionId:fresh}=await ok(await raw(base,'/api/cv/record',{persona:'thandi'}));
+  await ok(await raw(base,'/api/cv/review',{sessionId:fresh,role,include,entries:[entry]}));
+  const lost=await verify(base,{sessionId:fresh,cv:withExtra});
+  assert.equal(lost.status,400); assert.deepEqual((await lost.json()).error.fields,['cv.skills.'+cv.skills.length]);
+  await ok(await raw(base,'/api/cv/skills',{sessionId:fresh,include,handAdded:[{name:extra}]}));
+  assert.equal((await verify(base,{sessionId:fresh,cv:withExtra})).status,200);
+});

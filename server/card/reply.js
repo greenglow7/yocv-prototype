@@ -756,4 +756,6 @@ function createReplyStore(dir,{now=Date.now,random=crypto.randomBytes}={}){
 module.exports={translateLines,translateReply,TRANSLATE_SCHEMA_NAME,extractAnswers,ruleAnswers,answersText,chooseExperience,buildReplyLines,line6,fitReply,smsReply,editLine,createReplyStore,
   replySchema,postOrganisations,REPLY_SYSTEM_PROMPT,REPLY_SCHEMA_NAME,MAX_CLIPS,
   listingSchema,detectFees,detectDocuments,asksForIdByMessage,hasContact,ruleParse,parsePost,docMessages,createPostStore,
-  validateParsed,isMediaOnly,maskPhones,LISTING_SYSTEM_PROMPT,SCHEMA_NAME,MAX_POST,POST_TTL_MS};
+  validateParsed,isMediaOnly,maskPhones,LISTING_SYSTEM_PROMPT,SCHEMA_NAME,MAX_POST,POST_TTL_MS,
+  // For scripts/export-handover.js: the prompts saved as files.
+  listingMessages,replyMessages,translateMessages,translateSchema};

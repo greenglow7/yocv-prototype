@@ -302,6 +302,8 @@ Not yet done: no VoiceOver or TalkBack pass; the Accept, Edit and Leave out butt
 ## 📖 Other documentation
 
 - [Contributing](CONTRIBUTING.md), [Security](SECURITY.md), [AGENTS.md](AGENTS.md)
+- [Handover package for GenU](handover/README.md): the prompts, the CV line rubric and its test cases as files, the cost estimate, what is live, rule-based and mocked, and the plan for bringing YoCV into Yoma
+- [Phase 4 slide text](presentation/phase4-slides.md) and the [Talent Finder](docs/new-ideas/talent-finder-brief.md) new idea, with its [mock-ups](mockups/talent-finder/index.html)
 - [Testing log](docs/testing-log.md): what was run by hand, and what was not
 - [YoVouch design](docs/superpowers/specs/2026-11-16-yovouch-design.md) and [plan](docs/superpowers/plans/2026-11-16-yovouch.md)
 - [YoCV credential CV design](docs/superpowers/specs/2026-11-19-yocv-credential-cv-design.md) and [plan](docs/superpowers/plans/2026-11-19-yocv-credential-cv.md); the [Yoma integration pack](integration/yoma/README.md)

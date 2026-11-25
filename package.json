@@ -24,7 +24,8 @@
     "start": "node server.js",
     "test": "node --test tests/*.test.cjs",
     "seed:demo": "node scripts/seed-demo.js",
-    "measure": "node scripts/measure.js"
+    "measure": "node scripts/measure.js",
+    "handover": "node scripts/export-handover.js"
   },
   "engines": {
     "node": ">=20"

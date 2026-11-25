@@ -1,0 +1,28 @@
+{
+  "about": "CV line test cases for the checks in handover/rubrics/cv-line-checks.md. Each case is one suggested CV line for the fictional entry below, with the outcome the checks must give. tests/handover.test.cjs runs every case through server/cv/validate.js checkBullet. Add a case when you change a rule.",
+  "role": "Hairdresser",
+  "entry": {
+    "title": "Braiding at home",
+    "what": "I braid hair at home for women in my street, mostly box braids and cornrows.",
+    "forWhom": "customers",
+    "frequency": "a few times a week",
+    "months": {"start": "2025-03", "end": ""},
+    "number": {"value": 40, "unit": "customers a week", "hedge": "about"},
+    "outcome": "Most of them come back every month."
+  },
+  "cases": [
+    {"text": "Braided hair at home for about 40 customers a week, mostly box braids and cornrows.", "sourceQuote": "I braid hair at home for women in my street", "expect": "ok"},
+    {"text": "Braided box braids and cornrows for women nearby a few times a week.", "sourceQuote": "mostly box braids and cornrows", "expect": "ok"},
+    {"text": "Braided hair at home for about 60 customers a week, mostly box braids.", "sourceQuote": "I braid hair at home for women in my street", "expect": "invented_number"},
+    {"text": "Braided hair at home for 40 customers a week, mostly box braids and cornrows.", "sourceQuote": "I braid hair at home for women in my street", "expect": "hedge_dropped"},
+    {"text": "Braided hair at a salon in Durban for about 40 customers a week.", "sourceQuote": "I braid hair at home for women in my street", "expect": "invented_name"},
+    {"text": "Braided hair at home for customers, call 073 555 0147 to book a slot.", "sourceQuote": "I braid hair at home for women in my street", "expect": "contact_detail"},
+    {"text": "Braided hair as an expert stylist for about 40 customers a week at home.", "sourceQuote": "I braid hair at home for women in my street", "expect": "overstated"},
+    {"text": "Managed a braiding business for about 40 customers a week at home.", "sourceQuote": "I braid hair at home for women in my street", "expect": "overstated"},
+    {"text": "Responsible for braiding hair at home for about 40 customers a week.", "sourceQuote": "I braid hair at home for women in my street", "expect": "weak_opening"},
+    {"text": "Braided hair at home.", "sourceQuote": "I braid hair at home for women in my street", "expect": "length"},
+    {"text": "Braided hair at home for about 40 customers a week. Most come back.", "sourceQuote": "I braid hair at home for women in my street", "expect": "not_one_sentence"},
+    {"text": "Braided hair at home for about 40 customers a week, mostly cornrows!", "sourceQuote": "I braid hair at home for women in my street", "expect": "exclamation"},
+    {"text": "Braided hair at home for about 40 customers a week, mostly box braids.", "sourceQuote": "I run a busy salon", "expect": "quote_not_found"}
+  ]
+}
