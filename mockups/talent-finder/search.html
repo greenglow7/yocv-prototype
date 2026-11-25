@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Talent Finder mock-up, 1 Search</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Open+Sans:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="../../styles.css">
+<link rel="stylesheet" href="mockup.css">
+</head>
+<body class="yocv-app">
+<header class="topbar">
+  <span class="icon-button" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></span>
+  <span class="wordmark">yoma</span><span class="portal-label">Partner portal</span>
+  <nav class="top-links" aria-label="Partner portal sections, not clickable in the mock-up"><span>Opportunities</span><span>Verifications</span><span class="current">Talent Finder</span><span>Reports</span></nav>
+  <div class="top-actions"><span class="org-face" role="img" aria-label="Signed in as Sample Salon Group, a fictional partner">SG</span></div>
+</header>
+<div class="mock-band" role="note">Mock-up. Not a working build. Fictional sample data. <span>Nothing on these pages searches, sends or stores anything.</span></div>
+<section class="hero"><div class="hero-inner">
+  <div class="hero-head"><h1>Talent Finder</h1></div>
+  <p class="hero-line">Sample Salon Group (fictional partner). Find young people with verified skills who chose to be findable. You see skills and evidence, never names or contact details.</p>
+  <nav id="tabs" aria-label="Mock-up screens"><a class="pill current" href="search.html" aria-current="page"><span class="step-num">1</span>Search</a><a class="pill" href="results.html"><span class="step-num">2</span>Results</a><a class="pill" href="profile.html"><span class="step-num">3</span>Profile</a><a class="pill" href="notify.html"><span class="step-num">4</span>Notify</a><a class="pill" href="young-person.html"><span class="step-num">5</span>Young person</a></nav>
+</div></section>
+<main id="main"><div class="page">
+<nav class="breadcrumb" aria-label="Breadcrumb"><a href="index.html">Partner portal</a><span aria-hidden="true">›</span><span>Talent Finder</span><span aria-hidden="true">›</span><span>Search</span></nav>
+
+<div class="card intro"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg><p>Only young people who turned on <strong>Let partners find me</strong> in Yo-ID are in this pool. Every filter works on what Yoma records, what other people vouched for, and what the person says about themselves, and each result shows which is which.</p></div>
+<div class="tf-grid">
+<form class="card" aria-labelledby="f-title" onsubmit="return false">
+  <h2 id="f-title">Who are you looking for?</h2>
+  <p class="muted">Mock-up: the controls do nothing. The filters below are the sample search used on the next screens.</p>
+
+  <fieldset class="filter-group"><legend><h3>Skills</h3></legend>
+    <p class="field-help">Yoma skill names (Lightcast Open Skills), the same names that appear on Yo-ID and YoCV.</p>
+    <div class="chips tight"><span class="chip selected">Hairstyling</span><span class="chip selected">Customer Service</span><span class="chip">Cosmetics</span><span class="chip">Hair Care</span><span class="chip">Cash Handling</span><span class="chip add">+ Add a skill</span></div>
+  </fieldset>
+
+  <fieldset class="filter-group"><legend><h3>Evidence for those skills</h3></legend>
+    <p class="field-help">The same three groups as the YoCV employer check.</p>
+    <div class="choice-list tight">
+      <div class="choice"><span class="radio"></span><span class="choice-text"><strong>Confirmed from Yoma only</strong><small>A completion or credential on the person's Yoma record.</small></span></div>
+      <div class="choice selected"><span class="radio"></span><span class="choice-text"><strong>Confirmed from Yoma, or vouched for by other people</strong><small>Vouches are confirmed by them, not by Yoma.</small></span></div>
+      <div class="choice"><span class="radio"></span><span class="choice-text"><strong>Any, including self-declared</strong><small>The person's own words. Nobody else has confirmed these.</small></span></div>
+    </div>
+  </fieldset>
+
+  <fieldset class="filter-group"><legend><h3>Learning completed on Yoma</h3></legend>
+    <label class="checkbox-label"><input type="checkbox" checked> Hair Styling: Blow-Dry, Cut, and Colour Like a Pro (Alison Learning)</label>
+    <label class="checkbox-label"><input type="checkbox"> Customer Care Skills and Telephone Etiquette (Alison Learning)</label>
+    <label class="checkbox-label"><input type="checkbox"> Financial Literacy for Gig Workers (UNICEF Kenya)</label>
+  </fieldset>
+
+  <div class="filter-group fields-grid">
+    <div><label class="field-label" for="country">Country</label><select id="country"><option>South Africa</option><option>Kenya</option><option>Nigeria</option></select></div>
+    <div><label class="field-label" for="region">Region or province</label><select id="region"><option>Western Cape</option><option>Gauteng</option><option>KwaZulu-Natal</option></select><p class="field-help">The smallest area you can pick. No towns.</p></div>
+  </div>
+
+  <fieldset class="filter-group"><legend><h3>Availability</h3></legend>
+    <p class="field-help">As the young person set it in Yo-ID.</p>
+    <div class="chips tight"><span class="chip selected">Available now</span><span class="chip selected">Part-time</span><span class="chip selected">Weekends</span><span class="chip selected">From next month</span></div>
+  </fieldset>
+
+  <div class="action-row"><a class="primary" href="results.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>&nbsp;Search the pool</a><span class="muted">Searches are logged against your partner account.</span></div>
+</form>
+
+<aside class="stack" aria-label="About this search">
+  <div class="card"><h2>7 people match</h2><p class="muted">Hairdressing skills in Western Cape, confirmed from Yoma or vouched for.</p><p class="muted" style="margin-top:8px">A count is shown only from 5 upwards. Below 5 you see "Fewer than 5" and no list.</p></div>
+  <div class="card"><h3>What you will see</h3><ul class="rule-list"><li>Trade, region and availability</li><li>Skills, each with its evidence label</li><li>Learning completed on Yoma, with the organisation and month</li></ul></div>
+  <div class="card"><h3>What you will not see</h3><ul class="rule-list no"><li>Name, photo, town, phone number or email</li><li>Who vouched, or how many vouches</li><li>An export or download of the pool</li></ul></div>
+</aside>
+</div>
+<nav class="flow-nav" aria-label="Mock-up flow"><a href="index.html">Back: all screens</a><a href="index.html">All screens</a><a class="primary" href="results.html">Next: Results</a></nav>
+</div></main>
+<footer class="app-footer"><div class="footer-inner"><p class="footer-text"><span>Independent student prototype. Not operated by Yoma or UNICEF.</span> <span>The people shown are fictional sample accounts.</span> <span>Talent Finder is a proposal, not a Yoma feature.</span></p><span class="wordmark dark" aria-hidden="true">yoma</span></div></footer>
+</body></html>

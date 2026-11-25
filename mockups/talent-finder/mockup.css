@@ -1,0 +1,134 @@
+/* Talent Finder mock-ups. The pages link ../../styles.css first, so every colour, font and shadow here comes from its
+   :root tokens (--accent, --green, --line, --panel and the rest). Swapping to the shared design kit is a token change.
+   Spacing follows the steps styles.css already uses (4, 8, 12, 16, 24, 32 px); styles.css defines no spacing tokens. */
+
+/* The mock-up band: on every screen, under the bar, never scrolled away. */
+.mock-band{position:sticky;top:80px;z-index:40;background:var(--orange-tint);color:var(--awaiting);border-bottom:2px solid var(--orange);padding:8px 16px;font-weight:700;font-size:14px;text-align:center}
+.mock-band span{font-weight:400}
+
+/* Partner bar: the Yo-ID bar with a Partner label and plain (inactive) section names. */
+.portal-label{background:var(--accent-shade);color:var(--accent-tint);border-radius:9999px;padding:2px 12px;font-size:14px;font-weight:700;font-family:"Nunito",system-ui,sans-serif}
+.top-links span{color:var(--panel);font-weight:700;font-size:16px;padding:8px 16px;min-height:44px;display:inline-flex;align-items:center;border-radius:9999px;font-family:"Nunito",system-ui,sans-serif}
+.top-links span.current{background:var(--accent-shade)}
+.org-face{width:44px;height:44px;border-radius:50%;border:2px solid var(--panel);background:var(--green);color:var(--panel);display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-family:"Nunito",system-ui,sans-serif}
+.hero-line{color:var(--accent-soft);font-size:14px;margin-top:4px}
+.step-num{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--page);color:var(--ink);font-size:12px;font-weight:800}
+.pill.current .step-num,.pill[aria-current] .step-num{background:var(--panel);color:var(--green)}
+
+/* Layout */
+.tf-grid{display:grid;gap:16px}
+@media(min-width:1024px){.tf-grid{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}.tf-grid.even{grid-template-columns:1fr 1fr}}
+.stack{display:flex;flex-direction:column;gap:16px}
+.card h2{margin:0 0 4px;font-size:20px;font-weight:800}
+.card h3{font-size:16px;font-weight:800;margin:0 0 8px}
+.filter-group{border-top:1px solid var(--line);padding-top:16px;margin-top:16px}
+.filter-group:first-of-type{border-top:0;padding-top:0}
+.filter-group>legend{float:left;width:100%}
+.filter-group>legend+*{clear:both}
+.filter-group .field-help{margin:0 0 8px}
+.choice-list.tight{gap:8px;margin-top:8px}
+.choice-list.tight .choice{padding:12px 16px;border:1px solid var(--line)}
+.choice-list.tight .choice.selected{border:2px solid var(--green);background:var(--recorded-tint)}
+.choice-list.tight .selected .radio{border-color:var(--green)}
+.chips.tight{margin:8px 0 0}
+.chips .chip.selected::after{content:" \2713"}
+.chip.add{border-style:dashed;color:var(--muted)}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.row.between{justify-content:space-between}
+.big-count{font-family:"Nunito",system-ui,sans-serif;font-size:36px;font-weight:900;line-height:1.1;color:var(--ink)}
+.rule-list{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:8px;font-size:14px}
+.rule-list li{position:relative;padding-left:16px}
+.rule-list li::before{content:"";position:absolute;left:0;top:7px;width:8px;height:8px;border-radius:50%;background:var(--green)}
+.rule-list.no li::before{background:var(--error)}
+
+/* Result cards */
+.result-grid{display:grid;gap:16px}
+@media(min-width:700px){.result-grid{grid-template-columns:1fr 1fr}}
+@media(min-width:1100px){.result-grid{grid-template-columns:repeat(3,1fr)}}
+.profile-card{background:var(--panel);box-shadow:var(--shadow);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.profile-card .who{display:flex;gap:12px;align-items:center}
+.profile-card .who strong{display:block;font-family:"Nunito",system-ui,sans-serif;font-weight:800;font-size:16px}
+.profile-card .who small{display:block;color:var(--muted)}
+.ref{font-size:14px;color:var(--muted)}
+.skill-lines{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.skill-lines li{display:flex;flex-direction:column;align-items:flex-start;gap:2px;font-size:14px;font-weight:600}
+.skill-lines .tag{font-size:14px;padding:2px 10px}
+.card-foot{margin-top:auto;padding-top:12px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.card-foot .checkbox-label{margin:0;font-size:14px;align-items:center}
+.card-foot .checkbox-label input{accent-color:var(--green)}
+.active-filters{display:flex;gap:8px;flex-wrap:wrap}
+.active-filters .tag{background:var(--recorded-tint);color:var(--recorded)}
+.guard{border:2px dashed var(--line);border-radius:12px;padding:24px;background:var(--panel);text-align:center}
+.guard h3{font-size:18px;font-weight:900;margin:12px 0 4px}
+.guard p{color:var(--muted);font-size:14px;max-width:560px;margin:4px auto 0}
+.guard .shield{width:56px;height:56px;border-radius:50%;background:var(--accent-tint);color:var(--accent);display:inline-grid;place-items:center}
+.example-label{display:inline-block;font-size:14px;font-weight:700;color:var(--muted);margin-bottom:8px}
+
+/* The anonymised profile, grouped as YoCV's employer check groups it. */
+.group{border-left:6px solid var(--line);padding:4px 0 4px 16px;margin-top:20px}
+.group.yoma{border-color:var(--recorded)}
+.group.vouched{border-color:var(--gold)}
+.group.self{border-color:var(--muted)}
+.group h2{font-size:18px;margin:0}
+.group h3{font-size:16px;margin:12px 0 4px}
+.group ul{margin:4px 0 0;padding-left:24px}
+.group li{margin-top:4px}
+.group .gnote{color:var(--muted);font-size:14px;margin-top:2px}
+.facts{margin:12px 0 0;padding:12px 16px;background:var(--page);border-radius:12px;display:grid;gap:8px}
+.facts div{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.facts dt{color:var(--muted);font-size:14px}
+.facts dd{margin:0;font-weight:600}
+
+/* Notify */
+.preview-phone{max-width:340px;margin:8px auto 0;border:8px solid var(--ink);border-radius:32px;background:var(--page);overflow:hidden}
+.preview-phone .bar{background:var(--accent);color:var(--panel);padding:12px 16px;font-family:"Nunito",system-ui,sans-serif;font-weight:900;font-size:20px}
+.preview-phone .inner{padding:12px}
+.counter{font-size:14px;color:var(--muted);text-align:right;margin-top:4px}
+.sent-to{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+
+/* The notice itself, shared by the notify preview and the young person's screen. */
+.notice-card{background:var(--panel);box-shadow:var(--shadow);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:8px}
+.notice-card .from{display:flex;gap:12px;align-items:center}
+.notice-card .from strong{display:block;font-family:"Nunito",system-ui,sans-serif;font-weight:800}
+.notice-card .from small{display:block;color:var(--muted);font-size:14px}
+.notice-card .opp{background:var(--blue-tint);border-radius:12px;padding:12px}
+.notice-card .opp strong{display:block}
+.notice-card .opp small{display:block;color:var(--muted);font-size:14px}
+.notice-card .msg{margin:0;padding:4px 0 4px 12px;border-left:2px solid var(--line)}
+.notice-card .why{font-size:14px;color:var(--muted)}
+.notice-actions{display:flex;gap:8px;flex-wrap:wrap}
+.notice-actions>*{flex:1 1 140px}
+
+/* Step navigation at the foot of every screen */
+.flow-nav{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;padding-top:16px;border-top:1px solid var(--line)}
+.flow-nav a{font-weight:600}
+.flow-nav .primary{color:var(--panel)}
+
+/* Index */
+.screen-list{list-style:none;margin:0;padding:0;display:grid;gap:12px;counter-reset:screen}
+.screen-list li a{display:flex;gap:16px;align-items:flex-start;background:var(--panel);box-shadow:var(--shadow);border-radius:12px;padding:16px;text-decoration:none;color:var(--ink)}
+.screen-list li a:hover{outline:2px solid var(--green)}
+.screen-list .n{width:36px;height:36px;border-radius:50%;background:var(--green);color:var(--panel);display:grid;place-items:center;font-weight:900;font-family:"Nunito",system-ui,sans-serif;flex-shrink:0}
+.screen-list strong{display:block;font-family:"Nunito",system-ui,sans-serif;font-weight:800}
+.screen-list small{display:block;color:var(--muted);font-size:14px}
+.cost-table{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}
+.cost-table th,.cost-table td{text-align:left;padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+.cost-table td:last-child,.cost-table th:last-child{text-align:right;white-space:nowrap}
+.assume{display:inline-block;margin-top:8px;background:var(--orange-tint);color:var(--awaiting);border-radius:8px;padding:2px 8px;font-size:14px;font-weight:700}
+
+/* The young person's screen: Yo-ID inside a 375 px phone. On a wide screen the phone is framed; at 375 px it fills. */
+body.yocv-app.phone-page{padding:24px 0;background:var(--line)}
+.phone{width:375px;max-width:100%;margin:0 auto;background:var(--page);border-radius:24px;overflow:hidden;box-shadow:var(--shadow)}
+body.yocv-app.phone-page .phone .topbar{position:static;height:64px}
+.phone .mock-band{position:static}
+.phone .hero{padding:16px}
+.phone .page{padding:12px}
+.phone .wordmark{font-size:22px}
+.phone .avatar-face.generic{width:36px;height:36px;border:2px solid var(--panel);background:var(--accent-shade)}
+.phone .app-footer{padding:12px}
+.phone-outside{max-width:375px;margin:0 auto 24px;padding:0 16px}
+.state{border-radius:12px;padding:12px 16px;font-size:14px}
+.state.shared{background:var(--recorded-tint);color:var(--recorded)}
+.state.declined{background:var(--stated-tint);color:var(--muted);border:1px solid var(--line)}
+.state strong{display:block}
+@media(max-width:400px){body.yocv-app.phone-page{padding:0;background:var(--page)}.phone{margin:0;border-radius:0;box-shadow:none}}
