@@ -60,6 +60,10 @@ OPENAI_STRUCTURED_OUTPUT=json_object
 
 **Say:** "Nothing reaches the CV without an Accept. The sample account carries one small footer line on the paper. The evidence record keeps her answers, every suggestion, every refusal and the model that wrote them."
 
+**Optional, 45 seconds: the employer scans the QR.** Click **Make a QR code for employers** and scan it with a phone, or click **Open the employer view**. Needs `HOST=0.0.0.0` and `YOCARD_PUBLIC_URL=http://<laptop LAN IP>:4173` for a real phone scan.
+
+**Say:** "A shop owner with no HR team scans this. Green is what Yoma recorded, amber is what customers vouched for, grey is her own words, checked against her answers but confirmed by nobody. Her phone number is not on it."
+
 ## 4:30 to 5:30: The same entry on a live model
 
 **Do:** only if the rehearsal in Preparation step 5 passed: stop the server, add the Claude lines to `.env` so `MODEL_PROVIDER` is `anthropic`, and run `npm start` again. Repeat the one entry. Show the banner, **Live AI · claude-haiku-5-5**, and the evidence record naming provider `anthropic` and the model. With the Ollama alternative instead, `MODEL_PROVIDER` is `openai`, the banner reads **Live AI · <the model you pulled>** and the evidence record names provider `openai-compatible` and the local model. Otherwise open a saved evidence record from `reports/2026-11-19-task-20-live-runs/` and say it was recorded earlier, on this laptop, with the deadline raised.

@@ -7,6 +7,8 @@
      POST /api/cv/check         checks the person's own edit of a bullet or the profile line
      POST /api/cv/skills        recombines the skills with fresh vouches, no model call
      POST /api/cv/docx          the CV the page built, as a Word file. No session, nothing stored.
+     POST /api/cv/verify        a signed CV check for employers, with its QR (spec 2026-11-25-yocv-qr-verify-design)
+     GET  /cv-check/:id         the employer's page; /cv-check/:id.json the signed record. Both only with a sign key.
      POST /api/cv/draft         the RapidPro webhook: no account, no session, S3 skills only. Mounted only with
                                 YOCV_SERVICE_SECRET, which x-yocv-service-secret must match.
      GET  /demo/cv-rejected     the prepared refused suggestion (plan Task 17), only when YOVOUCH_SIM=1 and no gateway
@@ -28,6 +30,9 @@ const {gatewaySecretOk,sendPage}=require('../card/vouch-routes.js');
 const {flowPage}=require('../card/pages.js');
 const {createLocalProvider}=require('../providers/local.js');
 const {cvToDocx}=require('./docx.js');
+const {buildCheck,checkPage,CHECK_ID,MAX_CHECKS_PER_SESSION}=require('./verify.js');
+const {signRecord,verifyJwt}=require('../card/sign.js');
+const {qrSvg}=require('../qr.js');
 
 const SESSION_TTL_MS=30*60*1000;
 const MAX_SESSIONS=1000;
@@ -137,7 +142,7 @@ function sendJSON(res,status,payload){
 function sendError(res,status,code,message,retryable=false,details={}){sendJSON(res,status,{error:{code,message,retryable:Boolean(retryable),...details}});}
 const invalid=(res,fields,message)=>sendError(res,400,'invalid_input',message,false,{fields});
 
-function createCvRouter({config,provider,core,yoma,roleSkills,accountSource,cardStore,vouchStore,chipSkills,now=Date.now,readJSONBody,maxInFlight=4,random=crypto.randomBytes}={}){
+function createCvRouter({config,provider,core,yoma,roleSkills,accountSource,cardStore,vouchStore,chipSkills,now=Date.now,readJSONBody,maxInFlight=4,random=crypto.randomBytes,signKey=null,checkStore=null,publicUrl=''}={}){
   if(!accountSource||!core||typeof readJSONBody!=='function')throw new Error('createCvRouter needs accountSource, core and readJSONBody');
   const roleKeys=Object.keys(roleSkills||{});
   const serviceSecret=str(config?.yocv?.serviceSecret);
@@ -244,8 +249,8 @@ function createCvRouter({config,provider,core,yoma,roleSkills,accountSource,card
         const {menu:items}=await buildSkillMenu(body.role,{yoma,roleSkills});
         const {entries:drafts,generation}=await draftEntries({role:body.role,entries:v.entries.map(fieldsOf),provider:chosen,menu:items,learningTitles,known,now});
         const interview=drafts.flatMap(d=>d.skills.map(k=>({entryIndex:d.index,...k})));
-        if(s.reviewRun===run)Object.assign(s,{role:body.role,include:inc.include,entries:v.entries,interview,menu:items});
         const {skills,rejected}=combineSkills({record:s.record,include:inc.include,vouches:vouchesOf(s),interview,menu:items,copy:COPY});
+        if(s.reviewRun===run)Object.assign(s,{role:body.role,include:inc.include,entries:v.entries,interview,menu:items,skills});
         sendJSON(res,200,{entries:drafts,skills,skillsRejected:rejected,menu:items,generation});
       }catch(err){
         if(isProviderError(err))return sendError(res,502,err.code,err.message,err.retryable);
@@ -294,6 +299,7 @@ function createCvRouter({config,provider,core,yoma,roleSkills,accountSource,card
     // Only the name is taken: a hand-added skill must be on the menu, and its Yoma id comes from there.
     const {skills:out,rejected}=combineSkills({record:s.record,include:inc.include,vouches:vouchesOf(s),interview:s.interview||[],
       handAdded:handAdded.map(h=>({name:h.name})),menu:s.menu||[],copy:COPY});
+    if(s.entries)Object.assign(s,{include:inc.include,skills:out});
     sendJSON(res,200,{skills:out,skillsRejected:rejected});
   }
 
@@ -356,10 +362,45 @@ function createCvRouter({config,provider,core,yoma,roleSkills,accountSource,card
       '<h2>'+H(t('recordRejected'))+'</h2><ul>'+refused+'</ul><h2>'+H(t('recordProposals'))+'</h2><ul>'+shown+'</ul></section>';
     sendPage(res,200,flowPage({title:COPY.preparedExample,body,css:'dt{font-weight:600}dd{margin:0 0 8px}'}));
   }
+  // POST /api/cv/verify: the server's own check of the CV, signed and stored, and the QR that opens it.
+  async function verify(req,res){
+    const got=await withSession(req,res);
+    if(!got)return;
+    const {body,s}=got;
+    const cv=validateCv(body.cv);
+    if(!cv)return invalid(res,['cv'],COPY.errBody);
+    if((s.checks||0)>=MAX_CHECKS_PER_SESSION)return sendError(res,429,'too_many_checks',COPY.errVerifyMany,false);
+    const checkId=random(8).toString('hex'),nowMs=now();
+    const monthsOf=m=>{const a=core.monthLabel(m?.start),b=core.monthLabel(m?.end);return !a?'':!b?t('cvMonthsOpen',{start:a}):a===b?a:t('cvMonthsRange',{start:a,end:b});};
+    const out=buildCheck({session:s,cv,checkBullet,copy:COPY,checkId,nowMs,monthsOf,hasContact:text=>core.contactsIn(text).length>0});
+    if(!out.record)return sendError(res,out.status,out.code,out.message,false,{fields:out.fields});
+    checkStore.put(checkId,signRecord(signKey,out.record,{now,sub:checkId}));
+    s.checks=(s.checks||0)+1;
+    const url=checkBase+'/cv-check/'+checkId;
+    sendJSON(res,200,{checkId,code:out.record.code,url,qrSvg:qrSvg(url,{cellSize:4,margin:4,level:'M'}),expiresAt:out.record.expiresAt});
+  }
+  // GET /cv-check/:id and :id.json. The signature is checked on every load; the page never trusts the file alone.
+  function checkRoute(req,res,p){
+    const m=/^\/cv-check\/([^/.]+)(\.json)?$/.exec(p),id=m?m[1]:'';
+    if(req.method!=='GET'&&req.method!=='HEAD')return sendError(res,405,'method_not_allowed','Method not allowed.',false);
+    const jwt=CHECK_ID.test(id)?checkStore.get(id):null,json=Boolean(m?.[2]);
+    const payload=jwt?verifyJwt(signKey,jwt):null,record=payload?.record;
+    const state=!jwt?'missing':!payload||payload.sub!==id||record?.checkId!==id?'bad':!(now()<Date.parse(record.expiresAt))?'expired':'ok';
+    // The JSON follows the page: nothing for a missing or changed record, 410 once expired.
+    if(json){
+      if(state==='ok')return sendJSON(res,200,{jwt,jwksUrl:'/.well-known/jwks.json'});
+      return state==='expired'?sendError(res,410,'expired',COPY.checkExpired,false):sendError(res,404,'not_found',COPY.checkMissing,false);
+    }
+    const status={missing:404,expired:410,bad:200,ok:200}[state];
+    return sendPage(res,status,checkPage({state,record,copy:COPY}));
+  }
+  const checkBase=str(publicUrl).replace(/\/+$/,'');
+  const checksOn=Boolean(signKey&&checkStore);
   const simOn=Boolean(config?.yovouch?.sim)&&!config?.yovouch?.gatewaySecret;
 
   const POST={'/api/cv/record':record,'/api/cv/review':review,'/api/cv/check':check,'/api/cv/skills':skills,'/api/cv/docx':docx};
   if(serviceSecret)POST['/api/cv/draft']=draft;
+  if(checksOn)POST['/api/cv/verify']=verify;
   function handle(req,res,url){
     const p=url.pathname,m=req.method;
     const notAllowed=()=>Promise.resolve(sendError(res,405,'method_not_allowed','Method not allowed.',false));
@@ -367,6 +408,7 @@ function createCvRouter({config,provider,core,yoma,roleSkills,accountSource,card
       if(m!=='GET'&&m!=='HEAD')return notAllowed();
       return p==='/api/cv/config'?Promise.resolve(cvConfig(res)):menu(res,url);
     }
+    if(checksOn&&p.startsWith('/cv-check/'))return Promise.resolve(checkRoute(req,res,p));
     if(p==='/demo/cv-rejected'&&simOn)return m==='GET'||m==='HEAD'?cvRejected(res):notAllowed();
     if(!Object.hasOwn(POST,p))return null;
     return m==='POST'?POST[p](req,res):notAllowed();

@@ -41,7 +41,7 @@ Commit messages use the conventional style in the history: `feat(vouch): ...`, `
 ## Where things are
 
 - `server.js`: HTTP server, static allowlist, `/api/status` and `/api/yoma/opportunities`; mounts `server/cv/routes.js` and `server/card/routes.js`.
-- `server/cv/`: the YoCV routes and sessions (`routes.js`), the Yoma record (`record.js`), the draft pipeline (`draft.js`), the CV checks (`validate.js`), the skill evidence levels (`skills.js`), the role menu (`menu.js`) and the copy access (`copy.js`).
+- `server/cv/`: the YoCV routes and sessions (`routes.js`), the Yoma record (`record.js`), the draft pipeline (`draft.js`), the CV checks (`validate.js`), the skill evidence levels (`skills.js`), the role menu (`menu.js`), the employer CV check behind the QR (`verify.js`) and the copy access (`copy.js`).
 - `cv-rules.js` and `cv-copy.js`: the lists the CV checks run against and the YoCV copy catalogue, each a plain object loaded by the browser and the server. `core.js` takes them as arguments and never reads them when it loads.
 - `integration/yoma/`: the Yoma integration pack, written to Yoma's patterns and offered under GPL-3.0 (`LICENSE-NOTE.md`); `integration/rapidpro/`: the draft webhook flow skeleton.
 - `server/providers/`: model adapters (Azure OpenAI, OpenAI-compatible, local templates). Keep model integration behind this layer.

@@ -197,3 +197,19 @@ Branch `yoid-shell`, sample mode, port 4173. Rows marked "Left to the controller
 | 10 | The top bar at 640, 700 and 768 px: `scrollWidth === innerWidth` on `.topbar`, the avatar visible, the centre links hidden; at 800 px and 1280 px the links shown without wrapping (the final review put the bar's minimum width with the links at about 770 px, so `.top-links` now waits for 800 px instead of the spec's 640) | Pass (controller). At 640, 700 and 768 px `.topbar` scrollWidth equalled the width, the avatar was shown and the centre links hidden; at 800 px the links appeared on one line and at 1280 px as well. |
 | 11 | Switch account by keyboard: Enter on the pill moves focus to the current account row, Enter on the pill again moves it back to the pill, nothing lands on `body` (behaviour pinned in `tests/yoid-flows.test.cjs` against an element stub, not a browser) | Pass (controller). Enter on the avatar, Tab to Switch account, Enter: focus landed on the current account row (`Sipho Dlamini`) inside the drawer, six rows listed; Escape closed the drawer and returned focus to the avatar. |
 | 12 | Suite after the final-review fixes: `npm test` with `tests/yoid-flows.test.cjs` driving sign-in, switch, sign out, the `#/cv/3` reload and the no-server start in a vm | Pass (controller, on ae8db53): `ℹ tests 624`, `ℹ pass 622`, `ℹ fail 0`, `ℹ skipped 2` (the two live model tests, no key). |
+
+# YoCV QR verification, 2026-11-25
+
+Branch `yocv-qr-verify`, sample mode, port 4180 (4173 was held by another local process). Spec `docs/superpowers/specs/2026-11-25-yocv-qr-verify-design.md`.
+
+| # | Scenario | Result |
+| --- | --- | --- |
+| 1 | Suite: `npm test` with `tests/cv-verify.test.cjs` and `tests/cv-verify-paper.test.cjs`, after the review fixes | Pass. `ℹ tests 635`, `ℹ pass 633`, `ℹ fail 0`, `ℹ skipped 2` (the two live model tests, no key). |
+| 2 | Thandi, Hairdresser, Braiding at home, every line and skill accepted; Step 4 **Make a QR code for employers** at 1024 px | Pass (browser pane). The panel showed the QR, `Check code 4508-D33D`, `The check lasts until 23 February 2027.`, the URL and **Open the employer view**; the same QR, code and URL printed at the foot of the CV paper, after the sample line. No console errors. |
+| 3 | The employer page at 375 px | Pass (browser pane). Three ticked credentials and three S1 skills under **Confirmed from Yoma**, Hairstyling under **Vouched for by other people** with its customer label, the braiding line under **Self-declared** with its note. (First run, before the review fixes: the place `Khayelitsha` still showed under the entry; see row 6.) The sample line, `Who can see this: anyone with the link` and the footer honesty strings present. No phone, email or town. `/cv-check/<id>.json` and `/.well-known/jwks.json` answered 200. |
+| 4 | Scan with a real phone over Wi-Fi | Not run. Needs `HOST=0.0.0.0` and `YOCARD_PUBLIC_URL` set to the laptop's LAN address; the encoder is the one YoCard uses, covered by `tests/qr.test.cjs`. |
+| 5 | Print preview of the paper with the QR | Not measured. The `.cv-verify` block has `break-inside:avoid` and a 28 mm QR; the one-page measurement of 2026-11-22 row 7 was not repeated. |
+| 6 | Review fixes: a check made through the API with forged months (`2012 to now`) and a place, after a server restart | Pass (browser pane). The page printed `March 2025 to now` from the session entry and no place; no `2012`, no `Khayelitsha`. |
+| 7 | Step 4 again through the UI after the fixes, then a skill left out on Review and back to Step 4 | Pass (browser pane). The QR was made through the session-recovering call; after the change the QR left the paper, the button came back and `You changed the CV after making the QR code. Make a new one.` showed. No console errors. |
+| 8 | Session ended on Step 4 with a hand-added skill, then Make a QR code | Not run in a browser. The recovery now replays the hand-added skills after the review; no test drives it. |
+

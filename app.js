@@ -153,7 +153,18 @@ function cvStep(){
  const paper=C.renderCvHtml(C.buildCv(state,copy),copy,{headingLevel:2});
  return head(4,copy.stepCv,copy.cvLead)+paper
   +`<div class="export-actions"><button class="primary" data-action="print">${E(copy.printCv)}</button><button class="secondary" data-action="download-text">${E(copy.downloadText)}</button>${state.offline?'':`<button class="secondary" data-action="download-docx">${E(copy.downloadDocx)}</button>`}<button class="secondary" data-action="download-record-html">${E(copy.downloadRecordHtml)}</button><button class="secondary" data-action="download-record-json">${E(copy.downloadRecordJson)}</button></div>`
-  +(state.offline?'':`<p class="field-help">${E(copy.downloadDocxHelp)}</p>`)+oppsHTML()+footer(true);
+  +(state.offline?'':`<p class="field-help">${E(copy.downloadDocxHelp)}</p>`)+verifyHTML()+oppsHTML()+footer(true);
+}
+/* The QR for employers (spec 2026-11-25-yocv-qr-verify-design): made by the server from its own session, hidden offline.
+   A QR made before the CV changed is dropped by buildCv, so the button comes back with a note. */
+const qrSrc=svg=>'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
+const longDate=iso=>{const t=Date.parse(iso);return Number.isFinite(t)?new Date(t).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}):'';};
+function verifyHTML(){
+ if(state.offline)return '';
+ const v=C.buildCv(state,copy).verify,stale=Boolean(state.verify)&&!v;
+ const body=v?`<div class="verify-made"><img class="verify-qr" src="${E(qrSrc(v.qrSvg))}" alt="${E(copy.verifyScan)}" width="180" height="180"><div><p class="verify-code">${E(fill(copy.verifyCode,{code:v.code}))}</p><p class="field-help">${E(fill(copy.verifyUntil,{date:longDate(v.expiresAt)}))}</p><p class="field-help verify-url">${E(v.url)}</p><a class="secondary small" id="verify-open" href="${E(v.url)}" target="_blank" rel="noopener noreferrer">${E(copy.verifyOpen)}</a></div></div>`
+  :`${stale?`<p class="notice">${E(copy.verifyStale)}</p>`:''}<div class="action-row"><button class="secondary" data-action="make-qr" ${ui.busy?'disabled':''}>${E(ui.busy?copy.verifyMaking:copy.verifyMake)}</button></div>`;
+ return `<section class="claim-card verify print-hide" aria-labelledby="verify-title"><h2 id="verify-title">${E(copy.verifyHeading)}</h2><p class="field-help">${E(copy.verifyLead)}</p>${body}</section>`;
 }
 // The first field that would fail the server's checks (server/cv/routes.js validateEntries), with its screen.
 function checkWork(){
@@ -224,7 +235,11 @@ async function cvPost(path,body,opts={}){
  catch(e){
   if(e.code!=='session_expired')throw e;
   state.sessionId=(await post('/api/cv/record',state.selector||{},opts)).sessionId;
-  if(path!=='/api/cv/review'){await post('/api/cv/review',C.reviewPayload(state),opts);ui.reviewSession=state.sessionId;}
+  if(path!=='/api/cv/review'){
+   await post('/api/cv/review',C.reviewPayload(state),opts);ui.reviewSession=state.sessionId;
+   // The review stores skills without the hand-added ones; put them back so a later call (the QR check) sees them.
+   if(path!=='/api/cv/skills'&&state.handAdded.length)await post('/api/cv/skills',{sessionId:state.sessionId,include:state.include,handAdded:state.handAdded},opts);
+  }
   return send();
  }
 }
@@ -335,6 +350,20 @@ async function downloadDocx(){
  if(!res.ok){const data=await res.json().catch(()=>({}));notify(data.error?.message||copy.errServer);return;}
  download('YoCV-CV.docx',await res.blob(),DOCX_TYPE);
 }
+// The server gets the CV without contact or optional details: none of them go on the check. The QR is tied to the CV
+// that was sent, so a change made while the request runs leaves it stale. An ended session is re-opened as for every call.
+async function makeQr(){
+ if(ui.busy)return;
+ const cv={...C.buildCv(state,copy),contact:{phone:'',email:'',town:''},optional:{photo:'',dateOfBirth:'',idNumber:'',stateOfOrigin:''},verify:null};
+ ui.busy=true;rerender();
+ let data;
+ try{data=await cvPost('/api/cv/verify',{cv});}
+ catch(e){ui.busy=false;if(e.network)goOffline();rerender();notify(e.network?copy.errServer:e.message||copy.errVerify);return;}
+ ui.busy=false;
+ if(typeof data.url!=='string'){rerender();notify(copy.errVerify);return;}
+ state.verify={checkId:data.checkId,code:data.code,url:data.url,qrSvg:data.qrSvg,expiresAt:data.expiresAt,fp:C.cvFingerprint(cv)};
+ rerender();document.querySelector('#verify-open')?.focus();
+}
 const recordPage=record=>`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${E(copy.recordTitle)}</title><style>body{font:16px/1.5 Arial,Helvetica,"Liberation Sans",sans-serif;max-width:720px;margin:32px auto;padding:0 16px;color:#020304}.record-row{border-top:1px solid #dce0e5;margin-top:16px;padding-top:8px}p,li,dd{overflow-wrap:anywhere}</style>${C.renderRecordHtml(record,copy)}</html>`;
 // Steps 3 and 4 need valid work answers and a fresh review; anything stale goes back through the review.
 async function enter(step){
@@ -436,6 +465,7 @@ view.addEventListener('click',async event=>{
  if(action==='add-skill')await addSkill();
  if(action==='print')window.print();
  if(action==='download-docx')await downloadDocx();
+ if(action==='make-qr')await makeQr();
  if(action==='download-text')download('YoCV-CV.txt',C.buildCvText(C.buildCv(state,copy),copy),'text/plain;charset=utf-8');
  if(action==='download-record-html')download('YoCV-evidence.html',recordPage(C.buildCvRecord(state,copy)),'text/html;charset=utf-8');
  if(action==='download-record-json')download('YoCV-evidence.json',JSON.stringify(C.buildCvRecord(state,copy),null,2),'application/json');

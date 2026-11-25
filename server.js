@@ -17,6 +17,7 @@ const path=require('node:path');
 const {createCardRouter}=require('./server/card/routes.js');
 const {createAccountSource}=require('./server/card/account.js');
 const {createCvRouter}=require('./server/cv/routes.js');
+const {createCheckStore}=require('./server/cv/verify.js');
 
 const MAX_BODY_BYTES=64*1024;
 const MAX_OPPORTUNITIES=4;
@@ -133,7 +134,8 @@ function createApp({config,provider,yoma,roleSkills,core,rootDir=__dirname,maxIn
   const cardBase=String(publicUrl||config.publicUrl||('http://'+config.host+':'+config.port)).replace(/\/+$/,'');
   const cardRouter=card?createCardRouter({config,accountSource:card.accountSource,provider,store:card.store,key:card.key,yoma,publicUrl:cardBase,now,random:card.random,readJSONBody,maxInFlight,outbox:card.outbox??null,transcriber:card.transcriber}):null;
   const cvRouter=createCvRouter({config,provider,core,yoma,roleSkills,accountSource:card?.accountSource??createAccountSource({config,yoma,now}),
-    cardStore:card?.store??null,vouchStore:cardRouter?.vouch?.vouchStore??null,chipSkills:require('./data/chip-skills.json'),now,readJSONBody,maxInFlight});
+    cardStore:card?.store??null,vouchStore:cardRouter?.vouch?.vouchStore??null,chipSkills:require('./data/chip-skills.json'),now,readJSONBody,maxInFlight,
+    signKey:card?.key??null,checkStore:card?.store?.dir?createCheckStore(path.join(card.store.dir,'cv-checks')):null,publicUrl:cardBase});
 
   async function status(res){
     let reachable=false;

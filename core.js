@@ -243,7 +243,7 @@
     const experience=(state.entries||[]).map((e,i)=>({e,bullets:(draftFor(state,i)?.proposals||[]).map((p,j)=>chosenText(decisionOf(state,i+':'+j),p.text)).filter(Boolean)}))
       .filter(x=>x.bullets.length).sort((a,b)=>endKey(b.e.months)-endKey(a.e.months)||0)
       .map(({e,bullets})=>({title:trim(e.title),place:trim(e.place),months:monthsText(e.months,copy),bullets}));
-    return {
+    const cv={
       name:trim(c.name),contact:{phone:trim(c.phone),email:trim(c.email),town:trim(c.town)},
       profile:chosenText(pd,state.profile?.text),experience,
       skills:(state.skills||[]).filter(s=>decisionOf(state,'skill:'+s.name).decision==='accepted').map(s=>({name:s.name,label:s.label})),
@@ -251,7 +251,18 @@
       optional:{photo:trim(o.photo),dateOfBirth:trim(o.dateOfBirth),idNumber:trim(o.idNumber),stateOfOrigin:trim(o.stateOfOrigin)},
       sample:state.record?.source!=='token'
     };
+    cv.verify=verifyFor(state.verify,cv);
+    return cv;
   }
+  // The QR check (spec 2026-11-25-yocv-qr-verify-design): only what the check holds goes in the fingerprint, so a
+  // contact change keeps the QR and a changed line drops it. Only an http(s) URL and an svg the server drew print.
+  const cvFingerprint=cv=>JSON.stringify([cv.name,cv.experience,cv.skills,cv.learning]);
+  function verifyFor(v,cv){
+    if(!v||typeof v!=='object'||v.fp!==cvFingerprint(cv))return null;
+    if(!/^https?:\/\/[^\s"<>]+$/i.test(String(v.url??''))||!/^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg"[^<]*><rect [^<]*\/><path d="[Mhvz0-9 -]*" fill="#[0-9a-f]{6}"\/><\/svg>$/.test(String(v.qrSvg??'')))return null;
+    return {url:String(v.url),code:trim(v.code),qrSvg:String(v.qrSvg),expiresAt:trim(v.expiresAt)};
+  }
+  const qrSrc=svg=>'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
   const contactLine=cv=>[cv.contact.phone,cv.contact.email,cv.contact.town].filter(Boolean).join(' · ');
   const optionalLines=(cv,copy)=>[['cvDateOfBirth','dateOfBirth'],['cvIdNumber','idNumber'],['cvStateOfOrigin','stateOfOrigin']].filter(([,k])=>cv.optional[k]).map(([l,k])=>fill(copy.cvOptionalLine,{label:copy[l],value:cv.optional[k]}));
   const metaLine=e=>[e.place,e.months].filter(Boolean).join(' · ');
@@ -268,6 +279,8 @@
     if(cv.education)s+=h(1,copy.cvEducation)+'<p>'+E(cv.education)+'</p>';
     s+='<p class="cv-references">'+E(copy.cvReferences)+'</p>';
     if(cv.sample)s+='<p class="cv-sample-note">'+E(copy.cvSampleFooter)+'</p>';
+    if(cv.verify)s+='<div class="cv-verify"><img class="cv-qr" src="'+E(qrSrc(cv.verify.qrSvg))+'" alt="'+E(copy.verifyScan)+'" width="112" height="112">'
+      +'<div><p class="cv-verify-title">'+E(copy.verifyScan)+'</p><p>'+E(fill(copy.verifyCode,{code:cv.verify.code}))+'</p><p class="cv-verify-url">'+E(cv.verify.url)+'</p></div></div>';
     return s+'</article>';
   }
   function buildCvText(cv,copy){
@@ -279,6 +292,7 @@
     if(cv.education)blocks.push([copy.cvEducation,cv.education]);
     blocks.push([copy.cvReferences]);
     if(cv.sample)blocks.push([copy.cvSampleFooter]);
+    if(cv.verify)blocks.push([copy.verifyScan+': '+cv.verify.url,fill(copy.verifyCode,{code:cv.verify.code})]);
     return blocks.map(b=>b.join('\n')).join('\n\n');
   }
   // The evidence record: the name's first word in the number notes, never the phone, email, town or an optional field.
@@ -381,6 +395,6 @@
     });
     return {entries,skills:[],generation:{mode:'sample-offline',provider:'browser-local',model:null,durationMs:0}};
   }
-  const api={MONTHS,WEEKDAYS,escapeHTML,shortQuote,contactsIn,numbersIn,allowedNumbers,properNouns,maskNames,restoreNames,checkCvText,monthLabel,monthsBetween,templateBullet,profileLine,buildCv,renderCvHtml,buildCvText,buildCvRecord,renderRecordHtml,newCvState,reviewPayload,decide,readyForCv,profileInput,offlineReview};
+  const api={MONTHS,WEEKDAYS,escapeHTML,shortQuote,contactsIn,numbersIn,allowedNumbers,properNouns,maskNames,restoreNames,checkCvText,monthLabel,monthsBetween,templateBullet,profileLine,buildCv,renderCvHtml,buildCvText,buildCvRecord,cvFingerprint,renderRecordHtml,newCvState,reviewPayload,decide,readyForCv,profileInput,offlineReview};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.YoCV=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

@@ -155,7 +155,19 @@
     footerFictional:'The people shown are fictional sample accounts.',footerPrototype:'Independent student prototype. Not operated by Yoma or UNICEF.',
     aboutPrototype:'About this prototype',sourceLink:'Source',
     menuHome:'Home',menuAbout:'About Us',menuOpportunities:'Opportunities',menuMarketplace:'Marketplace',menuYoid:'Yo-ID',menuYocard:'My work card (YoCard)',
-    openMenu:'Open main menu',closeMenu:'Close',languageOnly:'English only',drawerAccount:'Your account'
+    openMenu:'Open main menu',closeMenu:'Close',languageOnly:'English only',drawerAccount:'Your account',
+    // QR verification (spec 2026-11-25-yocv-qr-verify-design): Step 4 and the employer page.
+    verifyHeading:'A QR code for employers',verifyLead:'An employer scans it to see which lines Yoma confirmed and which are your own words. Anyone with the link can open it. It never shows your phone, email or town.',
+    verifyMake:'Make a QR code for employers',verifyMaking:'Making the QR code',verifyOpen:'Open the employer view',verifyScan:'Scan to check this CV',
+    verifyCode:'Check code {code}',verifyUntil:'The check lasts until {date}.',verifyStale:'You changed the CV after making the QR code. Make a new one.',
+    errVerify:'The QR code could not be made. Try again in a moment.',errVerifyLine:'A line on the CV no longer matches your answers. Go back to Review.',errVerifyReview:'Finish the review first.',errVerifyMany:'You have made the most QR codes this session allows. Use the last one.',
+    checkTitle:'CV check',checkLead:'{name} shared this check. It shows what the YoCV prototype read from Yoma on {date}.',checkCodeLine:'Check code {code}. It should match the code printed on the CV.',
+    checkConfirmed:'Confirmed from Yoma',checkConfirmedNote:'Yoma has a record of these: learning completed and credentials issued by the organisations named.',
+    checkVouched:'Vouched for by other people',checkVouchedNote:'Confirmed by the people named, not by Yoma.',
+    checkSelf:'Self-declared',checkSelfNote:'In their own words. YoCV checked the wording against their answers. Nobody else has confirmed these lines.',
+    checkSkillsLabel:'Skills',checkExperienceLabel:'Experience',checkNone:'Nothing in this group.',checkUntil:'Valid until {date}.',
+    checkBad:'This record could not be checked. Do not rely on it.',checkExpired:'This CV check has expired. Ask the person for a new one.',checkMissing:'There is no CV check with this code.',
+    checkJson:'Signed record (JSON)',checkKey:'Signing key'
   }};
   if(typeof module!=='undefined'&&module.exports)module.exports=COPY;else root.YoCVCopy=COPY;
 })(typeof globalThis!=='undefined'?globalThis:this);
