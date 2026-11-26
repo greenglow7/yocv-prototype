@@ -11,7 +11,8 @@ const {NOW,fakeYoma}=require('./helpers/vouch-boot.cjs');
 const now=()=>NOW;
 const config={...loadConfig({env:{},cwd:fs.mkdtempSync(path.join(os.tmpdir(),'yocv-record-'))}),yomaAccessToken:''};
 test('every persona carries one sample credential per completion on Yoma\'s wallet model',()=>{
-  for(const p of personas){
+  // Halima follows the shared mock data instead: her own test below.
+  for(const p of personas.filter(x=>x.id!=='halima')){
     assert.equal(p.credentials.length,p.completions.length,p.id);
     p.credentials.forEach((c,i)=>{
       assert.equal(c.issuer,p.completions[i].organizationName); assert.ok(!/yoma/i.test(c.issuer)); assert.equal(c.title,p.completions[i].title);
@@ -95,4 +96,19 @@ test('a sample credential still links when Yoma serves a longer live title, and 
   assert.deepEqual(r.credentials.map(c=>c.completionId),['c1','c2','c3']);
   assert.deepEqual(r.selfAttested,[{evidenceId:'a1',id:'081d98d0-2094-449c-ab92-139cda908d36',name:'Pattern Making',infoURL:'https://lightcast.io/open-skills/skills/KS127LX759Q0BR1BYR7K'}]);
   assert.deepEqual(r.credentialsLeftOut,[]);
+});
+
+// The team's shared person (shared mock data, 2026-11-25): the same courses, credentials and ids in all four prototypes.
+test('readCvRecord reads Halima as the shared mock data has her',async()=>{
+  const r=await readCvRecord({accountSource:createAccountSource({config,yoma:fakeYoma(),now}),selector:{persona:'halima'}});
+  assert.equal(r.user.displayName,'Halima Yusuf'); assert.equal(r.user.city,'Kaduna North, Kaduna State');
+  assert.deepEqual(r.completions.map(c=>c.title),['Customer Service Basics','Digital Literacy Essentials','Community Tree Planting Day','Working Safely at Height','Solar PV Installation Basics']);
+  assert.ok(r.completions.every(c=>c.opportunityId===null),'fictional, so no Yoma opportunity id');
+  assert.deepEqual(r.credentials.map(c=>c.walletId),['cred-005','cred-001','cred-004','cred-003','cred-002']);
+  const skill=r.credentials.find(c=>c.walletId==='cred-002');
+  assert.equal(skill.title,'Solar PV Basics: practical challenge passed'); assert.equal(skill.issuer,'SkillLens');
+  assert.equal(skill.completionId,null,'the Skill Credential stands on its own, not on a course');
+  assert.deepEqual(skill.skills,['Photovoltaic Systems','Solar Panels']);
+  assert.equal(r.credentials.find(c=>c.walletId==='cred-003').completionId,r.completions[3].evidenceId);
+  assert.deepEqual(r.selfAttested.map(s=>s.name),['Mobile Device Troubleshooting']);
 });

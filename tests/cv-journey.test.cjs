@@ -7,7 +7,7 @@ const {buildCv,cvFingerprint,newCvState,yoidItems,withdrawnCheck,canApply,applie
 const {sampleState}=require('./helpers/cv-state.cjs');
 const {qrSvg}=require('../server/qr.js');
 const copy=require('../cv-copy.js').en;
-const LISTING=require('../data/journey.json').listing;
+const JOURNEY=require('../data/journey.json'),LISTING=JOURNEY.listing;
 const ID='0123456789abcdef',URL_='https://yocard.example/cv-check/'+ID;
 const day=iso=>iso.slice(0,10);
 const made=(state,id=ID)=>{
@@ -51,12 +51,12 @@ test('applying needs a QR for this CV, and is recorded once with the check it se
   assert.equal(canApply(s,copy),false,'no QR yet');
   made(s);
   assert.equal(canApply(s,copy),true);
-  const a=applied(s,LISTING,'2026-11-25T11:00:00.000Z');
-  assert.deepEqual(a.application,{listingId:LISTING.id,title:LISTING.title,organisation:LISTING.organisation,sentAt:'2026-11-25T11:00:00.000Z',code:'0123-4567'});
+  const a=applied(s,JOURNEY,'2026-11-25T11:00:00.000Z');
+  assert.deepEqual(a.application,{id:'app-001',name:'Job Application',listingId:'opp-job-001',title:LISTING.title,organisation:LISTING.organisation,sentAt:'2026-11-25T11:00:00.000Z',code:'0123-4567'});
   assert.equal(canApply(a,copy),false,'once only');
   const items=yoidItems(a,copy,day);
   assert.equal(items[1].kind,'application');
-  assert.equal(items[1].text,copy.yoidApplication.replace('{title}',LISTING.title).replace('{organisation}',LISTING.organisation).replace('{date}','2026-11-25'));
+  assert.equal(items[1].text,copy.yoidApplication.replace('{name}','Job Application').replace('{title}',LISTING.title).replace('{organisation}',LISTING.organisation).replace('{date}','2026-11-25'));
   s.contact.name+=' K';
   assert.equal(canApply(s,copy),false,'a stale QR is not enough');
 });
@@ -81,4 +81,13 @@ test('a live check gets a withdraw button in the list unless its QR is on the pa
   assert.deepEqual(yoidItems(s,copy,day).map(i=>i.button),[true],'still live on the server, so withdrawable from the list');
   const w=withdrawnCheck(s,ID,'2026-11-26T09:00:00.000Z');
   assert.deepEqual(yoidItems(w,copy,day).map(i=>i.button),[false],'nothing left to withdraw');
+});
+
+test('the handoff from SkillLens is named the same way as on the slides',()=>{
+  const {handoffOf}=require('../core.js');
+  const s=sampleState();
+  assert.equal(handoffOf({walletId:'cred-002'},JOURNEY,copy),'Skill Credential, from SkillLens');
+  assert.equal(handoffOf({walletId:'cred-001'},JOURNEY,copy),'');
+  assert.equal(handoffOf({walletId:'cred-002'},null,copy),'','no journey, no tag');
+  assert.ok(s);
 });

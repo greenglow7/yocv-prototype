@@ -11,17 +11,18 @@ const card=require('../server/card/draft.js');
 const reply=require('../server/card/reply.js');
 
 const ROOT=path.join(__dirname,'..'),OUT=path.join(ROOT,'handover','prompts');
-const fixture=require('../tests/fixtures/cv-thandi.json');
-const MENU=['Hairstyling','Customer service','Braiding'];
+const fixture=require('../tests/fixtures/cv-halima.json');
+const MENU=['Photovoltaic Systems','Mobile Device Troubleshooting','Customer Service'];
 
 // The CV entry as draftEntry sends it: no place, no confirm, names masked.
 function cvSample(){
   const e=fixture.entry;
   const fields={title:e.title,what:e.what,forWhom:e.forWhom,frequency:e.frequency,months:e.months,number:e.number,outcome:e.outcome};
   const {fields:masked}=core.maskNames(fields,{role:fixture.role,verbs:RULES.verbs,known:[]});
-  return buildCvMessages({role:fixture.role,entry:masked,menuNames:MENU,learningTitles:['Hair Styling: Blow-Dry, Cut, and Colour Like a Pro']});
+  return buildCvMessages({role:fixture.role,entry:masked,menuNames:MENU,learningTitles:['Solar PV Basics: practical challenge passed','Working Safely at Height']});
 }
 
+// Every sample follows the team's shared person, Halima (shared mock data, 2026-11-25).
 const PROMPTS=[
   {file:'yocv-cv-bullets.md',title:'YoCV: CV lines from one interview entry',
     where:'server/providers/schema.js (CV_SYSTEM_PROMPT, buildCvMessages, buildCvSchema); called from server/cv/draft.js, once per CV entry',
@@ -29,19 +30,19 @@ const PROMPTS=[
     after:'Every bullet that comes back is run through the checks in handover/rubrics/cv-line-checks.md before the person sees it. A refused bullet never reaches the CV; the template line replaces it.'},
   {file:'yocard-self-declared.md',title:'YoCard: the "Stated by you, not checked" part of a work card',
     where:'server/card/draft.js (SELF_SYSTEM_PROMPT, buildSelfMessages, selfDeclaredSchema)',
-    schemaName:card.SELF_SCHEMA_NAME||'yocard_self_declared',messages:card.buildSelfMessages({trade:'Hairdresser',description:'I do braids and cornrows from home, mostly on weekends.',country:'South Africa'}),schema:card.selfDeclaredSchema()},
+    schemaName:card.SELF_SCHEMA_NAME||'yocard_self_declared',messages:card.buildSelfMessages({trade:'Market seller',description:'I fix phones and sell phone accessories at my aunt\'s stall in the market.',country:'Nigeria'}),schema:card.selfDeclaredSchema()},
   {file:'yocard-confirms.md',title:'YoCard: one line per Yoma completion',
     where:'server/card/draft.js (CONFIRMS_SYSTEM_PROMPT, buildConfirmsMessages, confirmsSchema)',
-    schemaName:'yocard_confirms',messages:card.buildConfirmsMessages({trade:'Hairdresser',evidence:card.evidenceList({completions:[{evidenceId:'e1',title:'Customer Care Skills and Telephone Etiquette',organizationName:'Sample Skills Trust',dateCompleted:'2025-06-02',evidenceTypes:['File'],live:{verificationMethod:'Manual'},skills:[{name:'Customer service'}]}]})}),schema:card.confirmsSchema(['e1'])},
+    schemaName:'yocard_confirms',messages:card.buildConfirmsMessages({trade:'Market seller',evidence:card.evidenceList({completions:[{evidenceId:'e1',title:'Customer Service Basics',organizationName:'Passport to Earning',dateCompleted:'2026-03-12',evidenceTypes:[],live:{verificationMethod:'Automatic'},skills:[{name:'Customer Service'}]}]})}),schema:card.confirmsSchema(['e1'])},
   {file:'yovouch-listing.md',title:'YoVouch: read a pasted job post',
     where:'server/card/reply.js (LISTING_SYSTEM_PROMPT, listingMessages, listingSchema)',
-    schemaName:reply.SCHEMA_NAME,messages:reply.listingMessages('Need a hairdresser for braids on Saturday in town. Pay R300. Call [phone].'),schema:reply.listingSchema()},
+    schemaName:reply.SCHEMA_NAME,messages:reply.listingMessages('Need someone to fix two phone screens on Saturday at the market. Pay ₦3,000. Call [phone].'),schema:reply.listingSchema()},
   {file:'yovouch-reply.md',title:'YoVouch: pull the six reply lines out of the worker\'s spoken answer',
     where:'server/card/reply.js (REPLY_SYSTEM_PROMPT, replyMessages, replySchema)',
-    schemaName:reply.REPLY_SCHEMA_NAME,messages:reply.replyMessages('I have done braids for about three years, I can come on Saturday morning.',{rawText:'Need a hairdresser for braids on Saturday.',parsed:{work:{text:'braids'}}},'Hairdresser'),schema:reply.replySchema()},
+    schemaName:reply.REPLY_SCHEMA_NAME,messages:reply.replyMessages('I have fixed phones at my aunt\'s stall for two years, I can come on Saturday morning.',{rawText:'Need someone to fix two phone screens on Saturday.',parsed:{work:{text:'fix phone screens'}}},'Market seller'),schema:reply.replySchema()},
   {file:'yovouch-translate.md',title:'YoVouch: translate the reply lines',
     where:'server/card/reply.js (translateMessages, translateSchema)',
-    schemaName:reply.TRANSLATE_SCHEMA_NAME,messages:reply.translateMessages(['[name] can do braids.','Available: Saturday morning.'],'en','zu'),schema:reply.translateSchema()}
+    schemaName:reply.TRANSLATE_SCHEMA_NAME,messages:reply.translateMessages(['[name] can fix phone screens.','Available: Saturday morning.'],'en','pcm'),schema:reply.translateSchema()}
 ];
 
 const fence=(lang,t)=>'```'+lang+'\n'+t+'\n```';

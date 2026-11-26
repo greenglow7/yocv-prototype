@@ -229,3 +229,18 @@ Branch `yocv-journey-close`, sample mode, port 4180. Spec `docs/superpowers/spec
 | 5 | Dates on the page against the employer page | Failed, then fixed. The page printed 25 November (local time) while the employer page printed 26 November (UTC). `longDate` in `app.js` now prints in UTC, and both pages say the same day. |
 | 6 | A QR, then a skill left out on Review, back to Step 4 | Failed, then fixed. The older check was still live on the server but had no withdraw button anywhere, because the list hid the button for the check in `state.verify` even when it was stale. The rule moved into `core.js` `yoidItems` (`button`) with a test; after the fix the list showed **Withdraw this check** for it, and withdrawing gave 410 on its employer page. |
 | 7 | 375 px layout of the two new sections | Not run. The pane was hidden. Both sections reuse the `claim-card` styles of the QR panel; at the pane's width they had no sideways scroll, the buttons were 44 px tall, and both are `print-hide`. |
+
+# Shared mock data: Halima, 2026-11-25
+
+Branch `shared-mock-data`, sample mode, port 4180. Source: the team's `SHARED-MOCK-DATA.docx` (kept in git-ignored `research_notes/`). The browser pane was hidden, so the page was driven with in-page script clicks and read as text.
+
+| # | Scenario | Result |
+| --- | --- | --- |
+| 1 | Cold start with nothing in `sessionStorage` | Pass. Signs in as Halima ("Good evening, Halima"). |
+| 2 | Passport tab and Step 1 | Pass. Five completions (Passport to Earning and Kaduna Green Youth Network), five credentials; **Solar PV Basics: practical challenge passed** carries **Skill Credential, from SkillLens** on both; Mobile Device Troubleshooting under **Skills you added yourself on Yoma** as **Self-stated**. |
+| 3 | Role **Solar installation assistant**, then the phone repair entry from `tests/fixtures/cv-halima.json` | Pass. All twelve role skills resolved live on Yoma. The contact line prefilled Halima's name, sample phone and Kaduna North. Review offered the template line with **about 20 customers a week**, seven skills **Confirmed from Yoma** and Mobile Device Troubleshooting **Self-stated**. |
+| 4 | Step 4: QR, then **Send my application** | Pass. **Apply to Solar Installation Assistant (Trainee)**, Sunrise Solar Ltd, Kaduna, ₦85,000 a month; **On your Yo-ID** shows `Your YoID: yoid-ng-7f3a0123`, the CV check and `Job Application: Solar Installation Assistant (Trainee) at Sunrise Solar Ltd`. |
+| 5 | Employer page for that check | Pass. The SkillLens credential and the five courses under **Confirmed from Yoma**, **Vouched for by other people** empty, the phone repair line under **Self-declared**. |
+| 6 | Template wording keeps her first person ("my aunt's stall") | Known limitation, not new: the template copies her words and no check enforces third person (handover rubric). |
+
+Added for YoCV, not in the shared mock data (to add to `shared-mock-data.json` and tell the team): the job's place (Kaduna); completion and issue dates for the courses and the Skill Credential (the tree planting date, 29 November 2026, is from the shared data); a sample phone, `+2348005550123`, and date of birth for age 20; her interview answers in `tests/fixtures/cv-halima.json`, including "about 20 customers a week" and "daily since November 2024"; the YoCV role **Solar installation assistant**; the Lightcast skill names (Photovoltaic Systems, Solar Panels, Working at Heights, Workplace Safety, Digital Literacy, Customer Service, Community Outreach, Mobile Device Troubleshooting). Talent Finder adds her availability and five other anonymous codes (A07, A19, A31, A44, A58).

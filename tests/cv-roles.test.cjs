@@ -10,12 +10,14 @@ function fakeYoma({extra=[]}={}){
   return {async skillByName(name){return {item:known.has(name)?{id:'fake-'+name.toLowerCase().replace(/\W+/g,'-'),name,infoURL:'https://example.org/skill/'+encodeURIComponent(name)}:null,source:'live'};},
     async searchLearningOpportunities(){return {items:[],totalCount:0,source:'live'};},async reachable(){return true;}};
 }
-test('role-skills.json has the three YoCV roles and the twelve YoCard trades',()=>{
+test('role-skills.json has the four YoCV roles and the twelve YoCard trades',()=>{
   const rs=require('../data/role-skills.json');
-  assert.deepEqual(Object.keys(rs),['Retail assistant','Customer support assistant','Community outreach assistant','Hairdresser','Nail technician','Boda boda or taxi driver','Tailor','Mechanic','Electrician','Plumber','Cleaner','Cook or food seller','Market seller','Mobile money agent','General labourer']);
+  assert.deepEqual(Object.keys(rs),['Retail assistant','Customer support assistant','Community outreach assistant','Hairdresser','Nail technician','Boda boda or taxi driver','Tailor','Mechanic','Electrician','Solar installation assistant','Plumber','Cleaner','Cook or food seller','Market seller','Mobile money agent','General labourer']);
   const trades=TRADES.filter(t=>t.id!=='other');
   for(const t of trades)assert.equal(rs[t.label]?.tradeId,t.id,t.label);
   for(const [name,r] of Object.entries(rs))assert.ok(r.description&&r.skillNames.length>=6&&r.opportunityQueries.length>=1,name);
+  // The shared journey's job (shared mock data, 2026-11-25): Sunrise Solar's trainee role, every name a live Lightcast skill.
+  assert.ok(rs['Solar installation assistant'].skillNames.includes('Photovoltaic Systems'));
   assert.deepEqual(rs.Hairdresser.skillNames,['Hairstyling','Hair Care','Customer Service','Cleanliness','Time Management','Cash Handling','Reliability']);
 });
 test('buildSkillMenu drops inflation names as well as credential names',async()=>{
@@ -25,7 +27,7 @@ test('buildSkillMenu drops inflation names as well as credential names',async()=
 test('roleList returns name, description and tradeId in file order',()=>{
   const rs=require('../data/role-skills.json');
   const list=roleList(rs);
-  assert.equal(list.length,15);
+  assert.equal(list.length,16);
   assert.deepEqual(list.map(r=>r.name),Object.keys(rs));
   assert.deepEqual(list[0],{name:'Retail assistant',description:'Help customers, organise stock and support a shop.',tradeId:null});
   assert.deepEqual(list[3],{name:'Hairdresser',description:rs.Hairdresser.description,tradeId:'hair'});

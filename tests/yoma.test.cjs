@@ -201,9 +201,9 @@ test('reachable swallows unavailability instead of throwing',async()=>{
  assert.equal(await client(fetch).reachable(),false);
 });
 
-test('role-skills.json has the fifteen roles with skill names and opportunity queries',()=>{
+test('role-skills.json has the sixteen roles with skill names and opportunity queries',()=>{
  const roleSkills=require('../data/role-skills.json');
- assert.deepEqual(Object.keys(roleSkills),['Retail assistant','Customer support assistant','Community outreach assistant','Hairdresser','Nail technician','Boda boda or taxi driver','Tailor','Mechanic','Electrician','Plumber','Cleaner','Cook or food seller','Market seller','Mobile money agent','General labourer']);
+ assert.deepEqual(Object.keys(roleSkills),['Retail assistant','Customer support assistant','Community outreach assistant','Hairdresser','Nail technician','Boda boda or taxi driver','Tailor','Mechanic','Electrician','Solar installation assistant','Plumber','Cleaner','Cook or food seller','Market seller','Mobile money agent','General labourer']);
  for(const entry of Object.values(roleSkills)){
   assert.ok(Array.isArray(entry.skillNames)&&entry.skillNames.length>0);
   assert.ok(entry.skillNames.every(name=>name.length>=3&&name.length<=50));

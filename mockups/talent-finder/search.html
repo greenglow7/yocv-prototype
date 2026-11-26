@@ -14,12 +14,12 @@
   <span class="icon-button" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></span>
   <span class="wordmark">yoma</span><span class="portal-label">Partner portal</span>
   <nav class="top-links" aria-label="Partner portal sections, not clickable in the mock-up"><span>Opportunities</span><span>Verifications</span><span class="current">Talent Finder</span><span>Reports</span></nav>
-  <div class="top-actions"><span class="org-face" role="img" aria-label="Signed in as Sample Salon Group, a fictional partner">SG</span></div>
+  <div class="top-actions"><span class="org-face" role="img" aria-label="Signed in as Sunrise Solar Ltd, a fictional partner">SS</span></div>
 </header>
 <div class="mock-band" role="note">Mock-up. Not a working build. Fictional sample data. <span>Nothing on these pages searches, sends or stores anything.</span></div>
 <section class="hero"><div class="hero-inner">
   <div class="hero-head"><h1>Talent Finder</h1></div>
-  <p class="hero-line">Sample Salon Group (fictional partner). Find young people with verified skills who chose to be findable. You see skills and evidence, never names or contact details.</p>
+  <p class="hero-line">Sunrise Solar Ltd (fictional partner). Find young people with verified skills who chose to be findable. You see skills and evidence, never names or contact details.</p>
   <nav id="tabs" aria-label="Mock-up screens"><a class="pill current" href="search.html" aria-current="page"><span class="step-num">1</span>Search</a><a class="pill" href="results.html"><span class="step-num">2</span>Results</a><a class="pill" href="profile.html"><span class="step-num">3</span>Profile</a><a class="pill" href="notify.html"><span class="step-num">4</span>Notify</a><a class="pill" href="young-person.html"><span class="step-num">5</span>Young person</a></nav>
 </div></section>
 <main id="main"><div class="page">
@@ -29,11 +29,17 @@
 <div class="tf-grid">
 <form class="card" aria-labelledby="f-title" onsubmit="return false">
   <h2 id="f-title">Who are you looking for?</h2>
-  <p class="muted">Mock-up: the controls do nothing. The filters below are the sample search used on the next screens.</p>
+  <p class="muted">Mock-up: the controls do nothing. The filters below are the sample search used on the next screens: young women 18 to 24, digital skills, Kaduna.</p>
+
+  <fieldset class="filter-group"><legend><h3>Gender and age band</h3></legend>
+    <p class="field-help">As the young person set it in Yo-ID. Partners see a band, never a date of birth. Only people aged 18 or over are in this pool.</p>
+    <div class="chips tight"><span class="chip selected">Women</span><span class="chip">Men</span><span class="chip">Any gender</span></div>
+    <div class="chips tight"><span class="chip selected">18 to 24</span><span class="chip">25 to 30</span><span class="chip">Any age from 18</span></div>
+  </fieldset>
 
   <fieldset class="filter-group"><legend><h3>Skills</h3></legend>
-    <p class="field-help">Yoma skill names (Lightcast Open Skills), the same names that appear on Yo-ID and YoCV.</p>
-    <div class="chips tight"><span class="chip selected">Hairstyling</span><span class="chip selected">Customer Service</span><span class="chip">Cosmetics</span><span class="chip">Hair Care</span><span class="chip">Cash Handling</span><span class="chip add">+ Add a skill</span></div>
+    <p class="field-help">Yoma skill names (Lightcast Open Skills), the same names that appear on Yo-ID and YoCV. "Digital skills" is the skill Digital Literacy.</p>
+    <div class="chips tight"><span class="chip selected">Digital Literacy</span><span class="chip">Customer Service</span><span class="chip">Mobile Device Troubleshooting</span><span class="chip">Photovoltaic Systems</span><span class="chip">Solar Panels</span><span class="chip add">+ Add a skill</span></div>
   </fieldset>
 
   <fieldset class="filter-group"><legend><h3>Evidence for those skills</h3></legend>
@@ -46,14 +52,16 @@
   </fieldset>
 
   <fieldset class="filter-group"><legend><h3>Learning completed on Yoma</h3></legend>
-    <label class="checkbox-label"><input type="checkbox" checked> Hair Styling: Blow-Dry, Cut, and Colour Like a Pro (Alison Learning)</label>
-    <label class="checkbox-label"><input type="checkbox"> Customer Care Skills and Telephone Etiquette (Alison Learning)</label>
-    <label class="checkbox-label"><input type="checkbox"> Financial Literacy for Gig Workers (UNICEF Kenya)</label>
+    <p class="field-help">Optional. This search does not ask for a course.</p>
+    <label class="checkbox-label"><input type="checkbox"> Digital Literacy Essentials (Passport to Earning)</label>
+    <label class="checkbox-label"><input type="checkbox"> Customer Service Basics (Passport to Earning)</label>
+    <label class="checkbox-label"><input type="checkbox"> Working Safely at Height (Passport to Earning)</label>
+    <label class="checkbox-label"><input type="checkbox"> Solar PV Installation Basics (Passport to Earning)</label>
   </fieldset>
 
   <div class="filter-group fields-grid">
-    <div><label class="field-label" for="country">Country</label><select id="country"><option>South Africa</option><option>Kenya</option><option>Nigeria</option></select></div>
-    <div><label class="field-label" for="region">Region or province</label><select id="region"><option>Western Cape</option><option>Gauteng</option><option>KwaZulu-Natal</option></select><p class="field-help">The smallest area you can pick. No towns.</p></div>
+    <div><label class="field-label" for="country">Country</label><select id="country"><option>Nigeria</option><option>Kenya</option><option>South Africa</option></select></div>
+    <div><label class="field-label" for="region">State</label><select id="region"><option>Kaduna State</option><option>Kano State</option><option>Lagos State</option></select><p class="field-help">A state is the smallest area you can pick. No towns.</p></div>
   </div>
 
   <fieldset class="filter-group"><legend><h3>Availability</h3></legend>
@@ -65,8 +73,8 @@
 </form>
 
 <aside class="stack" aria-label="About this search">
-  <div class="card"><h2>7 people match</h2><p class="muted">Hairdressing skills in Western Cape, confirmed from Yoma or vouched for.</p><p class="muted" style="margin-top:8px">A count is shown only from 5 upwards. Below 5 you see "Fewer than 5" and no list.</p></div>
-  <div class="card"><h3>What you will see</h3><ul class="rule-list"><li>Trade, region and availability</li><li>Skills, each with its evidence label</li><li>Learning completed on Yoma, with the organisation and month</li></ul></div>
+  <div class="card"><h2>214 people match</h2><p class="muted">Women aged 18 to 24 in Kaduna State, Nigeria, with Digital Literacy confirmed from Yoma or vouched for.</p><p class="muted" style="margin-top:8px">A count is shown only from 5 upwards. Below 5 you see "Fewer than 5" and no list.</p></div>
+  <div class="card"><h3>What you will see</h3><ul class="rule-list"><li>Trade, state and availability</li><li>Gender and age band, as the young person set it in Yo-ID</li><li>Skills, each with its evidence label</li><li>Learning completed on Yoma, with the organisation and month</li></ul></div>
   <div class="card"><h3>What you will not see</h3><ul class="rule-list no"><li>Name, photo, town, phone number or email</li><li>Who vouched, or how many vouches</li><li>An export or download of the pool</li></ul></div>
 </aside>
 </div>

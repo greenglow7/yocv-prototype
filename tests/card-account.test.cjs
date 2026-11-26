@@ -62,10 +62,11 @@ test('ageAt returns null for missing or unparseable dates',()=>{
 
 // --- personas.json ---
 
-test('personas.json holds the six personas with real opportunity ids and confirmed phones',()=>{
+// Halima comes first so the app opens on the team's shared person (research_notes shared mock data, 2026-11-25).
+test('personas.json holds Halima and the six personas with real opportunity ids and confirmed phones',()=>{
  assert.ok(Array.isArray(personas),'personas.json must be an array');
  const ids=personas.map(p=>p.id);
- assert.deepEqual(ids,['thandi','brian','amara','sipho','lerato','bongani']);
+ assert.deepEqual(ids,['halima','thandi','brian','amara','sipho','lerato','bongani']);
  const byId=Object.fromEntries(personas.map(p=>[p.id,p]));
  assert.deepEqual(byId.thandi.completions.map(c=>c.opportunityId),[HAIR,CARE,FINLIT]);
  assert.deepEqual(byId.brian.completions.map(c=>c.opportunityId),['019e6fa0-1b36-7cba-a344-44f23ab7619d','019e6fb9-bfc4-7dd7-ac9d-c09a384c5160',FINLIT]);
@@ -79,8 +80,8 @@ test('personas.json holds the six personas with real opportunity ids and confirm
   assert.ok(p.dateYoIDOnboarded&&p.dateCreated&&p.dateOfBirth&&p.country&&p.city&&p.displayName&&p.firstName&&p.trade);
   assert.equal(p.photoURL,null);
   for(const c of p.completions){
-   // The one completion with no opportunity id is the fictional Sample Skills Trust one (plan Task 13).
-   if(c.opportunityId===null)assert.equal(c.organizationName,'Sample Skills Trust');
+   // A completion with no opportunity id is fictional: Sample Skills Trust (plan Task 13) or one from the shared mock data.
+   if(c.opportunityId===null)assert.ok(['Sample Skills Trust','Passport to Earning','Kaduna Green Youth Network'].includes(c.organizationName),c.organizationName);
    else assert.match(c.opportunityId,/^[0-9a-f-]{36}$/);
    assert.ok(c.myOpportunityId&&c.title&&c.organizationName&&c.dateCompleted);
    assert.ok(/^202[56]-/.test(c.dateCompleted),p.id+' completion dates are in 2025 or 2026');
@@ -90,12 +91,14 @@ test('personas.json holds the six personas with real opportunity ids and confirm
    assert.ok(s.id&&s.name&&Array.isArray(s.organizations)&&s.organizations.length>0);
   }
  }
+ assert.equal(ageAt(byId.halima.dateOfBirth,NOW),20);
  assert.equal(ageAt(byId.thandi.dateOfBirth,NOW),24);
  assert.equal(ageAt(byId.brian.dateOfBirth,NOW),26);
  assert.equal(ageAt(byId.amara.dateOfBirth,NOW),22);
  assert.equal(ageAt(byId.sipho.dateOfBirth,NOW),19);
  assert.equal(ageAt(byId.lerato.dateOfBirth,NOW),17);
  assert.equal(ageAt(byId.bongani.dateOfBirth,NOW),27);
+ assert.ok(byId.halima.skills.some(s=>s.name==='Photovoltaic Systems'));
  assert.ok(byId.thandi.skills.some(s=>s.name==='Cosmetics'));
  assert.ok(byId.brian.skills.some(s=>s.name==='First Aid'));
  assert.ok(byId.amara.skills.some(s=>s.name==='Sewing'));
@@ -108,11 +111,11 @@ test('createAccountSource defaults to the sample kind and lists every persona wi
  const source=createAccountSource({config,yoma:fakeYoma(),now});
  assert.equal(source.kind,'sample');
  const listed=source.listPersonas();
- assert.deepEqual(listed.map(p=>p.id),['thandi','brian','amara','sipho','lerato','bongani']);
+ assert.deepEqual(listed.map(p=>p.id),['halima','thandi','brian','amara','sipho','lerato','bongani']);
  const lerato=listed.find(p=>p.id==='lerato');
  assert.equal(lerato.age,17);
  assert.deepEqual(Object.keys(listed[0]).sort(),['age','city','displayName','firstName','id','trade']);
- assert.equal(listed[0].displayName,'Thandi Mokoena');
+ assert.equal(listed[0].displayName,'Halima Yusuf');
  assert.ok(!('phoneNumber' in listed[0]));
 });
 

@@ -1,10 +1,12 @@
 # YoCV: six-minute live demonstration
 
+The YoCV demo follows the team's shared mock data (2026-11-25): **Halima Yusuf**, 20, who fixes phones at her aunt's stall in Kaduna Central Market and applies for the Solar Installation Assistant (Trainee) job at Sunrise Solar Ltd. Everything about her is fictional and the same in all four prototypes.
+
 ## Preparation
 
 1. Put `YOVOUCH_SIM=1` in `.env`. The simulators and the `/demo` pages need it, and a gateway secret turns them off.
-2. Run `node scripts/seed-demo.js`. It publishes Thandi's card and adds her three customer vouches with sample numbers.
-3. Run `npm start` and open `http://127.0.0.1:4173`. The page opens signed in as Thandi on the Yo-ID Overview. If another person is signed in, open the avatar menu, choose **Switch account** and pick **Thandi Mokoena**, or open `http://127.0.0.1:4173/?as=thandi`. Click **Reset** in the footer so no CV draft is left from a rehearsal. Note the mode label in the footer: **Live AI · <model>** or **Sample mode**. Say which one you are in.
+2. Run `node scripts/seed-demo.js`. YoCV does not need it for Halima; the YoCard and YoVouch demos below do. It publishes Thandi's card and adds her three customer vouches with sample numbers.
+3. Run `npm start` and open `http://127.0.0.1:4173`. The page opens signed in as Halima on the Yo-ID Overview. If another person is signed in, open the avatar menu, choose **Switch account** and pick **Halima Yusuf**, or open `http://127.0.0.1:4173/?as=halima`. Click **Reset** in the footer so no CV draft is left from a rehearsal. Note the mode label in the footer: **Live AI · <model>** or **Sample mode**. Say which one you are in.
 4. Open a second tab on `http://127.0.0.1:4173/demo/cv-rejected`, the prepared refused suggestion.
 5. Keep these `.env` lines ready for the live-model switch. The first choice is Claude: it needs only a key, and `effort` is set low for the 20 s deadline. It has not been run live on the build laptop, so rehearse it as described below. The banner then reads **Live AI · claude-haiku-5-5**.
 
@@ -14,7 +16,7 @@ ANTHROPIC_API_KEY=<key>
 ANTHROPIC_MODEL=claude-haiku-5-5
 ```
 
-   The alternative is the Ollama switch, from the local model block in `.env.example`, with `ollama serve` running and the model pulled. The Ollama beat is unverified on the build laptop: the only model run there, `qwen3.5:9b`, timed out at the adapter's fixed 20 s (testing log rows 8 and 9), and `qwen2.5:3b-instruct` was never pulled. The model must answer inside 20 s, so it needs an instruct model with no reasoning pass. Rehearse whichever configuration you use before the demo: start the server with its lines, open the app, run one entry through **Continue to review** (or `POST /api/cv/review` once) and keep the server up only if the banner reads **Live AI** and a line comes back. If it does not, drop the beat and show a saved evidence record instead: the `json_object` and `json_schema` runs of Thandi's entry under `reports/2026-11-19-task-20-live-runs/`, which name the provider and the model.
+   The alternative is the Ollama switch, from the local model block in `.env.example`, with `ollama serve` running and the model pulled. The Ollama beat is unverified on the build laptop: the only model run there, `qwen3.5:9b`, timed out at the adapter's fixed 20 s (testing log rows 8 and 9), and `qwen2.5:3b-instruct` was never pulled. The model must answer inside 20 s, so it needs an instruct model with no reasoning pass. Rehearse whichever configuration you use before the demo: start the server with its lines, open the app, run one entry through **Continue to review** (or `POST /api/cv/review` once) and keep the server up only if the banner reads **Live AI** and a line comes back. If it does not, drop the beat and show a saved evidence record instead: the `json_object` and `json_schema` runs under `reports/2026-11-19-task-20-live-runs/`, which name the provider and the model. They were recorded on an earlier sample person, so say so.
 
 ```
 MODEL_PROVIDER=openai
@@ -26,43 +28,43 @@ OPENAI_STRUCTURED_OUTPUT=json_object
 
 6. Keep a clone of Yoma's public code open on `src/web/src/pages/yoid/index.tsx`, and this repository's `integration/yoma/README.md` beside it.
 
-## 0:00 to 0:45: Thandi's Yo-ID and her Yoma record
+## 0:00 to 0:45: Halima's Yo-ID and her Yoma record
 
-**Do:** start on the Overview, signed in as **Thandi Mokoena**, a fictional sample account. Point at the CV card under the four section cards.
+**Do:** start on the Overview, signed in as **Halima Yusuf**, a fictional sample account. Point at the CV card under the four section cards.
 
-**Say:** "This is Thandi's Yo-ID. Yoma's own dashboard promises a CV built from it; here it is."
+**Say:** "This is Halima's Yo-ID. She saved the solar trainee job in Phase 1, followed her Learning Plan in Phase 2 and passed the SkillLens challenge in Phase 3. Yoma's own dashboard promises a CV built from her record; here it is."
 
-**Do:** click **Open CV**. Step 1, **Confirmed from Yoma**, shows her record, already read. Tick two completions, **Hair Styling: Blow-Dry, Cut, and Colour Like a Pro** and **Customer Care Skills and Telephone Etiquette**, and their two credentials. Choose **Hairdresser**.
+**Do:** click **Open CV**. Step 1, **Confirmed from Yoma**, shows her record, already read: five completions from Passport to Earning and Kaduna Green Youth Network, and five credentials. Point at **Solar PV Basics: practical challenge passed**, tagged **Skill Credential, from SkillLens**. Leave everything ticked. Choose **Solar installation assistant**.
 
-**Say:** "This is a sample account. The CV is built from what Yoma records: completed opportunities and the credentials in the wallet. Nothing in the record can be edited here."
+**Say:** "This is the Skill Credential Charisse just showed, arriving from SkillLens. The CV is built from what Yoma records. Nothing in the record can be edited here."
 
 ## 0:45 to 1:45: Her work in her own words
 
-**Do:** answer the six questions for **Braiding at home** in Khayelitsha. What she did: *I braid hair at home for women in my street, mostly box braids and cornrows.* For whom: **customers**. How often: **a few times a week**, since March 2025. The number: **about 40 customers a week**. What was better: *Most of them come back every month.* Who could confirm it: **a vouch on my YoCard**. Click **Continue to review**.
+**Do:** answer the six questions for **Phone repair and sales** at Kaduna Central Market. What she did: *I fix phones and sell phone accessories at my aunt's stall in the market.* For whom: **customers**. How often: **daily**, since November 2024. The number: **about 20 customers a week**. What was better: *Customers come back to me when their phone breaks again.* Who could confirm it: **a person I can name** (her aunt wrote a reference letter). Click **Continue to review**.
 
-**Say:** "Her name, her phone and her town never go to the model. Names in her answers are masked before the call."
+**Say:** "Her name, her phone and her town never go to the model. Names and places in her answers are masked before the call. This part is self-declared, and the CV will say so."
 
 ## 1:45 to 2:45: The bullet next to her words, and the refused one
 
-**Do:** on Review, show the model's bullet next to her answer, with **about 40 customers a week** highlighted. Switch to the `/demo/cv-rejected` tab: a suggestion that tried **over 50** customers a week, refused as `invented_number`, and the template wording shown instead.
+**Do:** on Review, show the suggested bullet next to her answer, with **about 20 customers a week** highlighted. Switch to the `/demo/cv-rejected` tab: a suggestion that tried **over 50** customers a week, refused as `invented_number`, and the template wording shown instead.
 
 **Say:** "Every line is checked against her own words. A number she did not give is refused, and the refusal is recorded. The refused example is prepared, not a live call, and it runs through the same checks."
 
 ## 2:45 to 3:30: Skills and their evidence
 
-**Do:** show the skills list. Point at **Confirmed from Yoma** on Customer Service, from her completion. Point at the hairdressing skill carrying **Vouched by a customer, confirmed by them, not by Yoma**, from her YoCard vouches.
+**Do:** show the skills list. Point at **Confirmed from Yoma** on Photovoltaic Systems, from the Skill Credential, and on Digital Literacy, from her course. Point at **Mobile Device Troubleshooting**, labelled **Self-stated**.
 
-**Say:** "Each skill names its evidence. A skill is never confirmed on the strength of her own words. Nothing here says Yoma verified anything."
+**Say:** "Each skill names its evidence. Her solar skill is confirmed because SkillLens issued a credential for it. Her phone repair skill is her own word, and it is labelled that way. Nothing here says Yoma verified anything it did not."
 
-## 3:30 to 4:30: The profile line, the CV and the evidence record
+## 3:30 to 4:30: The CV, the QR check and the Job Application
 
-**Do:** accept the lines and the skills, then accept the profile line. Click **Continue to your CV** and **Print or save as PDF**. Then **Download evidence record (HTML)** and open it.
+**Do:** accept the lines and the skills, then accept the profile line. Click **Continue to your CV** and **Print or save as PDF**. Click **Make a QR code for employers**, then **Send my application** on **Apply to Solar Installation Assistant (Trainee)**. Point at **On your Yo-ID**: the CV check and the **Job Application**, under her YoID `yoid-ng-7f3a0123`.
 
-**Say:** "Nothing reaches the CV without an Accept. The sample account carries one small footer line on the paper. The evidence record keeps her answers, every suggestion, every refusal and the model that wrote them."
+**Say:** "This is the Job Application, the handoff back to Sunrise Solar, who wrote the job with RoleMap. It is a mock-up, and the page says nothing was sent. In Yoma it would be written to her YoID."
 
 **Optional, 45 seconds: the employer scans the QR.** Click **Make a QR code for employers** and scan it with a phone, or click **Open the employer view**. Needs `HOST=0.0.0.0` and `YOCARD_PUBLIC_URL=http://<laptop LAN IP>:4173` for a real phone scan.
 
-**Say:** "A shop owner with no HR team scans this. Green is what Yoma recorded, amber is what customers vouched for, grey is her own words, checked against her answers but confirmed by nobody. Her phone number is not on it."
+**Say:** "Sunrise Solar scans this. Green is what Yoma recorded, the Skill Credential included. Grey is her own words, checked against her answers but confirmed by nobody. Her phone number is not on it." If you withdraw the check now, the scan says it was withdrawn.
 
 ## 4:30 to 5:30: The same entry on a live model
 

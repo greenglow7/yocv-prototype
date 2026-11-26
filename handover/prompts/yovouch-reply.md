@@ -21,13 +21,13 @@ If nothing fits a field, return an empty string. Output JSON only.
 ## User message (sample, fictional, already masked)
 
 ```text
-Trade: Hairdresser
-The job: braids
+Trade: Market seller
+The job: fix phone screens
 <<<POST>>>
-Need a hairdresser for braids on Saturday.
+Need someone to fix two phone screens on Saturday.
 <<<END>>>
 <<<SPEECH>>>
-I have done braids for about three years, I can come on Saturday morning.
+I have fixed phones at my aunt's stall for two years, I can come on Saturday morning.
 <<<END>>>
 ```
 

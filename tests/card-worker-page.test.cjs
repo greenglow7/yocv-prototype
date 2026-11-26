@@ -116,7 +116,7 @@ test('card withdrawal removes the number index entry at once',async()=>{
  assert.equal(store.indexGet('numbers',store.get(id).ownerPhoneHash),null);
 });
 test('Sipho is a labourer with a confirmed phone; Bongani has one completion',()=>{
- assert.deepEqual(personas.map(x=>x.id),['thandi','brian','amara','sipho','lerato','bongani']);
+ assert.deepEqual(personas.map(x=>x.id),['halima','thandi','brian','amara','sipho','lerato','bongani']);
  assert.equal(byId.sipho.trade,'labourer'); assert.equal(byId.sipho.phoneNumberConfirmed,true);
  assert.equal(byId.bongani.completions.length,1);
 });

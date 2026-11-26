@@ -269,8 +269,15 @@
     return {...state,checks,verify:state.verify?.checkId===checkId?null:state.verify};
   }
   const canApply=(state,copy)=>!state.application&&Boolean(buildCv(state,copy).verify);
-  function applied(state,listing,atIso){
-    return {...state,application:{listingId:String(listing.id),title:String(listing.title),organisation:String(listing.organisation),sentAt:atIso,code:trim(state.verify?.code)}};
+  // journey is data/journey.json as the config serves it: the listing and the outgoing handoff's name and id.
+  function applied(state,journey,atIso){
+    const l=journey.listing,o=journey.outgoing||{};
+    return {...state,application:{id:trim(o.id),name:trim(o.name),listingId:String(l.id),title:String(l.title),organisation:String(l.organisation),sentAt:atIso,code:trim(state.verify?.code)}};
+  }
+  // The incoming handoff (the Skill Credential from SkillLens) carries its shared name wherever it is shown.
+  function handoffOf(credential,journey,copy){
+    const h=journey?.incoming;
+    return h&&credential?.walletId&&credential.walletId===h.id?fill(copy.handoffFrom,{name:h.name,from:h.from}):'';
   }
   // The mocked Yo-ID lines, oldest first. dateOf turns an ISO time into the date the page prints.
   // A live check gets a withdraw button in the list (button) unless it is the one printed on the paper, whose button
@@ -281,7 +288,7 @@
       text:c.withdrawnAt?fill(copy.yoidCheckWithdrawn,{code:c.code,made:dateOf(c.madeAt),date:dateOf(c.withdrawnAt)})
         :fill(copy.yoidCheck,{code:c.code,made:dateOf(c.madeAt),until:dateOf(c.expiresAt)})}));
     const a=state.application;
-    if(a)out.push({kind:'application',text:fill(copy.yoidApplication,{title:a.title,organisation:a.organisation,date:dateOf(a.sentAt)})});
+    if(a)out.push({kind:'application',text:fill(copy.yoidApplication,{name:a.name||copy.applicationName,title:a.title,organisation:a.organisation,date:dateOf(a.sentAt)})});
     return out;
   }
   const qrSrc=svg=>'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
@@ -417,6 +424,6 @@
     });
     return {entries,skills:[],generation:{mode:'sample-offline',provider:'browser-local',model:null,durationMs:0}};
   }
-  const api={MONTHS,WEEKDAYS,escapeHTML,shortQuote,contactsIn,numbersIn,allowedNumbers,properNouns,maskNames,restoreNames,checkCvText,monthLabel,monthsBetween,templateBullet,profileLine,buildCv,renderCvHtml,buildCvText,buildCvRecord,cvFingerprint,renderRecordHtml,newCvState,withdrawnCheck,canApply,applied,yoidItems,reviewPayload,decide,readyForCv,profileInput,offlineReview};
+  const api={MONTHS,WEEKDAYS,escapeHTML,shortQuote,contactsIn,numbersIn,allowedNumbers,properNouns,maskNames,restoreNames,checkCvText,monthLabel,monthsBetween,templateBullet,profileLine,buildCv,renderCvHtml,buildCvText,buildCvRecord,cvFingerprint,renderRecordHtml,newCvState,withdrawnCheck,canApply,applied,handoffOf,yoidItems,reviewPayload,decide,readyForCv,profileInput,offlineReview};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.YoCV=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

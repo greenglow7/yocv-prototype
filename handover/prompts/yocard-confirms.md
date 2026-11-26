@@ -20,21 +20,19 @@ Output JSON only.
 ## User message (sample, fictional, already masked)
 
 ```text
-Trade: Hairdresser
+Trade: Market seller
 Evidence list (JSON):
 [
  {
   "evidenceId": "e1",
   "kind": "completion",
-  "title": "Customer Care Skills and Telephone Etiquette",
-  "organizationName": "Sample Skills Trust",
-  "dateCompleted": "2025-06-02",
-  "evidenceTypes": [
-   "File"
-  ],
-  "verificationMethod": "Manual",
+  "title": "Customer Service Basics",
+  "organizationName": "Passport to Earning",
+  "dateCompleted": "2026-03-12",
+  "evidenceTypes": [],
+  "verificationMethod": "Automatic",
   "skills": [
-   "Customer service"
+   "Customer Service"
   ]
  }
 ]

@@ -1,6 +1,6 @@
 # Phase 4 (Workforce, YoCV): draft slide text
 
-Draft text for Nathan's slides in the final GenU deck. It goes into Charisse's master template when that exists. Lines marked **To confirm** wait on the team or on GenU. Figures come from `handover/cost-estimate.md`, which is generated from the code.
+Draft text for Nathan's slides in the final GenU deck. It goes into Charisse's master template when that exists. Lines marked **To confirm** wait on the team or on GenU. Figures come from `handover/cost-estimate.md`, which is generated from the code. Names, ids and the story follow the team's shared mock data (2026-11-25): Halima Yusuf, 20, in Kaduna.
 
 ## Midterm recap: YoCV before and after
 
@@ -21,27 +21,29 @@ For Jongmin's "What We Changed" slide. Each row is tied to a feedback point. The
 
 **Phase 4 one-liner:** YoCV turns what a young person did on Yoma, and in their own words, into a first CV an employer can check by scanning a QR code.
 
-**What arrives from Phase 3 (SkillLens):** a skill credential on the person's YoID. YoCV shows it as **Confirmed from Yoma**. **To confirm:** the handoff item's name, so it reads the same on Charisse's slide and this one.
+**In the story:** Halima builds a CV from her verified credentials and her self-declared phone repair work, makes a QR check, and applies to the Solar Installation Assistant (Trainee) job at Sunrise Solar Ltd that she saved in Phase 1.
 
-**What Phase 4 hands on:** the CV and its QR check, used to apply to the listing found in Phase 1. Step 4 now ends with an **Apply to** card for that listing, which sends the CV and its check link (a mock-up: nothing is sent). **To confirm:** the shared listing from Jongmin's mock data, so the apply screen names the same listing. It is one file, `data/journey.json`.
+**What arrives from Phase 3 (SkillLens):** the **Skill Credential** `cred-002`, "Solar PV Basics: practical challenge passed". Step 1 and the Passport tab show it tagged "Skill Credential, from SkillLens", and the CV lists it under **Confirmed from Yoma**.
 
-**YoID thread:** the CV check and the application are recorded on the person's YoID. Step 4 shows this as an **On your Yo-ID** list, a mocked write labelled "Designed, not written to Yoma". The person can already withdraw a check: the employer's scan then says it was withdrawn.
+**What Phase 4 hands on:** the **Job Application** `app-001` to `opp-job-001`, the Saved Opportunity from Phase 1. Step 4 ends with **Apply to Solar Installation Assistant (Trainee)**, which sends the CV and its check link (a mock-up: nothing is sent). The listing and the handoff names sit in one file, `data/journey.json`.
+
+**YoID thread:** the CV check and the Job Application are recorded on Halima's YoID, `yoid-ng-7f3a0123`. Step 4 shows this as an **On your Yo-ID** list, a mocked write labelled "Designed, not written to Yoma". She can already withdraw a check: the employer's scan then says it was withdrawn.
 
 ## Slide 2: Cost & Handover
 
 ### Cost estimate
 
 - **One run** is one CV: three model calls, one per piece of work. The QR check, the skill labels and the line checks make no model call.
-- **Per call:** about 740 input tokens and 150 visible output tokens. Thinking at effort `low` adds an assumed 0 to 1,000 output tokens.
+- **Per call:** about 760 input tokens and 150 visible output tokens. Thinking at effort `low` adds an assumed 0 to 1,000 output tokens.
 - **Cost per CV:**
   - Claude Opus 5.5: $0.02 to $0.08
   - Claude Sonnet 5.5: about $0.01 to $0.04
-  - Claude Haiku 5.5: under $0.002
+  - Claude Haiku 5.5: about $0.0005 to $0.002
   - A locally hosted open model: no token cost
 - **Monthly, at 10,000 CVs:**
   - Opus 5.5: about $780
   - Sonnet 5.5: about $390
-  - Haiku 5.5: about $19
+  - Haiku 5.5: about $20
 
   **To confirm:** GenU's real monthly scale, and the cost method the team agrees on.
 
@@ -75,13 +77,13 @@ Everything else is in `handover/README.md`.
 
 ## Closing slide: the four new ideas
 
-Nathan owns this slide. The rows for the other three ideas are drafts from the brief. Each owner replaces theirs with the one-sentence idea and the cost of not having it from their own slides.
+Nathan owns this slide. The examples come from the team's shared mock data, so every idea shows the same people and ids. Each owner still replaces the one-sentence idea and the cost of not having it with the text from their own slides.
 
 | Idea | For | The idea in one sentence | Today, without it | Owner |
 | --- | --- | --- | --- | --- |
-| AI review of submitted proof | GenU operations | A confidence score on photos, locations and certificates submitted as proof, flagging duplicates and AI-made images. | Every proof is checked by hand. **To confirm:** Charisse's figure. | Charisse |
-| AI co-author in the partner portal | Partners | Drafts a full opportunity listing from a short description. | Partners write each listing by hand. **To confirm:** Jongmin's figure. | Jongmin |
-| Talent Finder | Partners and employers | Partners search an anonymised pool of verified young people and notify the ones who match; the young person decides whether to share their CV. | Partners source candidates by hand, outside Yoma. See `docs/new-ideas/talent-finder-brief.md`. | Nathan |
-| Employer role definition tool | Employers | Helps an employer set out the real skills and tasks a role needs, then matches talent to it. | Generic job descriptions that match poorly. **To confirm:** Anagha's figure. | Anagha |
+| AI review of submitted proof | GenU operations | A confidence score on photos, locations and certificates submitted as proof, flagging duplicates and AI-made images. Example: four proofs for the Community Tree Planting Day; Halima's passes (0.93), and a reused photo, an AI-looking image and a mismatched certificate go to a reviewer. | Every proof is checked by hand. **To confirm:** Charisse's figure. | Charisse |
+| AI co-author in the partner portal | Partners | Drafts a full opportunity listing from a short description. Example: Arewa Tech Hub's one-line note becomes the full listing for the Kaduna Youth Green Jobs Fair. | Partners write each listing by hand. **To confirm:** Jongmin's figure. | Jongmin |
+| Talent Finder | Partners and employers | Partners search an anonymised pool of verified young people and notify the ones who match; the young person decides whether to share their CV. Example: "young women 18 to 24, digital skills, Kaduna" gives 214 matches; Halima is A12. | Partners source candidates by hand, outside Yoma. See `docs/new-ideas/talent-finder-brief.md`. | Nathan |
+| RoleMap, employer role definition | Employers | Helps an employer set out the real skills and tasks a role needs, then matches talent to it. Example: Sunrise Solar's description becomes a list of tasks and 38 matches, against 9 before the diploma requirement was dropped; Halima is A12. | Generic job descriptions that match poorly. **To confirm:** Anagha's figure. | Anagha |
 
-**The thread:** all four ideas read from or write to the same YoID record. That record is what the four prototypes build up across the journey.
+**The thread:** all four ideas read from or write to the same YoID record, Halima's `yoid-ng-7f3a0123`. That record is what the four prototypes build up across the journey, through the four handoffs: Saved Opportunity, Learning Plan, Skill Credential and Job Application.

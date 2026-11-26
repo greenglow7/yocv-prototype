@@ -200,11 +200,16 @@ test('withdrawing needs no live session, and an unknown or malformed check id is
   assert.equal((await withdraw(base,'not-an-id',{withdrawSecret:v.withdrawSecret})).status,404);
 });
 
-test('the config names the listing the CV is sent to, labelled as a sample until the shared data arrives',async()=>{
+test('the config carries the shared journey: the listing, the handoff names and Halima\'s YoID',async()=>{
   const {base}=await reviewed();
   const cfg=await (await fetch(base+'/api/cv/config')).json();
   const l=cfg.journey?.listing;
   assert.ok(l,'journey.listing in the config');
   for(const k of ['id','title','organisation','place','asks'])assert.equal(typeof l[k],'string',k);
   assert.equal(l.sample,true);
+  // The team's shared mock data (2026-11-25): the same ids and names on every slide and in every prototype.
+  assert.equal(l.id,'opp-job-001'); assert.equal(l.title,'Solar Installation Assistant (Trainee)'); assert.equal(l.organisation,'Sunrise Solar Ltd');
+  assert.deepEqual(cfg.journey.incoming,{name:'Skill Credential',id:'cred-002',from:'SkillLens'});
+  assert.deepEqual(cfg.journey.outgoing,{name:'Job Application',id:'app-001'});
+  assert.deepEqual(cfg.journey.person,{personaId:'halima',yoid:'yoid-ng-7f3a0123'});
 });

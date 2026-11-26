@@ -45,7 +45,8 @@ const DOCX_TYPE='application/vnd.openxmlformats-officedocument.wordprocessingml.
 const DRAFT_NOTICE='Draft. Nothing is saved until the person confirms it.';
 // The listing the CV is sent to at the end of Step 4 (spec 2026-11-25-yocv-journey-close-design, section 2).
 const JOURNEY=Object.freeze(JSON.parse(fs.readFileSync(path.join(__dirname,'..','..','data','journey.json'),'utf8')));
-const PREPARED_FILE=path.join(__dirname,'..','..','tests','fixtures','cv-rejected.json');
+// Halima's entry (the team's shared person); tests/fixtures/cv-rejected.json stays for the unit tests built on it.
+const PREPARED_FILE=path.join(__dirname,'..','..','tests','fixtures','cv-rejected-halima.json');
 const YM=/^(\d{4})-(0[1-9]|1[0-2])$/;
 const str=v=>v==null?'':String(v);
 const list=v=>Array.isArray(v)?v:[];

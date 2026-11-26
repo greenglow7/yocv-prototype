@@ -27,7 +27,7 @@ cd yocv-prototype
 npm start
 ```
 
-Open `http://127.0.0.1:4173`. It opens signed in as Thandi, a fictional sample person. With no keys it runs in sample mode: CV lines come from templates, and Yoma data is still read live from Yoma's public API.
+Open `http://127.0.0.1:4173`. It opens signed in as Halima Yusuf, the fictional person the four prototypes share (the team's shared mock data). The other six sample people are under Switch account. With no keys it runs in sample mode: CV lines come from templates, and Yoma data is still read live from Yoma's public API.
 
 - **Live AI.** Copy `.env.example` to `.env` and set `MODEL_PROVIDER` with its key. Claude, Azure OpenAI and any OpenAI-compatible endpoint work, a locally hosted model through Ollama included. The [main README](../README.md), section Development Setup, has the three configurations side by side.
 - **The demo pages.** Run `npm run seed:demo`, then start with `YOVOUCH_SIM=1`. The script is [presentation/demo-script.md](../presentation/demo-script.md).
@@ -42,7 +42,7 @@ No keys or secrets are in the repo. `.env` and `data/cards/` (the signing key an
 | --- | --- |
 | **Live** | Yoma's public API: skill names (Lightcast), opportunity details on each completion, and learning opportunities for the role. The model call for CV lines, when a key is set. Claude and Azure are unit-tested against a fake API only; the one live model run was a local Ollama model on 2026-11-19. |
 | **Rule-based** | Everything that decides what is true. The checks on every CV line (`rubrics/cv-line-checks.md`), the name and contact masking before a model call, the skill levels S1 to S4, the template lines, the CV paper, the Word file, the evidence record, and the signed QR check with its 90-day expiry. All of it runs in this repo with no model. |
-| **Mocked** | The Yoma account: six fictional people with sample completions and credentials, unless `YOMA_ACCESS_TOKEN` is set (implemented, not run live). The vouches, seeded through simulated SMS and WhatsApp. The Yo-ID shell around YoCV, which follows Yoma's look but is not Yoma's code. The application at the end of Step 4, to a fictional sample listing in `data/journey.json`. The **On your Yo-ID** list in Step 4: no write to YoID happens. |
+| **Mocked** | The Yoma account: seven fictional people with sample completions and credentials, Halima Yusuf from the team's shared mock data first, unless `YOMA_ACCESS_TOKEN` is set (implemented, not run live). The vouches, seeded through simulated SMS and WhatsApp. The Yo-ID shell around YoCV, which follows Yoma's look but is not Yoma's code. The application at the end of Step 4, to a fictional sample listing in `data/journey.json`. The **On your Yo-ID** list in Step 4: no write to YoID happens. |
 
 The full table, YoCard and YoVouch included, is in the main README under [Real versus simulated](../README.md#real-versus-simulated).
 

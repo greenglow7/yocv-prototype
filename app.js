@@ -31,14 +31,15 @@ const stepPills=()=>{const names=stepNames();return `<ol class="step-pills" aria
 const head=(n,title,lead)=>stepPills()+`<h2 class="step-title" tabindex="-1">${E(title)}</h2>${lead?`<p class="lead">${E(lead)}</p>`:''}`;
 const footer=(back,action,label,disabled)=>`<div class="form-footer">${back?`<button class="back-link" data-action="back">${E(copy.back)}</button>`:'<span></span>'}${action?`<button class="primary" data-action="${action}" ${disabled?'disabled':''}>${E(label)}</button>`:''}</div>`;
 /* Step 1: the record the shell read, under Confirmed from Yoma, ticked to include, never edited; then the target role. */
-function tick(kind,id,title,meta,skills){
+// handoff names the item another prototype handed over (the Skill Credential from SkillLens), as the slides name it.
+function tick(kind,id,title,meta,skills,handoff=''){
  const on=state.include[kind].includes(id);
- return `<li><label class="checkbox-label"><input type="checkbox" id="inc-${E(kind)}-${E(id)}" data-include="${E(kind)}" value="${E(id)}" ${on?'checked':''}><span class="choice-text"><strong>${E(title)}</strong>${meta?`<small>${E(meta)}</small>`:''}${skills.length?`<small>${E(fill(copy.skillsLine,{skills:skills.join(', ')}))}</small>`:''}</span></label></li>`;
+ return `<li><label class="checkbox-label"><input type="checkbox" id="inc-${E(kind)}-${E(id)}" data-include="${E(kind)}" value="${E(id)}" ${on?'checked':''}><span class="choice-text"><strong>${E(title)}</strong>${handoff?` <span class="tag recorded handoff">${E(handoff)}</span>`:''}${meta?`<small>${E(meta)}</small>`:''}${skills.length?`<small>${E(fill(copy.skillsLine,{skills:skills.join(', ')}))}</small>`:''}</span></label></li>`;
 }
 const tickList=items=>items.length?`<ul class="record-list">${items.join('')}</ul>`:`<p class="field-help">${E(copy.recordEmpty)}</p>`;
 function recordHTML(r){
  const credentials=r.wallet==='unavailable'?`<p class="notice">${E(copy.walletUnavailable)}</p>`
-  :tickList(r.credentials.map(credential=>tick('credentials',credential.id,credential.title,[fill(copy.issuedBy,{issuer:credential.issuer||copy.issuerNotStated}),credential.month].filter(Boolean).join(', '),credential.skills||[])));
+  :tickList(r.credentials.map(credential=>tick('credentials',credential.id,credential.title,[fill(copy.issuedBy,{issuer:credential.issuer||copy.issuerNotStated}),credential.month].filter(Boolean).join(', '),credential.skills||[],C.handoffOf(credential,cfg?.journey,copy))));
  return `<section class="form-section" aria-label="${E(copy.labelYoma)}"><p class="field-help">${E(copy.recordTick)}</p>`
   +`<h3>${E(copy.recordCompletions)}</h3>${tickList(r.completions.map(c=>tick('completions',c.evidenceId,c.title,[c.organizationName,c.month].filter(Boolean).join(', '),c.skills.map(s=>s.name))))}`
   +`<h3>${E(copy.recordCredentials)}</h3>${credentials}`
@@ -180,7 +181,8 @@ function applyHTML(){
 function yoidHTML(){
  const items=C.yoidItems(state,copy,isoDay);if(!items.length)return '';
  const li=i=>`<li>${E(i.text)}${i.button?` <button class="text-button" data-withdraw="${E(i.checkId)}">${E(copy.verifyWithdraw)}</button>`:''}</li>`;
- return `<section class="claim-card yoid-record print-hide" aria-labelledby="yoid-record-title"><h2 id="yoid-record-title">${E(copy.yoidHeading)}</h2><p class="field-help">${E(copy.yoidNote)}</p><ul>${items.map(li).join('')}</ul></section>`;
+ const p=cfg?.journey?.person,yoid=p&&p.personaId===state.selector?.persona?`<p class="verify-code">${E(fill(copy.yoidId,{id:p.yoid}))}</p>`:'';
+ return `<section class="claim-card yoid-record print-hide" aria-labelledby="yoid-record-title"><h2 id="yoid-record-title">${E(copy.yoidHeading)}</h2>${yoid}<p class="field-help">${E(copy.yoidNote)}</p><ul>${items.map(li).join('')}</ul></section>`;
 }
 // The withdraw call needs only the check's secret, not the CV session, so it works after the session has ended.
 async function withdrawQr(checkId){
@@ -498,7 +500,7 @@ view.addEventListener('click',async event=>{
  if(action==='print')window.print();
  if(action==='download-docx')await downloadDocx();
  if(action==='make-qr')await makeQr();
- if(action==='apply'&&C.canApply(state,copy)){state=C.applied(state,cfg.journey.listing,new Date().toISOString());rerender();document.querySelector('#apply-title')?.focus?.();}
+ if(action==='apply'&&C.canApply(state,copy)){state=C.applied(state,cfg.journey,new Date().toISOString());rerender();document.querySelector('#apply-title')?.focus?.();}
  if(action==='download-text')download('YoCV-CV.txt',C.buildCvText(C.buildCv(state,copy),copy),'text/plain;charset=utf-8');
  if(action==='download-record-html')download('YoCV-evidence.html',recordPage(C.buildCvRecord(state,copy)),'text/html;charset=utf-8');
  if(action==='download-record-json')download('YoCV-evidence.json',JSON.stringify(C.buildCvRecord(state,copy),null,2),'application/json');

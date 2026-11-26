@@ -1,5 +1,181 @@
 [
   {
+    "id": "halima",
+    "displayName": "Halima Yusuf",
+    "firstName": "Halima",
+    "trade": "market",
+    "tradeLabel": "Phone repair and sales",
+    "country": "Nigeria",
+    "city": "Kaduna North, Kaduna State",
+    "dateOfBirth": "2006-05-14T00:00:00+00:00",
+    "phoneNumber": "+2348005550123",
+    "phoneNumberConfirmed": true,
+    "emailConfirmed": true,
+    "yoIDOnboarded": true,
+    "dateYoIDOnboarded": "2026-02-18T08:30:00+00:00",
+    "dateCreated": "2026-02-16T19:12:00+00:00",
+    "photoURL": null,
+    "userId": "5e9d6f7a-8b9c-4d0e-9f1a-2b3c4d5e6f17",
+    "completions": [
+      {
+        "myOpportunityId": "0f4e1a2b-3c4d-4e5f-8a6b-7c8d9e0f1a01",
+        "opportunityId": null,
+        "title": "Customer Service Basics",
+        "organizationName": "Passport to Earning",
+        "organizationLogoURL": null,
+        "dateCompleted": "2026-03-12T10:15:00+00:00",
+        "opportunityType": "Learning",
+        "verificationMethod": "Automatic",
+        "evidenceTypes": [],
+        "skills": [
+          {"id": "448bb36e-6e5a-4c5a-9150-78703666c37a", "name": "Customer Service", "infoURL": "https://lightcast.io/open-skills/skills/KS121Z26S4VJLQ1WXN21"}
+        ]
+      },
+      {
+        "myOpportunityId": "1a5f2b3c-4d5e-4f6a-9b7c-8d9e0f1a2b02",
+        "opportunityId": null,
+        "title": "Digital Literacy Essentials",
+        "organizationName": "Passport to Earning",
+        "organizationLogoURL": null,
+        "dateCompleted": "2026-05-20T14:30:00+00:00",
+        "opportunityType": "Learning",
+        "verificationMethod": "Automatic",
+        "evidenceTypes": [],
+        "skills": [
+          {"id": "06804adb-41b0-4460-83a2-2cffe64af2a1", "name": "Digital Literacy", "infoURL": "https://lightcast.io/open-skills/skills/ESB04BCB6189A2CB271E"}
+        ]
+      },
+      {
+        "myOpportunityId": "2b6a3c4d-5e6f-4a7b-8c8d-9e0f1a2b3c03",
+        "opportunityId": null,
+        "title": "Community Tree Planting Day",
+        "organizationName": "Kaduna Green Youth Network",
+        "organizationLogoURL": null,
+        "dateCompleted": "2026-11-29T12:00:00+00:00",
+        "opportunityType": "Other",
+        "verificationMethod": "Manual",
+        "evidenceTypes": ["Picture", "Location"],
+        "skills": [
+          {"id": "8f13e31f-9b49-436c-8d19-6c2eee61baef", "name": "Community Outreach", "infoURL": "https://lightcast.io/open-skills/skills/BGS6F9F4F7DBABC95CE3"}
+        ]
+      },
+      {
+        "myOpportunityId": "3c7b4d5e-6f7a-4b8c-9d9e-0f1a2b3c4d04",
+        "opportunityId": null,
+        "title": "Working Safely at Height",
+        "organizationName": "Passport to Earning",
+        "organizationLogoURL": null,
+        "dateCompleted": "2026-10-08T09:40:00+00:00",
+        "opportunityType": "Learning",
+        "verificationMethod": "Automatic",
+        "evidenceTypes": [],
+        "skills": [
+          {"id": "26a0c301-03e7-4030-993f-912b16c9815a", "name": "Working at Heights", "infoURL": "https://lightcast.io/open-skills/skills/ES1F25BCAD7FB5B22F2F"},
+          {"id": "7bee82bb-685b-4e94-8ef7-de9934a70685", "name": "Workplace Safety", "infoURL": "https://lightcast.io/open-skills/skills/KS7G8GT6FMX6NJ5BWKF0"}
+        ]
+      },
+      {
+        "myOpportunityId": "4d8c5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e05",
+        "opportunityId": null,
+        "title": "Solar PV Installation Basics",
+        "organizationName": "Passport to Earning",
+        "organizationLogoURL": null,
+        "dateCompleted": "2026-11-02T16:05:00+00:00",
+        "opportunityType": "Learning",
+        "verificationMethod": "Automatic",
+        "evidenceTypes": [],
+        "skills": [
+          {"id": "e8228203-ed7a-4535-91e3-ddbe2aa7136a", "name": "Photovoltaic Systems", "infoURL": "https://lightcast.io/open-skills/skills/KS127SX66CYN04XRHR81"},
+          {"id": "0bc7699c-bd92-4f11-8157-9908ab7aafea", "name": "Solar Panels", "infoURL": "https://lightcast.io/open-skills/skills/KS127SW65NSYKS9RH8PN"}
+        ]
+      }
+    ],
+    "skills": [
+      {"id": "448bb36e-6e5a-4c5a-9150-78703666c37a", "name": "Customer Service", "infoURL": "https://lightcast.io/open-skills/skills/KS121Z26S4VJLQ1WXN21", "organizations": [{"id": "6b1f0c2e-3d4a-4e5b-8c6d-7e8f9a0b1c21", "name": "Passport to Earning", "logoURL": null}]},
+      {"id": "06804adb-41b0-4460-83a2-2cffe64af2a1", "name": "Digital Literacy", "infoURL": "https://lightcast.io/open-skills/skills/ESB04BCB6189A2CB271E", "organizations": [{"id": "6b1f0c2e-3d4a-4e5b-8c6d-7e8f9a0b1c21", "name": "Passport to Earning", "logoURL": null}]},
+      {"id": "8f13e31f-9b49-436c-8d19-6c2eee61baef", "name": "Community Outreach", "infoURL": "https://lightcast.io/open-skills/skills/BGS6F9F4F7DBABC95CE3", "organizations": [{"id": "7c2a1d3f-4e5b-4f6c-9d7e-8f9a0b1c2d32", "name": "Kaduna Green Youth Network", "logoURL": null}]},
+      {"id": "26a0c301-03e7-4030-993f-912b16c9815a", "name": "Working at Heights", "infoURL": "https://lightcast.io/open-skills/skills/ES1F25BCAD7FB5B22F2F", "organizations": [{"id": "6b1f0c2e-3d4a-4e5b-8c6d-7e8f9a0b1c21", "name": "Passport to Earning", "logoURL": null}]},
+      {"id": "7bee82bb-685b-4e94-8ef7-de9934a70685", "name": "Workplace Safety", "infoURL": "https://lightcast.io/open-skills/skills/KS7G8GT6FMX6NJ5BWKF0", "organizations": [{"id": "6b1f0c2e-3d4a-4e5b-8c6d-7e8f9a0b1c21", "name": "Passport to Earning", "logoURL": null}]},
+      {"id": "e8228203-ed7a-4535-91e3-ddbe2aa7136a", "name": "Photovoltaic Systems", "infoURL": "https://lightcast.io/open-skills/skills/KS127SX66CYN04XRHR81", "organizations": [{"id": "6b1f0c2e-3d4a-4e5b-8c6d-7e8f9a0b1c21", "name": "Passport to Earning", "logoURL": null}]},
+      {"id": "0bc7699c-bd92-4f11-8157-9908ab7aafea", "name": "Solar Panels", "infoURL": "https://lightcast.io/open-skills/skills/KS127SW65NSYKS9RH8PN", "organizations": [{"id": "6b1f0c2e-3d4a-4e5b-8c6d-7e8f9a0b1c21", "name": "Passport to Earning", "logoURL": null}]}
+    ],
+    "credentials": [
+      {
+        "id": "cred-005",
+        "artifactType": "JWS",
+        "schemaType": "Opportunity",
+        "typeContext": "Learning",
+        "status": "Issued",
+        "issuer": "Passport to Earning",
+        "issuerLogoURL": null,
+        "title": "Customer Service Basics",
+        "dateIssued": "2026-03-12T10:15:00+00:00",
+        "attributes": [
+          {"name": "Opportunity_Skills", "nameDisplay": "Skills", "valueDisplay": "Customer Service", "group": null, "subGroup": null, "sortOrder": null, "itemsDisplay": [{"name": "Customer Service"}]}
+        ]
+      },
+      {
+        "id": "cred-001",
+        "artifactType": "JWS",
+        "schemaType": "Opportunity",
+        "typeContext": "Learning",
+        "status": "Issued",
+        "issuer": "Passport to Earning",
+        "issuerLogoURL": null,
+        "title": "Digital Literacy Essentials",
+        "dateIssued": "2026-05-20T14:30:00+00:00",
+        "attributes": [
+          {"name": "Opportunity_Skills", "nameDisplay": "Skills", "valueDisplay": "Digital Literacy", "group": null, "subGroup": null, "sortOrder": null, "itemsDisplay": [{"name": "Digital Literacy"}]}
+        ]
+      },
+      {
+        "id": "cred-004",
+        "artifactType": "JWS",
+        "schemaType": "Opportunity",
+        "typeContext": "Learning",
+        "status": "Issued",
+        "issuer": "Kaduna Green Youth Network",
+        "issuerLogoURL": null,
+        "title": "Community Tree Planting Day",
+        "dateIssued": "2026-11-29T12:00:00+00:00",
+        "attributes": [
+          {"name": "Opportunity_Skills", "nameDisplay": "Skills", "valueDisplay": "Community Outreach", "group": null, "subGroup": null, "sortOrder": null, "itemsDisplay": [{"name": "Community Outreach"}]}
+        ]
+      },
+      {
+        "id": "cred-003",
+        "artifactType": "JWS",
+        "schemaType": "Opportunity",
+        "typeContext": "Learning",
+        "status": "Issued",
+        "issuer": "Passport to Earning",
+        "issuerLogoURL": null,
+        "title": "Working Safely at Height",
+        "dateIssued": "2026-10-08T09:40:00+00:00",
+        "attributes": [
+          {"name": "Opportunity_Skills", "nameDisplay": "Skills", "valueDisplay": "Working at Heights, Workplace Safety", "group": null, "subGroup": null, "sortOrder": null, "itemsDisplay": [{"name": "Working at Heights"}, {"name": "Workplace Safety"}]}
+        ]
+      },
+      {
+        "id": "cred-002",
+        "artifactType": "JWS",
+        "schemaType": "Opportunity",
+        "typeContext": "Learning",
+        "status": "Issued",
+        "issuer": "SkillLens",
+        "issuerLogoURL": null,
+        "title": "Solar PV Basics: practical challenge passed",
+        "dateIssued": "2026-11-03T11:20:00+00:00",
+        "attributes": [
+          {"name": "Opportunity_Skills", "nameDisplay": "Skills", "valueDisplay": "Photovoltaic Systems, Solar Panels", "group": null, "subGroup": null, "sortOrder": null, "itemsDisplay": [{"name": "Photovoltaic Systems"}, {"name": "Solar Panels"}]}
+        ]
+      }
+    ],
+    "selfAttestedSkills": [
+      {"id": "8c45b359-ad55-4f1a-a5ab-95e07eda1c25", "name": "Mobile Device Troubleshooting", "infoURL": "https://lightcast.io/open-skills/skills/BGSB3D4350996C89FB65"}
+    ]
+  },
+  {
     "id": "thandi",
     "displayName": "Thandi Mokoena",
     "firstName": "Thandi",

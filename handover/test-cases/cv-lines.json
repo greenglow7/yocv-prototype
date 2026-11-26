@@ -1,28 +1,28 @@
 {
-  "about": "CV line test cases for the checks in handover/rubrics/cv-line-checks.md. Each case is one suggested CV line for the fictional entry below, with the outcome the checks must give. tests/handover.test.cjs runs every case through server/cv/validate.js checkBullet. Add a case when you change a rule.",
-  "role": "Hairdresser",
+  "about": "CV line test cases for the checks in handover/rubrics/cv-line-checks.md. Each case is one suggested CV line for the fictional entry below (Halima, the team's shared person; the number is a sample answer, not from the shared mock data), with the outcome the checks must give. tests/handover.test.cjs runs every case through server/cv/validate.js checkBullet. Add a case when you change a rule.",
+  "role": "Solar installation assistant",
   "entry": {
-    "title": "Braiding at home",
-    "what": "I braid hair at home for women in my street, mostly box braids and cornrows.",
+    "title": "Phone repair and sales",
+    "what": "I fix phones and sell phone accessories at my aunt's stall in the market.",
     "forWhom": "customers",
-    "frequency": "a few times a week",
-    "months": {"start": "2025-03", "end": ""},
-    "number": {"value": 40, "unit": "customers a week", "hedge": "about"},
-    "outcome": "Most of them come back every month."
+    "frequency": "daily",
+    "months": {"start": "2024-11", "end": ""},
+    "number": {"value": 20, "unit": "customers a week", "hedge": "about"},
+    "outcome": "Customers come back to me when their phone breaks again."
   },
   "cases": [
-    {"text": "Braided hair at home for about 40 customers a week, mostly box braids and cornrows.", "sourceQuote": "I braid hair at home for women in my street", "expect": "ok"},
-    {"text": "Braided box braids and cornrows for women nearby a few times a week.", "sourceQuote": "mostly box braids and cornrows", "expect": "ok"},
-    {"text": "Braided hair at home for about 60 customers a week, mostly box braids.", "sourceQuote": "I braid hair at home for women in my street", "expect": "invented_number"},
-    {"text": "Braided hair at home for 40 customers a week, mostly box braids and cornrows.", "sourceQuote": "I braid hair at home for women in my street", "expect": "hedge_dropped"},
-    {"text": "Braided hair at a salon in Durban for about 40 customers a week.", "sourceQuote": "I braid hair at home for women in my street", "expect": "invented_name"},
-    {"text": "Braided hair at home for customers, call 073 555 0147 to book a slot.", "sourceQuote": "I braid hair at home for women in my street", "expect": "contact_detail"},
-    {"text": "Braided hair as an expert stylist for about 40 customers a week at home.", "sourceQuote": "I braid hair at home for women in my street", "expect": "overstated"},
-    {"text": "Managed a braiding business for about 40 customers a week at home.", "sourceQuote": "I braid hair at home for women in my street", "expect": "overstated"},
-    {"text": "Responsible for braiding hair at home for about 40 customers a week.", "sourceQuote": "I braid hair at home for women in my street", "expect": "weak_opening"},
-    {"text": "Braided hair at home.", "sourceQuote": "I braid hair at home for women in my street", "expect": "length"},
-    {"text": "Braided hair at home for about 40 customers a week. Most come back.", "sourceQuote": "I braid hair at home for women in my street", "expect": "not_one_sentence"},
-    {"text": "Braided hair at home for about 40 customers a week, mostly cornrows!", "sourceQuote": "I braid hair at home for women in my street", "expect": "exclamation"},
-    {"text": "Braided hair at home for about 40 customers a week, mostly box braids.", "sourceQuote": "I run a busy salon", "expect": "quote_not_found"}
+    {"text": "Fixed phones and sold phone accessories at a market stall for about 20 customers a week.", "sourceQuote": "I fix phones and sell phone accessories", "expect": "ok"},
+    {"text": "Repaired phones and sold accessories for customers at a market stall daily.", "sourceQuote": "sell phone accessories at my aunt's stall", "expect": "ok"},
+    {"text": "Fixed phones and sold phone accessories for about 50 customers a week.", "sourceQuote": "I fix phones and sell phone accessories", "expect": "invented_number"},
+    {"text": "Fixed phones and sold phone accessories for 20 customers a week.", "sourceQuote": "I fix phones and sell phone accessories", "expect": "hedge_dropped"},
+    {"text": "Fixed phones at a shop in Lagos for about 20 customers a week.", "sourceQuote": "I fix phones and sell phone accessories", "expect": "invented_name"},
+    {"text": "Fixed phones for customers at the market, call 0800 555 0123 to book.", "sourceQuote": "I fix phones and sell phone accessories", "expect": "contact_detail"},
+    {"text": "Fixed phones as an expert technician for about 20 customers a week.", "sourceQuote": "I fix phones and sell phone accessories", "expect": "overstated"},
+    {"text": "Managed a phone repair stall for about 20 customers a week.", "sourceQuote": "I fix phones and sell phone accessories", "expect": "overstated"},
+    {"text": "Responsible for fixing phones for about 20 customers a week at the market.", "sourceQuote": "I fix phones and sell phone accessories", "expect": "weak_opening"},
+    {"text": "Fixed phones.", "sourceQuote": "I fix phones and sell phone accessories", "expect": "length"},
+    {"text": "Fixed phones for about 20 customers a week. Most come back.", "sourceQuote": "I fix phones and sell phone accessories", "expect": "not_one_sentence"},
+    {"text": "Fixed phones and sold phone accessories for about 20 customers a week!", "sourceQuote": "I fix phones and sell phone accessories", "expect": "exclamation"},
+    {"text": "Fixed phones and sold phone accessories for about 20 customers a week.", "sourceQuote": "I run a big phone shop", "expect": "quote_not_found"}
   ]
 }

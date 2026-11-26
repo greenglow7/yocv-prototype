@@ -1,11 +1,24 @@
 {
+  "source": "BBS x GenU shared mock data, 2026-11-25. Everything here is fictional. Use the same names and ids as the other three prototypes.",
+  "person": {
+    "personaId": "halima",
+    "yoid": "yoid-ng-7f3a0123"
+  },
+  "incoming": {
+    "name": "Skill Credential",
+    "id": "cred-002",
+    "from": "SkillLens"
+  },
   "listing": {
-    "id": "sample-salon-assistant",
-    "title": "Salon assistant, weekends",
-    "organisation": "A sample partner salon",
-    "place": "Cape Town",
-    "asks": "Braiding and customer service, Saturdays and Sundays.",
-    "sample": true,
-    "note": "Fictional sample listing. To be replaced by the shared listing from Phase 1 when the team's mock data arrives."
+    "id": "opp-job-001",
+    "title": "Solar Installation Assistant (Trainee)",
+    "organisation": "Sunrise Solar Ltd",
+    "place": "Kaduna",
+    "asks": "Trainee role, ₦85,000 a month, Monday to Saturday.",
+    "sample": true
+  },
+  "outgoing": {
+    "name": "Job Application",
+    "id": "app-001"
   }
 }

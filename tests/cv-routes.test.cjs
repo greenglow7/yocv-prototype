@@ -15,12 +15,13 @@ async function thandiSession(opts={}){
   const {sessionId}=await ok(await raw(booted.base,'/api/cv/record',{persona:'thandi'}));
   return {...booted,sessionId};
 }
-test('config carries the copy, the rules, fifteen roles and the six personas',async()=>{
+test('config carries the copy, the rules, sixteen roles and the seven personas, Halima first',async()=>{
   const {base}=await bootVouch({yoma:skillYoma()});
   const c=await get(base,'/api/cv/config');
   assert.equal(c.copy.stepRecord,'Your Yoma record'); assert.equal(c.rules.inflation.length,8);
-  assert.equal(c.roles.length,15); assert.equal(c.accounts.personas.length,6);
-  assert.equal(c.accounts.personas[0].firstName,'Thandi');
+  assert.equal(c.roles.length,16); assert.equal(c.accounts.personas.length,7);
+  assert.equal(c.accounts.personas[0].firstName,'Halima');
+  assert.ok(c.roles.some(r=>r.name==='Solar installation assistant'),'the shared journey\'s role');
   for(const p of c.accounts.personas)assert.equal(typeof p.firstName,'string');
 });
 test('record then review gives Thandi\'s skills with their levels and a checked bullet',async()=>{

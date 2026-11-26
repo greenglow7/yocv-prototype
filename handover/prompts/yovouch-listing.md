@@ -23,7 +23,7 @@ If nothing fits a field, return an empty string. Output JSON only.
 
 ```text
 <<<POST>>>
-Need a hairdresser for braids on Saturday in town. Pay R300. Call [phone].
+Need someone to fix two phone screens on Saturday at the market. Pay ₦3,000. Call [phone].
 <<<END>>>
 ```
 

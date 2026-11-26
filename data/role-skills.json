@@ -163,6 +163,28 @@
       "electrical"
     ]
   },
+  "Solar installation assistant": {
+    "tradeId": null,
+    "description": "Help install and look after solar panels and their wiring, safely.",
+    "skillNames": [
+      "Photovoltaic Systems",
+      "Solar Panels",
+      "Solar Energy",
+      "Working at Heights",
+      "Workplace Safety",
+      "Electrical Wiring",
+      "Hand Tools",
+      "Mobile Device Troubleshooting",
+      "Customer Service",
+      "Teamwork",
+      "Reliability",
+      "Willingness To Learn"
+    ],
+    "opportunityQueries": [
+      "solar",
+      "electrical"
+    ]
+  },
   "Plumber": {
     "tradeId": "plumber",
     "description": "Fix leaks, clear drains and fit pipes and taps.",

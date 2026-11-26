@@ -34,24 +34,24 @@ Output: {"bullets":[{"text":"Fixed phones at [name1]'s shop after school.","used
 ## User message (sample, fictional, already masked)
 
 ```text
-Target role: Hairdresser
+Target role: Solar installation assistant
 
 <<<ENTRY>>>
-title: Braiding at home
-what: I braid hair at home for women in my street, mostly box braids and cornrows.
+title: Phone repair and sales
+what: I fix phones and sell phone accessories at my aunt's stall in the market.
 forWhom: customers
-frequency: a few times a week
-months: March 2025 to now (still doing it)
-number: about 40 customers a week
-outcome: Most of them come back every month.
+frequency: daily
+months: November 2024 to now (still doing it)
+number: about 20 customers a week
+outcome: Customers come back to me when their phone breaks again.
 <<<END>>>
 
-Learning on Yoma (context only, do not mention): Hair Styling: Blow-Dry, Cut, and Colour Like a Pro
+Learning on Yoma (context only, do not mention): Solar PV Basics: practical challenge passed; Working Safely at Height
 
 Skill list (choose only from these names):
-- Hairstyling
-- Customer service
-- Braiding
+- Photovoltaic Systems
+- Mobile Device Troubleshooting
+- Customer Service
 ```
 
 ## Output schema
@@ -110,9 +110,9 @@ Skill list (choose only from these names):
           "name": {
             "type": "string",
             "enum": [
-              "Hairstyling",
-              "Customer service",
-              "Braiding"
+              "Photovoltaic Systems",
+              "Mobile Device Troubleshooting",
+              "Customer Service"
             ]
           },
           "sourceQuote": {

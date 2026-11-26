@@ -46,7 +46,7 @@ cd yocv-prototype
 npm start
 ```
 
-Then open `http://127.0.0.1:4173`. The page opens signed in as Thandi, a fictional sample person, on the Yo-ID Overview. Without credentials the server runs in **sample mode**: the generator uses local templates, Yoma data is still live.
+Then open `http://127.0.0.1:4173`. The page opens signed in as Halima Yusuf, the fictional person the team's four prototypes share, on the Yo-ID Overview. Without credentials the server runs in **sample mode**: the generator uses local templates, Yoma data is still live.
 
 To enable **live AI mode**, copy `.env.example` to `.env` and pick the provider with `MODEL_PROVIDER`. Set to `azure`, `anthropic`, `openai` or `local`, it wins, and the server refuses to start without that provider's values. Left empty, the order is Azure if its three values are set, else Anthropic (Claude) if `ANTHROPIC_API_KEY` is set, else the OpenAI-compatible endpoint if `OPENAI_API_KEY` is set, else the local templates (sample mode). So a leftover `OPENAI_API_KEY=ollama` never beats a Claude key. So switching from Azure to a model on the laptop is a one-line change, and the Azure block can stay filled in.
 
@@ -112,15 +112,18 @@ npm test
 
 ### 🎬 Demonstrate it
 
-YoCV, Thandi's four steps. Run `npm run seed:demo` first, so her card carries three customer vouches. The full six-minute script is in `presentation/demo-script.md`.
+YoCV, Halima's four steps. Halima Yusuf, 20, fixes phones at her aunt's stall in Kaduna Central Market; the team's shared mock data (2026-11-25) gives her the same courses, credentials and ids in all four prototypes. The full six-minute script is in `presentation/demo-script.md`.
 
-The app opens signed in as Thandi on the Overview. Open CV.
+The app opens signed in as Halima on the Overview. Open CV.
 
-1. **Confirmed from Yoma.** Her record is already read. Tick two completions, **Hair Styling: Blow-Dry, Cut, and Colour Like a Pro** and **Customer Care Skills and Telephone Etiquette**, and their two credentials. Choose **Hairdresser** and click **Continue to your work**.
-2. **Your work.** Answer the six questions for **Braiding at home** in Khayelitsha. What she did: *I braid hair at home for women in my street, mostly box braids and cornrows.* For whom: **customers**. How often: **a few times a week**, since March 2025. The number: **about 40 customers a week**. What was better: *Most of them come back every month.* Who could confirm it: **a vouch on my YoCard**. Check the contact line, which the account prefills, and click **Continue to review**.
-3. **Review.** Each suggested line sits next to her words, with her number highlighted. Accept, edit or leave out every line and every skill; an edit runs the same checks. Customer Service carries **Confirmed from Yoma**, and the hairdressing skill carries **Vouched by a customer, confirmed by them, not by Yoma**. Accept the profile line and click **Continue to your CV**.
-4. **Your CV.** Click **Print or save as PDF**, then **Download evidence record (HTML)**. The record keeps her answers, `stated by Thandi, not checked` after each number she typed, every suggestion and refusal, and the provider and model. Below the CV, **Learning opportunities on Yoma for this role** lists opportunities fetched live for the role.
+1. **Confirmed from Yoma.** Her record is already read: five completions and five credentials. **Solar PV Basics: practical challenge passed** carries the tag **Skill Credential, from SkillLens**, the handoff from Phase 3. Choose **Solar installation assistant** and click **Continue to your work**.
+2. **Your work.** Answer the six questions for **Phone repair and sales** at Kaduna Central Market. What she did: *I fix phones and sell phone accessories at my aunt's stall in the market.* For whom: **customers**. How often: **daily**, since November 2024. The number: **about 20 customers a week**. What was better: *Customers come back to me when their phone breaks again.* Who could confirm it: **a person I can name**. Check the contact line, which the account prefills, and click **Continue to review**.
+3. **Review.** Each suggested line sits next to her words, with her number highlighted. Accept, edit or leave out every line and every skill; an edit runs the same checks. Photovoltaic Systems and Digital Literacy carry **Confirmed from Yoma**; Mobile Device Troubleshooting, which she added herself on Yoma, carries **Self-stated**. Accept the profile line and click **Continue to your CV**.
+4. **Your CV.** Click **Print or save as PDF**, then **Download evidence record (HTML)**. The record keeps her answers, `stated by Halima, not checked` after each number she typed, every suggestion and refusal, and the provider and model. Below the CV, **Learning opportunities on Yoma for this role** lists opportunities fetched live for the role.
 5. **The employer scans the QR.** Click **Make a QR code for employers**. The QR and a check code print at the foot of the CV. Scan it with a phone, or click **Open the employer view**. The employer page groups every line under **Confirmed from Yoma**, **Vouched for by other people** or **Self-declared**, from the server's own record, and never shows her phone, email or town. Change a line afterwards and the QR is dropped until you make a new one. Spec: `docs/superpowers/specs/2026-11-25-yocv-qr-verify-design.md`.
+6. **The Job Application.** Under the QR, **Apply to Solar Installation Assistant (Trainee)** sends the CV and its check link to Sunrise Solar Ltd, the job she saved in Phase 1 (`opp-job-001`). It is a mock-up and says so. **On your Yo-ID** then lists the CV check and the Job Application under her YoID, `yoid-ng-7f3a0123`. **Withdraw this check** ends the check early, and the employer page then says it was withdrawn.
+
+The YoCard and YoVouch demos still use Thandi and the other sample people, with the vouches `npm run seed:demo` adds.
 
 The refused suggestion: with `YOVOUCH_SIM=1`, `/demo/cv-rejected` runs a prepared suggestion that tried "over 50" customers a week through the real checks. It is refused as `invented_number`, and the template wording is shown instead. The page says `Prepared example. Not a live call.`, because a live model will not produce an error on cue.
 
@@ -136,8 +139,8 @@ What follows Yoma's look: the fixed purple top bar, the left menu drawer, the av
 
 What is not Yoma: there is no Yoma logo, favicon or image file (the wordmark is plain text), no Yoma login (the person is a fictional sample account, or the token account when `YOMA_ACCESS_TOKEN` is set), and no Yoma copyright or legal links. The footer on every tab says `Independent student prototype. Not operated by Yoma or UNICEF.`, the mode label, and, in sample mode, `The people shown are fictional sample accounts.`
 
-- **Who is signed in.** A cold start signs in as the first sample person, Thandi. A link with `?as=<id>` (for example `?as=sipho`) signs in as that person and drops the parameter from the address. The chosen id is the only thing kept in `sessionStorage`, so a reload keeps the person.
-- **The avatar menu.** The avatar opens a drawer with the person's name and town, **Switch account** (the six sample people; with a CV draft in progress it asks first, because the draft is cleared), **About this prototype**, the four section cards and **Sign out**. Signed out, every tab shows the log-in card, and **Log in** opens the account list.
+- **Who is signed in.** A cold start signs in as the first sample person, Halima. A link with `?as=<id>` (for example `?as=sipho`) signs in as that person and drops the parameter from the address. The chosen id is the only thing kept in `sessionStorage`, so a reload keeps the person.
+- **The avatar menu.** The avatar opens a drawer with the person's name and town, **Switch account** (the seven sample people; with a CV draft in progress it asks first, because the draft is cleared), **About this prototype**, the four section cards and **Sign out**. Signed out, every tab shows the log-in card, and **Log in** opens the account list.
 - **Reset** in the footer clears the CV draft and keeps the person signed in.
 
 Design and plan: `docs/superpowers/specs/2026-11-22-yoid-shell-design.md` and `docs/superpowers/plans/2026-11-22-yoid-shell.md`.
@@ -273,7 +276,7 @@ Safety rules built in: adults only (self-declared date of birth under 18 is refu
 - `scripts/seed-demo.js`: prepared demo cards, vouches, ring, referral, inbox reply and beat 3 extraction; `scripts/measure.js`: the pilot counts and the end-of-pilot clip deletion
 - `server/qr.js`: QR encoder (ISO 18004 byte mode, versions 1 to 10) with SVG output, written in-repo
 - `data/cards/`: published cards and the signing key (git-ignored)
-- `tests/`: `node --test` suites; `tests/fixtures/` holds the Thandi entry and the prepared refused suggestion; `tests/live.test.cjs` holds two model smoke tests (skipped without a model key) and two Yoma tests that call `YOMA_API_BASE` on every run (`YOCV_LIVE_YOMA=0` skips them offline)
+- `tests/`: `node --test` suites; `tests/fixtures/` holds the Thandi and Halima entries and the prepared refused suggestions (the `/demo/cv-rejected` page uses Halima's); `tests/live.test.cjs` holds two model smoke tests (skipped without a model key) and two Yoma tests that call `YOMA_API_BASE` on every run (`YOCV_LIVE_YOMA=0` skips them offline)
 - `docs/`: design specs, implementation plans, testing log, YoVouch measurement plan, pilot plan and pilot consent text
 - `presentation/`: demo script and Yoma integration notes
 

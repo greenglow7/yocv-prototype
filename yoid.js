@@ -121,7 +121,7 @@ const pillRow=(label,items)=>`<div class="pill-row" role="group" aria-label="${E
 const band=issuer=>`<div class="cred-band"><span class="issuer-mark" aria-hidden="true">${first(issuer)?E(first(issuer)):icon('passport',22)}</span></div>`;
 function credCard(c){
  return `<div class="cred-card">${band(c.issuer)}<div class="cred-body"><div class="cred-top"><span class="type-chip">${E(copy.typeLearning)}</span><span class="status-pill">${E(c.status||copy.statusIssued)}</span></div>`
-  +`<h3 class="cred-title">${E(c.title)}</h3><p class="cred-issuer">${E(c.issuer||copy.issuerNotStated)}</p>${c.month?`<p class="muted">${E(fill(copy.issuedOn,{month:c.month}))}</p>`:''}`
+  +`<h3 class="cred-title">${E(c.title)}</h3>${(h=>h?`<span class="tag recorded handoff">${E(h)}</span>`:'')(C.handoffOf(c,S.cfg?.journey,copy))}<p class="cred-issuer">${E(c.issuer||copy.issuerNotStated)}</p>${c.month?`<p class="muted">${E(fill(copy.issuedOn,{month:c.month}))}</p>`:''}`
   +`<button class="cred-button" data-credential="${E(c.id)}" aria-haspopup="dialog">${E(copy.viewCredential)}</button></div></div>`;
 }
 function oppCard(c){

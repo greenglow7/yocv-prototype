@@ -21,11 +21,11 @@ Output JSON only.
 ## User message (sample, fictional, already masked)
 
 ```text
-Trade: Hairdresser
-Country: South Africa
+Trade: Market seller
+Country: Nigeria
 
 <<<DESCRIPTION>>>
-I do braids and cornrows from home, mostly on weekends.
+I fix phones and sell phone accessories at my aunt's stall in the market.
 <<<END>>>
 ```
 

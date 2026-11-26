@@ -21,8 +21,8 @@ test.before(async()=>{
   const config={...loadConfig({env:{},cwd:fs.mkdtempSync(path.join(os.tmpdir(),'yoid-flows-'))}),yomaAccessToken:''};
   const accountSource=createAccountSource({config,yoma:fakeYoma(),now:()=>NOW});
   personas=accountSource.listPersonas().map(p=>({id:p.id,displayName:p.displayName,firstName:p.firstName,trade:p.trade,city:p.city}));
-  for(const id of ['thandi','sipho'])records[id]=await readCvRecord({accountSource,selector:{persona:id}});
-  assert.equal(records.thandi.completions.length,3);assert.equal(records.sipho.completions.length,0);
+  for(const id of ['halima','sipho'])records[id]=await readCvRecord({accountSource,selector:{persona:id}});
+  assert.equal(records.halima.completions.length,5);assert.equal(records.sipho.completions.length,0);
 });
 const settle=async()=>{for(let i=0;i<30;i++)await new Promise(r=>setImmediate(r));};
 /* An element: innerHTML, hidden, attributes, dialog open state and listeners. querySelector looks for a tag in its own
@@ -110,16 +110,17 @@ async function boot({online=true,hash='',app='real'}={}){
     tabView:()=>el('tab-view').innerHTML,cvView:()=>el('view').innerHTML,drawer:()=>el('user-drawer').innerHTML,
     show:route=>{ctx.location.hash=route;ctx.YoID.render();}};
 }
-const thandiTitle=()=>records.thandi.completions[0].title;
+// The first persona is Halima, the team's shared person (shared mock data, 2026-11-25).
+const halimaTitle=()=>records.halima.completions[0].title;
 const closeButton=dialog=>({closest:sel=>sel==='.close-dialog'?{closest:()=>dialog}:null});
 const button=dataset=>({closest:sel=>sel==='button'?{disabled:false,dataset,closest:()=>null}:null});
 
 test('boot signs in as the first persona, reads the record and stores only the id',async()=>{
   const s=await boot();
-  assert.equal(s.YoID.person().id,'thandi');assert.equal(s.YoID.record(),records.thandi);
-  assert.deepEqual([...s.storage.entries()],[['yoid.person','thandi']]);
+  assert.equal(s.YoID.person().id,'halima');assert.equal(s.YoID.record(),records.halima);
+  assert.deepEqual([...s.storage.entries()],[['yoid.person','halima']]);
   assert.equal(s.el('avatar-button').hidden,false);assert.equal(s.el('login-button').hidden,true);
-  assert.ok(s.el('greeting').innerHTML.includes('Thandi'));
+  assert.ok(s.el('greeting').innerHTML.includes('Halima'));
   assert.ok(s.tabView().includes(copy.openCv),'the Overview CV card');
 });
 test('Review Focus 1: a switch with a draft asks first; Cancel keeps the draft and the person, Switch clears and signs in',async()=>{
@@ -130,11 +131,11 @@ test('Review Focus 1: a switch with a draft asks first; Cancel keeps the draft a
   s.YoID.chooseAccount('sipho');
   assert.equal(confirmDialog.open,true,'the confirm dialog opened');
   assert.equal(s.el('confirm-title').textContent,copy.switchTitle);assert.equal(s.el('confirm-copy').textContent,copy.switchCopy);assert.equal(s.el('confirm-action').textContent,copy.switchAccount);
-  assert.equal(s.YoID.person().id,'thandi');assert.ok(!calls.slice(before).some(c=>c[0]==='clearDraft'),'nothing cleared before the answer');
+  assert.equal(s.YoID.person().id,'halima');assert.ok(!calls.slice(before).some(c=>c[0]==='clearDraft'),'nothing cleared before the answer');
   s.dom.click(closeButton(confirmDialog));
   assert.equal(confirmDialog.open,false);
   s.el('confirm-action').onclick();await settle();
-  assert.equal(s.YoID.person().id,'thandi','Cancel: the person stays');assert.equal(s.YoID.record(),records.thandi);
+  assert.equal(s.YoID.person().id,'halima','Cancel: the person stays');assert.equal(s.YoID.record(),records.halima);
   assert.deepEqual(draft,{step:1,accepted:0,ready:false,dirty:true},'Cancel: the draft stays');
   assert.ok(!calls.slice(before).some(c=>c[0]==='clearDraft'));
   s.YoID.chooseAccount('sipho');
@@ -146,9 +147,9 @@ test('Review Focus 1: a switch with a draft asks first; Cancel keeps the draft a
   assert.deepEqual([...s.storage.entries()],[['yoid.person','sipho']]);
   assert.equal(draft.step,0);
   const afterSwitch=calls.length;
-  s.YoID.chooseAccount('thandi');await settle();
-  assert.equal(confirmDialog.open,false,'no draft: no question');assert.equal(s.YoID.person().id,'thandi');
-  s.YoID.chooseAccount('thandi');await settle();
+  s.YoID.chooseAccount('halima');await settle();
+  assert.equal(confirmDialog.open,false,'no draft: no question');assert.equal(s.YoID.person().id,'halima');
+  s.YoID.chooseAccount('halima');await settle();
   assert.equal(calls.slice(afterSwitch).filter(c=>c[0]==='clearDraft').length,1,'the same account again does nothing');
 });
 test('Review Focus 2: a reload on #/cv/3 with no draft lands on CV step 1 and corrects the hash',async()=>{
@@ -157,7 +158,7 @@ test('Review Focus 2: a reload on #/cv/3 with no draft lands on CV step 1 and co
   assert.ok(s.history.includes('#/cv'),'the hash was corrected with replaceState');
   assert.equal(s.YoCVApp.draftStatus().step,0);
   assert.equal(s.el('view').hidden,false,'the CV tab is shown');
-  assert.ok(s.cvView().includes(copy.labelYoma)&&s.cvView().includes(thandiTitle()),'step 1 with the record');
+  assert.ok(s.cvView().includes(copy.labelYoma)&&s.cvView().includes(halimaTitle()),'step 1 with the record');
   assert.ok(!s.cvView().includes(copy.stepReview+'</h2>'),'not the review');
 });
 test('showStep clamps a step above maxStep to step 1 on a fresh state',()=>{
@@ -177,16 +178,16 @@ test('showStep clamps a step above maxStep to step 1 on a fresh state',()=>{
 });
 test('Review Focus 3: sign out leaves no name, no record and nothing in sessionStorage; Log in signs in again',async()=>{
   const s=await boot({hash:'#/cv'});
-  assert.ok(s.cvView().includes(thandiTitle()));
+  assert.ok(s.cvView().includes(halimaTitle()));
   s.YoID.signOut();
   assert.equal(s.YoID.person(),null);assert.equal(s.YoID.record(),null);
   assert.equal(s.storage.size,0,'sessionStorage empty');
   assert.equal(s.el('avatar-button').hidden,true);assert.equal(s.el('login-button').hidden,false);
   assert.equal(s.el('avatar-button').attrs['aria-label'],copy.drawerAccount);
-  assert.ok(!s.el('greeting').innerHTML.includes('Thandi'));
+  assert.ok(!s.el('greeting').innerHTML.includes('Halima'));
   for(const r of ['#/','#/wallet','#/passport','#/opportunities','#/skills','#/cv']){s.show(r);assert.ok(s.tabView().includes(copy.signedOutTitle)&&s.tabView().includes(copy.signedOutBody),r);}
   assert.equal(s.el('view').hidden,true,'the CV container is hidden while signed out');
-  assert.ok(!s.cvView().includes(thandiTitle()),'the record left the CV tab');
+  assert.ok(!s.cvView().includes(halimaTitle()),'the record left the CV tab');
   assert.equal(s.YoCVApp.draftStatus().step,0);
   s.el('login-button').onclick();
   const rows=[...s.drawer().matchAll(/data-account="([\w-]+)"/g)].map(m=>m[1]);
@@ -215,39 +216,39 @@ test('Review Focus 4: with no server every tab renders, the CV tab keeps the typ
 });
 test('offline after online: the drawer lists only the person read before, and a failed switch shows no stale record',async()=>{
   const s=await boot({hash:'#/cv'});
-  assert.ok(s.cvView().includes(thandiTitle()));
+  assert.ok(s.cvView().includes(halimaTitle()));
   s.net.online=false;
   // The server is gone and app.js has noticed (a failed review announces offline through yocv:draft, as goOffline does).
   s.dom.document.dispatchEvent({type:'yocv:draft',detail:{step:0,accepted:0,ready:false,dirty:false,offline:true}});
   assert.equal(s.el('footer-mode').textContent,copy.modeOffline+'.');
   s.el('login-button').onclick(); // the account list in the drawer
-  assert.deepEqual([...s.drawer().matchAll(/data-account="([\w-]+)"/g)].map(m=>m[1]),['thandi'],'one account offline');
+  assert.deepEqual([...s.drawer().matchAll(/data-account="([\w-]+)"/g)].map(m=>m[1]),['halima'],'one account offline');
   assert.ok(s.drawer().includes('data-action="switch"'),'the record in memory keeps the Switch account pill');
   s.YoID.signIn('sipho');
   await settle();
   assert.equal(s.YoID.person().id,'sipho');assert.equal(s.YoID.record(),null);
-  assert.ok(!s.cvView().includes(thandiTitle()),'the previous record left the CV tab');
+  assert.ok(!s.cvView().includes(halimaTitle()),'the previous record left the CV tab');
   assert.ok(s.cvView().includes(copy.recordOffline),'the CV tab shows its offline step 1');
-  assert.ok(!s.cvView().includes(records.thandi.user.displayName),'no previous contact name');
+  assert.ok(!s.cvView().includes(records.halima.user.displayName),'no previous contact name');
   s.show('#/skills');
   assert.ok(s.tabView().includes(copy.recordOffline)&&!s.tabView().includes('Cosmetics'),'no previous skills');
   assert.equal(s.el('footer-mode').textContent,copy.modeOffline+'.');
 });
 test('between sign-in and the record the CV tab shows the reading note, not the previous person',async()=>{
   const s=await boot({hash:'#/cv'});
-  assert.ok(s.cvView().includes(thandiTitle()));
+  assert.ok(s.cvView().includes(halimaTitle()));
   s.net.hold=true;
   const done=s.YoID.signIn('sipho');
   await settle();
   assert.ok(s.net.release,'the record read is pending');
   assert.equal(s.YoID.person().id,'sipho');
-  assert.ok(s.cvView().includes(copy.reading)&&!s.cvView().includes(thandiTitle()),'no stale ticks while reading');
+  assert.ok(s.cvView().includes(copy.reading)&&!s.cvView().includes(halimaTitle()),'no stale ticks while reading');
   s.show('#/skills');
   assert.ok(s.tabView().includes(copy.reading)&&!s.tabView().includes('Cosmetics'),'the record tabs say the shell is reading');
   s.show('#/cv');
   s.net.release();await done;await settle();
   assert.equal(s.YoID.record(),records.sipho);
-  assert.ok(s.cvView().includes(copy.recordEmpty)&&!s.cvView().includes(thandiTitle()));
+  assert.ok(s.cvView().includes(copy.recordEmpty)&&!s.cvView().includes(halimaTitle()));
 });
 test('Switch account keeps keyboard focus inside the drawer on open and on close',async()=>{
   const s=await boot({app:'stub'});
@@ -255,7 +256,7 @@ test('Switch account keeps keyboard focus inside the drawer on open and on close
   assert.equal(s.el('user-drawer').open,true);
   s.dom.click(button({action:'switch'}));
   assert.ok(s.drawer().includes('class="account-row current"'),'the list opened');
-  assert.ok(s.dom.activeElement?.tag?.includes('account-row current')&&s.dom.activeElement.tag.includes('data-account="thandi"'),'focus on the current row, got '+s.dom.activeElement?.tag);
+  assert.ok(s.dom.activeElement?.tag?.includes('account-row current')&&s.dom.activeElement.tag.includes('data-account="halima"'),'focus on the current row, got '+s.dom.activeElement?.tag);
   s.dom.click(button({action:'switch'}));
   assert.ok(!s.drawer().includes('account-row'),'the list closed');
   assert.ok(s.dom.activeElement?.tag?.includes('data-action="switch"'),'focus back on the Switch account pill, got '+s.dom.activeElement?.tag);
