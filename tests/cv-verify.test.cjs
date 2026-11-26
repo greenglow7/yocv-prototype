@@ -159,3 +159,52 @@ test('a hand-added skill reaches the check only once the skills call has stored 
   await ok(await raw(base,'/api/cv/skills',{sessionId:fresh,include,handAdded:[{name:extra}]}));
   assert.equal((await verify(base,{sessionId:fresh,cv:withExtra})).status,200);
 });
+
+// Withdrawing a check (spec docs/superpowers/specs/2026-11-25-yocv-journey-close-design.md, section 1).
+const withdraw=(base,id,body)=>raw(base,'/api/cv/verify/'+id+'/withdraw',body);
+
+test('verify returns a withdraw secret and stores only its hash',async()=>{
+  const {base,sessionId,cv,dir}=await reviewed();
+  const v=await ok(await verify(base,{sessionId,cv}));
+  assert.match(v.withdrawSecret,/^[0-9a-f]{32}$/);
+  const stored=fs.readFileSync(path.join(dir,'cv-checks',v.checkId+'.json'),'utf8');
+  assert.ok(!stored.includes(v.withdrawSecret),'the secret itself is not stored');
+  const payload=Buffer.from(JSON.parse(stored).jwt.split('.')[1],'base64url').toString('utf8');
+  assert.ok(!payload.includes('withdraw'),'the signed record does not change');
+});
+
+test('the person withdraws a check, after which the page and the JSON say so and show nothing',async()=>{
+  const {base,sessionId,cv}=await reviewed();
+  const v=await ok(await verify(base,{sessionId,cv}));
+  assert.equal((await withdraw(base,v.checkId,{withdrawSecret:'0'.repeat(32)})).status,403,'a wrong secret');
+  assert.equal((await withdraw(base,v.checkId,{})).status,403,'no secret');
+  assert.equal((await pageOf(base,v.checkId)).status,200,'still open after a refused withdrawal');
+  const w=await ok(await withdraw(base,v.checkId,{withdrawSecret:v.withdrawSecret}));
+  assert.equal(w.checkId,v.checkId); assert.equal(Date.parse(w.withdrawnAt),NOW);
+  const r=await pageOf(base,v.checkId);
+  assert.equal(r.status,410); assertHonestPage(r.html);
+  for(const part of copy.checkWithdrawn.split('{date}'))assert.ok(r.html.includes(part),'withdrawn notice: '+part);
+  assert.ok(!r.html.includes('Thandi'),'no content once withdrawn');
+  const j=await fetch(base+'/cv-check/'+v.checkId+'.json');
+  assert.equal(j.status,410); assert.equal((await j.json()).error.code,'withdrawn');
+  assert.equal((await withdraw(base,v.checkId,{withdrawSecret:v.withdrawSecret})).status,410,'already withdrawn');
+});
+
+test('withdrawing needs no live session, and an unknown or malformed check id is refused',async()=>{
+  const {base,sessionId,cv,clock}=await reviewed();
+  const v=await ok(await verify(base,{sessionId,cv}));
+  clock.t=NOW+2*DAY;
+  assert.equal((await verify(base,{sessionId,cv})).status,410,'the CV session has expired');
+  await ok(await withdraw(base,v.checkId,{withdrawSecret:v.withdrawSecret}));
+  assert.equal((await withdraw(base,'0123456789abcdef',{withdrawSecret:v.withdrawSecret})).status,404);
+  assert.equal((await withdraw(base,'not-an-id',{withdrawSecret:v.withdrawSecret})).status,404);
+});
+
+test('the config names the listing the CV is sent to, labelled as a sample until the shared data arrives',async()=>{
+  const {base}=await reviewed();
+  const cfg=await (await fetch(base+'/api/cv/config')).json();
+  const l=cfg.journey?.listing;
+  assert.ok(l,'journey.listing in the config');
+  for(const k of ['id','title','organisation','place','asks'])assert.equal(typeof l[k],'string',k);
+  assert.equal(l.sample,true);
+});

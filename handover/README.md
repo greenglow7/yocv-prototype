@@ -42,7 +42,7 @@ No keys or secrets are in the repo. `.env` and `data/cards/` (the signing key an
 | --- | --- |
 | **Live** | Yoma's public API: skill names (Lightcast), opportunity details on each completion, and learning opportunities for the role. The model call for CV lines, when a key is set. Claude and Azure are unit-tested against a fake API only; the one live model run was a local Ollama model on 2026-11-19. |
 | **Rule-based** | Everything that decides what is true. The checks on every CV line (`rubrics/cv-line-checks.md`), the name and contact masking before a model call, the skill levels S1 to S4, the template lines, the CV paper, the Word file, the evidence record, and the signed QR check with its 90-day expiry. All of it runs in this repo with no model. |
-| **Mocked** | The Yoma account: six fictional people with sample completions and credentials, unless `YOMA_ACCESS_TOKEN` is set (implemented, not run live). The vouches, seeded through simulated SMS and WhatsApp. The Yo-ID shell around YoCV, which follows Yoma's look but is not Yoma's code. No write to YoID happens. |
+| **Mocked** | The Yoma account: six fictional people with sample completions and credentials, unless `YOMA_ACCESS_TOKEN` is set (implemented, not run live). The vouches, seeded through simulated SMS and WhatsApp. The Yo-ID shell around YoCV, which follows Yoma's look but is not Yoma's code. The application at the end of Step 4, to a fictional sample listing in `data/journey.json`. The **On your Yo-ID** list in Step 4: no write to YoID happens. |
 
 The full table, YoCard and YoVouch included, is in the main README under [Real versus simulated](../README.md#real-versus-simulated).
 
@@ -52,7 +52,8 @@ The full table, YoCard and YoVouch included, is in the main README under [Real v
 - **First person.** The prompt asks for no first person, but no check enforces it.
 - **Names.** Lowercase names of other people are not masked before the model call.
 - **Language.** English only.
-- **The QR check.** It cannot be withdrawn early, is not in the Word file, does not re-read Yoma when scanned, and is not written to YoID.
+- **The QR check.** The person can withdraw it early, but only from the page that made it, since the withdraw secret is kept in memory. It is not in the Word file, does not re-read Yoma when scanned, and is not written to YoID.
+- **The listing.** Step 4 applies to a fictional sample listing until the team's shared Phase 1 listing replaces `data/journey.json`.
 - **No real sign-in.** There is no Yoma sign-in flow. A real account needs a Yoma-issued client and the person's consent.
 - **Storage.** Single host, JSON files, no database.
 - **Accessibility.** Some buttons are below the 44 px touch target. No screen reader pass yet.
@@ -61,7 +62,7 @@ The full table, YoCard and YoVouch included, is in the main README under [Real v
 
 1. **The CV service in Yoma's API.** [integration/yoma/](../integration/yoma/README.md) is a C# pack laid out at the paths it would take in Yoma's repository. It has the model client behind an interface, the CV service with the checks ported, a controller and tests. It reads only from Yoma's existing services and adds no table. It has not been compiled. Next: the Yoma API owner compiles it, runs the tests and reviews the role skill menus.
 2. **The screens in Yo-ID.** The four steps are plain HTML and JavaScript. They would be rebuilt in Yoma's web app on the team's shared design kit, and combined with the Liquid Thought YoID mobile sharing prototype. The CV and its QR would sit beside the public share link.
-3. **The QR check.** Today it is signed with YoCard's key. In Yoma it would be signed with Yoma's key and written to the person's YoID, so the person can see and withdraw it.
+3. **The QR check.** Today it is signed with YoCard's key, and the person withdraws it with a secret held by the page. In Yoma it would be signed with Yoma's key and written to the person's YoID, so the person can see and withdraw it from any device. The **On your Yo-ID** list in Step 4 shows what that record would hold.
 4. **WhatsApp.** `POST /api/cv/draft` and [integration/rapidpro/yocv-draft-flow.json](../integration/rapidpro/yocv-draft-flow.json) let a RapidPro flow draft CV lines in a chat. The flow is untested against a RapidPro instance.
 
 **Still missing before a pilot:**

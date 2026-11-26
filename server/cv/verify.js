@@ -4,7 +4,9 @@
    session's Yoma record and ticks, each skill's level and label from the session's own skills answer, and every bullet
    must pass checkBullet against an entry of the session again (AGENTS rule 5). The browser's labels are never used.
    No phone, email, town, optional field, photo or profile line is copied into a check.
-   checkPage renders the employer's page; createCheckStore keeps one signed JWS per check under <dir>. */
+   checkPage renders the employer's page; createCheckStore keeps one signed JWS per check under <dir>, with the hash
+   of its withdraw secret and the time it was withdrawn (spec 2026-11-25-yocv-journey-close-design). */
+const crypto=require('node:crypto');
 const fs=require('node:fs');
 const path=require('node:path');
 const {flowPage}=require('../card/pages.js');
@@ -72,12 +74,13 @@ function buildCheck({session,cv,checkBullet,copy,checkId,nowMs,monthsOf,hasConta
     learning:confirmedLearning(session.record,session.include,copy),skills,experience}};
 }
 
-// The employer's page: state ok, bad (the signature failed), expired or missing. Server-rendered, no script.
-function checkPage({state,record,copy}){
+// The employer's page: state ok, bad (the signature failed), expired, withdrawn or missing. Server-rendered, no script.
+function checkPage({state,record,copy,withdrawnAt=null}){
   const p=(t,cls)=>'<p'+(cls?' class="'+cls+'"':'')+'>'+E(t)+'</p>',ul=items=>items.length?'<ul>'+items.map(t=>'<li>'+E(t)+'</li>').join('')+'</ul>':p(copy.checkNone,'small');
   const say=text=>flowPage({title:copy.checkTitle,body:'<section><h1>'+E(copy.checkTitle)+'</h1>'+p(text,'notice')+'</section>'});
   if(state==='missing')return say(copy.checkMissing);
   if(state==='expired')return say(copy.checkExpired);
+  if(state==='withdrawn')return say(fill(copy.checkWithdrawn,{date:withdrawnAt?dateOf(Date.parse(withdrawnAt)):''}));
   if(state!=='ok')return say(copy.checkBad);
   const r=record,skillLine=k=>fill(copy.cvSkillLine,k);
   const ofLevel=test=>r.skills.filter(k=>test(k.level)).map(skillLine);
@@ -100,12 +103,26 @@ function checkPage({state,record,copy}){
 }
 
 function createCheckStore(dir){
+  const file=id=>path.join(dir,id+'.json');
+  const read=id=>{
+    if(!CHECK_ID.test(str(id)))return null;
+    try{const v=JSON.parse(fs.readFileSync(file(id),'utf8'));return typeof v?.jwt==='string'?v:null;}catch{return null;}
+  };
+  const hash=secret=>crypto.createHash('sha256').update(str(secret)).digest();
   return {
     dir,
-    put(id,jwt){fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(path.join(dir,id+'.json'),JSON.stringify({jwt}),{mode:0o600});},
-    get(id){
-      if(!CHECK_ID.test(str(id)))return null;
-      try{const v=JSON.parse(fs.readFileSync(path.join(dir,id+'.json'),'utf8'));return typeof v?.jwt==='string'?v.jwt:null;}catch{return null;}
+    // withdrawSecret is optional: only its SHA-256 hash is kept, beside the signed check and outside it.
+    put(id,jwt,withdrawSecret){fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(file(id),JSON.stringify({jwt,...(withdrawSecret?{withdrawHash:hash(withdrawSecret).toString('hex')}:{})}),{mode:0o600});},
+    get(id){return read(id)?.jwt??null;},
+    withdrawnAt(id){const v=read(id);return typeof v?.withdrawnAt==='string'?v.withdrawnAt:null;},
+    // 'ok', 'missing', 'forbidden' or 'withdrawn'. The secret is compared in constant time.
+    withdraw(id,secret,atIso){
+      const v=read(id);if(!v)return 'missing';
+      const want=Buffer.from(str(v.withdrawHash),'hex');
+      if(typeof secret!=='string'||!secret||want.length!==32||!crypto.timingSafeEqual(want,hash(secret)))return 'forbidden';
+      if(v.withdrawnAt)return 'withdrawn';
+      fs.writeFileSync(file(id),JSON.stringify({...v,withdrawnAt:atIso}),{mode:0o600});
+      return 'ok';
     }
   };
 }

@@ -215,3 +215,17 @@ Branch `yocv-qr-verify`, sample mode, port 4180 (4173 was held by another local 
 | 9 | Talent Finder mock-ups, `mockups/talent-finder/` | Pass (browser pane, served by `python3 -m http.server` on port 4190, since the pane cannot drive `file://` pages). The partner screens at 1280 px and the young person screen at 375 px (no sideways scroll). Every link between the six pages answered 200. Every page carries `Mock-up. Not a working build. Fictional sample data.` and `Not operated by Yoma or UNICEF`. No persona name, town, phone or email on any page. The only console error was a missing favicon. |
 | 10 | Handover package, `handover/` | Pass. `tests/handover.test.cjs`: the exported prompts and the cost estimate match the code (an edited file makes the test and `npm run handover -- --check` fail), every CV line test case gives its named outcome, the rubric names every refusal reason in `cv-copy.js`. |
 
+
+# YoCV closes the journey, 2026-11-25
+
+Branch `yocv-journey-close`, sample mode, port 4180. Spec `docs/superpowers/specs/2026-11-25-yocv-journey-close-design.md`. The browser pane was hidden, so the page was driven with in-page script clicks and read as text; no screenshots.
+
+| # | Scenario | Result |
+| --- | --- | --- |
+| 1 | Suite: `npm test` with the new withdraw tests in `tests/cv-verify.test.cjs` and `tests/cv-journey.test.cjs` | Pass. `ℹ tests 652`, `ℹ pass 650`, `ℹ fail 0`, `ℹ skipped 2` (the two live model tests). |
+| 2 | Thandi, Hairdresser, Braiding at home, every line and skill accepted, Step 4 before any QR | Pass. **Apply to Salon assistant, weekends** shows the sample listing, `Fictional sample listing, not a real opportunity.`, `Make the QR code first…` and a disabled **Send my application**. |
+| 3 | Make a QR, then **Send my application** | Pass. The notice reads `Mock-up: nothing was sent. In Yoma this would go to A sample partner salon with your CV and its check link.` **On your Yo-ID** lists the check with its code and end date, then the application, under `Designed, not written to Yoma…`. |
+| 4 | **Withdraw this check** under the QR | Pass. The dialog asks first; after it the QR leaves the paper, the make button comes back, the toast says `Check withdrawn. The QR code now says so.`, the list says `withdrawn`, and the employer page answers 410 with `The person withdrew this check on …` and no name. The JSON answers 410. |
+| 5 | Dates on the page against the employer page | Failed, then fixed. The page printed 25 November (local time) while the employer page printed 26 November (UTC). `longDate` in `app.js` now prints in UTC, and both pages say the same day. |
+| 6 | A QR, then a skill left out on Review, back to Step 4 | Failed, then fixed. The older check was still live on the server but had no withdraw button anywhere, because the list hid the button for the check in `state.verify` even when it was stale. The rule moved into `core.js` `yoidItems` (`button`) with a test; after the fix the list showed **Withdraw this check** for it, and withdrawing gave 410 on its employer page. |
+| 7 | 375 px layout of the two new sections | Not run. The pane was hidden. Both sections reuse the `claim-card` styles of the QR panel; at the pane's width they had no sideways scroll, the buttons were 44 px tall, and both are `print-hide`. |

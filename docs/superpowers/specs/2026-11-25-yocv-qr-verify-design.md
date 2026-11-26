@@ -42,7 +42,7 @@ Stored under `data/cards/cv-checks/` (git-ignored). The URL base is `YOCARD_PUBL
 
 ## 5. Out of scope, listed as limitations
 
-- Withdrawing a check before it expires.
+- Withdrawing a check before it expires. Added later by `2026-11-25-yocv-journey-close-design.md`.
 - The QR in the Word file.
 - A live re-check against Yoma when the employer scans. The page shows what Yoma said when the check was made.
 - A YoID write of the check. That belongs to the shared journey work.

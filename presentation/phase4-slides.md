@@ -23,9 +23,9 @@ For Jongmin's "What We Changed" slide. Each row is tied to a feedback point. The
 
 **What arrives from Phase 3 (SkillLens):** a skill credential on the person's YoID. YoCV shows it as **Confirmed from Yoma**. **To confirm:** the handoff item's name, so it reads the same on Charisse's slide and this one.
 
-**What Phase 4 hands on:** the CV and its QR check, used to apply to the listing found in Phase 1. **To confirm:** the shared listing from Jongmin's mock data, so the apply screen names the same listing.
+**What Phase 4 hands on:** the CV and its QR check, used to apply to the listing found in Phase 1. Step 4 now ends with an **Apply to** card for that listing, which sends the CV and its check link (a mock-up: nothing is sent). **To confirm:** the shared listing from Jongmin's mock data, so the apply screen names the same listing. It is one file, `data/journey.json`.
 
-**YoID thread:** the CV check would be recorded on the person's YoID, so they can see and withdraw it. This is designed, not built.
+**YoID thread:** the CV check and the application are recorded on the person's YoID. Step 4 shows this as an **On your Yo-ID** list, a mocked write labelled "Designed, not written to Yoma". The person can already withdraw a check: the employer's scan then says it was withdrawn.
 
 ## Slide 2: Cost & Handover
 
@@ -56,8 +56,8 @@ The figures below are **assumptions, to confirm with GenU**:
 ### What is live, rule-based and mocked
 
 - **Live:** Yoma's public API, and the model call when a key is set. The one live model run so far was on a local open model.
-- **Rule-based:** everything that decides what is true. That covers the line checks, the masking, the skill labels, the signed QR check, the CV paper and the Word file.
-- **Mocked:** the Yoma accounts, which are fictional people; the vouches, sent through simulated SMS and WhatsApp; and the YoID write.
+- **Rule-based:** everything that decides what is true. That covers the line checks, the masking, the skill labels, the signed QR check and its withdrawal, the CV paper and the Word file.
+- **Mocked:** the Yoma accounts, which are fictional people; the vouches, sent through simulated SMS and WhatsApp; the application to the listing; and the YoID write.
 
 ### Handover
 

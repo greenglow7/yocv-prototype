@@ -153,18 +153,48 @@ function cvStep(){
  const paper=C.renderCvHtml(C.buildCv(state,copy),copy,{headingLevel:2});
  return head(4,copy.stepCv,copy.cvLead)+paper
   +`<div class="export-actions"><button class="primary" data-action="print">${E(copy.printCv)}</button><button class="secondary" data-action="download-text">${E(copy.downloadText)}</button>${state.offline?'':`<button class="secondary" data-action="download-docx">${E(copy.downloadDocx)}</button>`}<button class="secondary" data-action="download-record-html">${E(copy.downloadRecordHtml)}</button><button class="secondary" data-action="download-record-json">${E(copy.downloadRecordJson)}</button></div>`
-  +(state.offline?'':`<p class="field-help">${E(copy.downloadDocxHelp)}</p>`)+verifyHTML()+oppsHTML()+footer(true);
+  +(state.offline?'':`<p class="field-help">${E(copy.downloadDocxHelp)}</p>`)+verifyHTML()+applyHTML()+yoidHTML()+oppsHTML()+footer(true);
 }
 /* The QR for employers (spec 2026-11-25-yocv-qr-verify-design): made by the server from its own session, hidden offline.
    A QR made before the CV changed is dropped by buildCv, so the button comes back with a note. */
 const qrSrc=svg=>'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
-const longDate=iso=>{const t=Date.parse(iso);return Number.isFinite(t)?new Date(t).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}):'';};
+// In UTC, as the employer page prints the same dates (server/cv/verify.js dateOf), so both say the same day.
+const longDate=iso=>{const t=Date.parse(iso);return Number.isFinite(t)?new Date(t).toLocaleDateString('en-GB',{timeZone:'UTC',day:'numeric',month:'long',year:'numeric'}):'';};
 function verifyHTML(){
  if(state.offline)return '';
  const v=C.buildCv(state,copy).verify,stale=Boolean(state.verify)&&!v;
- const body=v?`<div class="verify-made"><img class="verify-qr" src="${E(qrSrc(v.qrSvg))}" alt="${E(copy.verifyScan)}" width="180" height="180"><div><p class="verify-code">${E(fill(copy.verifyCode,{code:v.code}))}</p><p class="field-help">${E(fill(copy.verifyUntil,{date:longDate(v.expiresAt)}))}</p><p class="field-help verify-url">${E(v.url)}</p><a class="secondary small" id="verify-open" href="${E(v.url)}" target="_blank" rel="noopener noreferrer">${E(copy.verifyOpen)}</a></div></div>`
+ const body=v?`<div class="verify-made"><img class="verify-qr" src="${E(qrSrc(v.qrSvg))}" alt="${E(copy.verifyScan)}" width="180" height="180"><div><p class="verify-code">${E(fill(copy.verifyCode,{code:v.code}))}</p><p class="field-help">${E(fill(copy.verifyUntil,{date:longDate(v.expiresAt)}))}</p><p class="field-help verify-url">${E(v.url)}</p><div class="action-row"><a class="secondary small" id="verify-open" href="${E(v.url)}" target="_blank" rel="noopener noreferrer">${E(copy.verifyOpen)}</a><button class="text-button" data-withdraw="${E(state.verify.checkId)}">${E(copy.verifyWithdraw)}</button></div></div></div>`
   :`${stale?`<p class="notice">${E(copy.verifyStale)}</p>`:''}<div class="action-row"><button class="secondary" data-action="make-qr" ${ui.busy?'disabled':''}>${E(ui.busy?copy.verifyMaking:copy.verifyMake)}</button></div>`;
  return `<section class="claim-card verify print-hide" aria-labelledby="verify-title"><h2 id="verify-title">${E(copy.verifyHeading)}</h2><p class="field-help">${E(copy.verifyLead)}</p>${body}</section>`;
+}
+/* The close of the journey (spec 2026-11-25-yocv-journey-close-design): apply to the listing with the CV and its check,
+   then the mocked Yo-ID list. Neither sends anything: the application is a mock-up and no YoID write happens. */
+const isoDay=iso=>longDate(iso)||String(iso??'').slice(0,10);
+function applyHTML(){
+ const l=cfg?.journey?.listing;if(state.offline||!l)return '';
+ const sent=state.application,can=C.canApply(state,copy);
+ const body=sent?`<p class="notice" role="status">${E(fill(copy.applySent,{organisation:sent.organisation}))}</p>`
+  :`<p class="field-help">${E(can?copy.applySends:copy.applyNeedsQr)}</p><div class="action-row"><button class="primary" data-action="apply" ${can?'':'disabled'}>${E(copy.applyButton)}</button></div>`;
+ return `<section class="claim-card apply print-hide" aria-labelledby="apply-title"><h2 id="apply-title" tabindex="-1">${E(fill(copy.applyHeading,{title:l.title}))}</h2><p>${E(fill(copy.applyLead,{organisation:l.organisation,place:l.place,asks:l.asks}))}</p>${l.sample?`<p class="field-help">${E(copy.applySample)}</p>`:''}${body}</section>`;
+}
+function yoidHTML(){
+ const items=C.yoidItems(state,copy,isoDay);if(!items.length)return '';
+ const li=i=>`<li>${E(i.text)}${i.button?` <button class="text-button" data-withdraw="${E(i.checkId)}">${E(copy.verifyWithdraw)}</button>`:''}</li>`;
+ return `<section class="claim-card yoid-record print-hide" aria-labelledby="yoid-record-title"><h2 id="yoid-record-title">${E(copy.yoidHeading)}</h2><p class="field-help">${E(copy.yoidNote)}</p><ul>${items.map(li).join('')}</ul></section>`;
+}
+// The withdraw call needs only the check's secret, not the CV session, so it works after the session has ended.
+async function withdrawQr(checkId){
+ const c=(state.checks||[]).find(x=>x.checkId===checkId);if(!c||ui.busy)return;
+ ui.busy=true;rerender();
+ const d=deadline();let res;
+ try{res=await fetch('/api/cv/verify/'+encodeURIComponent(checkId)+'/withdraw',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({withdrawSecret:c.withdrawSecret}),signal:d.signal});}
+ catch(e){ui.busy=false;const err=fetchError(e);if(err.network)goOffline();rerender();notify(err.network?copy.errServer:copy.errWithdraw);return;}
+ finally{d.clear();}
+ ui.busy=false;
+ const data=await res.json().catch(()=>({}));
+ if(!res.ok&&data.error?.code!=='withdrawn'){rerender();notify(data.error?.message||copy.errWithdraw);return;}
+ state=C.withdrawnCheck(state,checkId,data.withdrawnAt||new Date().toISOString());
+ rerender();notify(copy.withdrawDone);
 }
 // The first field that would fail the server's checks (server/cv/routes.js validateEntries), with its screen.
 function checkWork(){
@@ -362,6 +392,7 @@ async function makeQr(){
  ui.busy=false;
  if(typeof data.url!=='string'){rerender();notify(copy.errVerify);return;}
  state.verify={checkId:data.checkId,code:data.code,url:data.url,qrSvg:data.qrSvg,expiresAt:data.expiresAt,fp:C.cvFingerprint(cv)};
+ state.checks=[...(state.checks||[]),{checkId:data.checkId,code:data.code,madeAt:new Date().toISOString(),expiresAt:data.expiresAt,withdrawSecret:String(data.withdrawSecret??'')}];
  rerender();document.querySelector('#verify-open')?.focus();
 }
 const recordPage=record=>`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${E(copy.recordTitle)}</title><style>body{font:16px/1.5 Arial,Helvetica,"Liberation Sans",sans-serif;max-width:720px;margin:32px auto;padding:0 16px;color:#020304}.record-row{border-top:1px solid #dce0e5;margin-top:16px;padding-top:8px}p,li,dd{overflow-wrap:anywhere}</style>${C.renderRecordHtml(record,copy)}</html>`;
@@ -455,6 +486,7 @@ view.addEventListener('click',async event=>{
  if(d.decide){state=C.decide(state,d.decide,d.decision);if(ui.editing===d.decide)ui.editing=null;rerender();await refreshProfile();rerender();return;}
  if(d.edit){const k=d.edit,x=state.decisions[k];ui.editing=k;ui.editError='';ui.editText=x?.decision==='edited'?x.text:k==='profile'?state.profile.text:proposalOf(k).text;rerender();document.querySelector('#edit-text')?.focus();return;}
  if(d.save){await saveEdit(d.save);return;}
+ if(d.withdraw){const id=d.withdraw;confirmAction(copy.withdrawTitle,copy.withdrawCopy,copy.withdrawAction,()=>withdrawQr(id));return;}
  const action=d.action;
  if(action==='back')go(state.step-1);
  if(action==='to-work'){if(state.offline?!state.role:!state.record||!cfg.roles.some(r=>r.name===state.role)){showError(state.offline?copy.errRoleOffline:copy.errRole,state.offline?'role-offline':'role');return;}go(1);}
@@ -466,6 +498,7 @@ view.addEventListener('click',async event=>{
  if(action==='print')window.print();
  if(action==='download-docx')await downloadDocx();
  if(action==='make-qr')await makeQr();
+ if(action==='apply'&&C.canApply(state,copy)){state=C.applied(state,cfg.journey.listing,new Date().toISOString());rerender();document.querySelector('#apply-title')?.focus?.();}
  if(action==='download-text')download('YoCV-CV.txt',C.buildCvText(C.buildCv(state,copy),copy),'text/plain;charset=utf-8');
  if(action==='download-record-html')download('YoCV-evidence.html',recordPage(C.buildCvRecord(state,copy)),'text/html;charset=utf-8');
  if(action==='download-record-json')download('YoCV-evidence.json',JSON.stringify(C.buildCvRecord(state,copy),null,2),'application/json');

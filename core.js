@@ -262,6 +262,28 @@
     if(!/^https?:\/\/[^\s"<>]+$/i.test(String(v.url??''))||!/^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg"[^<]*><rect [^<]*\/><path d="[Mhvz0-9 -]*" fill="#[0-9a-f]{6}"\/><\/svg>$/.test(String(v.qrSvg??'')))return null;
     return {url:String(v.url),code:trim(v.code),qrSvg:String(v.qrSvg),expiresAt:trim(v.expiresAt)};
   }
+  // The close of the journey (spec 2026-11-25-yocv-journey-close-design). state.checks lists every check made on this
+  // page, with its withdraw secret, so one made before the CV changed can still be withdrawn. Nothing here goes to Yoma.
+  function withdrawnCheck(state,checkId,atIso){
+    const checks=(state.checks||[]).map(c=>c.checkId===checkId?{...c,withdrawnAt:atIso}:c);
+    return {...state,checks,verify:state.verify?.checkId===checkId?null:state.verify};
+  }
+  const canApply=(state,copy)=>!state.application&&Boolean(buildCv(state,copy).verify);
+  function applied(state,listing,atIso){
+    return {...state,application:{listingId:String(listing.id),title:String(listing.title),organisation:String(listing.organisation),sentAt:atIso,code:trim(state.verify?.code)}};
+  }
+  // The mocked Yo-ID lines, oldest first. dateOf turns an ISO time into the date the page prints.
+  // A live check gets a withdraw button in the list (button) unless it is the one printed on the paper, whose button
+  // sits under its QR. One made before the CV changed is still live on the server, so it keeps its button.
+  function yoidItems(state,copy,dateOf){
+    const onPaper=buildCv(state,copy).verify?state.verify.checkId:null;
+    const out=(state.checks||[]).map(c=>({kind:'check',checkId:c.checkId,live:!c.withdrawnAt,button:!c.withdrawnAt&&c.checkId!==onPaper,
+      text:c.withdrawnAt?fill(copy.yoidCheckWithdrawn,{code:c.code,made:dateOf(c.madeAt),date:dateOf(c.withdrawnAt)})
+        :fill(copy.yoidCheck,{code:c.code,made:dateOf(c.madeAt),until:dateOf(c.expiresAt)})}));
+    const a=state.application;
+    if(a)out.push({kind:'application',text:fill(copy.yoidApplication,{title:a.title,organisation:a.organisation,date:dateOf(a.sentAt)})});
+    return out;
+  }
   const qrSrc=svg=>'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
   const contactLine=cv=>[cv.contact.phone,cv.contact.email,cv.contact.town].filter(Boolean).join(' · ');
   const optionalLines=(cv,copy)=>[['cvDateOfBirth','dateOfBirth'],['cvIdNumber','idNumber'],['cvStateOfOrigin','stateOfOrigin']].filter(([,k])=>cv.optional[k]).map(([l,k])=>fill(copy.cvOptionalLine,{label:copy[l],value:cv.optional[k]}));
@@ -352,7 +374,7 @@
   function newCvState(){
     return {step:0,maxStep:0,sessionId:null,selector:null,record:null,role:'',include:{completions:[],credentials:[],selfAttested:[]},entries:[],
       contact:{name:'',phone:'',email:'',town:'',education:''},optional:{photo:'',dateOfBirth:'',idNumber:'',stateOfOrigin:''},
-      review:null,decisions:{},handAdded:[],skills:[],profile:null,generation:null,offline:false};
+      review:null,decisions:{},handAdded:[],skills:[],profile:null,generation:null,offline:false,checks:[],application:null};
   }
   // The body of POST /api/cv/review. Each entry goes without its place; contact and optional fields never go.
   // knownWords lists the words of every place, the name and the town once each, only so the server can mask them.
@@ -395,6 +417,6 @@
     });
     return {entries,skills:[],generation:{mode:'sample-offline',provider:'browser-local',model:null,durationMs:0}};
   }
-  const api={MONTHS,WEEKDAYS,escapeHTML,shortQuote,contactsIn,numbersIn,allowedNumbers,properNouns,maskNames,restoreNames,checkCvText,monthLabel,monthsBetween,templateBullet,profileLine,buildCv,renderCvHtml,buildCvText,buildCvRecord,cvFingerprint,renderRecordHtml,newCvState,reviewPayload,decide,readyForCv,profileInput,offlineReview};
+  const api={MONTHS,WEEKDAYS,escapeHTML,shortQuote,contactsIn,numbersIn,allowedNumbers,properNouns,maskNames,restoreNames,checkCvText,monthLabel,monthsBetween,templateBullet,profileLine,buildCv,renderCvHtml,buildCvText,buildCvRecord,cvFingerprint,renderRecordHtml,newCvState,withdrawnCheck,canApply,applied,yoidItems,reviewPayload,decide,readyForCv,profileInput,offlineReview};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.YoCV=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

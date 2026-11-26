@@ -1,0 +1,11 @@
+{
+  "listing": {
+    "id": "sample-salon-assistant",
+    "title": "Salon assistant, weekends",
+    "organisation": "A sample partner salon",
+    "place": "Cape Town",
+    "asks": "Braiding and customer service, Saturdays and Sundays.",
+    "sample": true,
+    "note": "Fictional sample listing. To be replaced by the shared listing from Phase 1 when the team's mock data arrives."
+  }
+}

@@ -160,13 +160,20 @@
     verifyHeading:'A QR code for employers',verifyLead:'An employer scans it to see which lines Yoma confirmed and which are your own words. Anyone with the link can open it. It never shows your phone, email or town.',
     verifyMake:'Make a QR code for employers',verifyMaking:'Making the QR code',verifyOpen:'Open the employer view',verifyScan:'Scan to check this CV',
     verifyCode:'Check code {code}',verifyUntil:'The check lasts until {date}.',verifyStale:'You changed the CV after making the QR code. Make a new one.',
+    verifyWithdraw:'Withdraw this check',withdrawTitle:'Withdraw this check?',withdrawCopy:'Employers who scan this QR code will see that you withdrew it. It comes off your CV, and you can make a new one.',withdrawAction:'Withdraw',
+    withdrawDone:'Check withdrawn. The QR code now says so.',errWithdraw:'The check could not be withdrawn. Try again in a moment.',
+    applyHeading:'Apply to {title}',applyLead:'{organisation}, {place}. {asks}',applySample:'Fictional sample listing, not a real opportunity.',applySends:'This sends your CV and its check link.',
+    applyNeedsQr:'Make the QR code first. The employer uses it to check your CV.',applyButton:'Send my application',applySent:'Mock-up: nothing was sent. In Yoma this would go to {organisation} with your CV and its check link.',
+    yoidHeading:'On your Yo-ID',yoidNote:'Designed, not written to Yoma. Yoma has no YoID write for these yet.',yoidCheck:'CV check {code}, made {made}, open until {until}.',
+    yoidCheckWithdrawn:'CV check {code}, made {made}, withdrawn {date}.',yoidApplication:'Applied to {title} at {organisation}, {date}. Mock-up.',
     errVerify:'The QR code could not be made. Try again in a moment.',errVerifyLine:'A line on the CV no longer matches your answers. Go back to Review.',errVerifyReview:'Finish the review first.',errVerifyMany:'You have made the most QR codes this session allows. Use the last one.',
     checkTitle:'CV check',checkLead:'{name} shared this check. It shows what the YoCV prototype read from Yoma on {date}.',checkCodeLine:'Check code {code}. It should match the code printed on the CV.',
     checkConfirmed:'Confirmed from Yoma',checkConfirmedNote:'Yoma has a record of these: learning completed and credentials issued by the organisations named.',
     checkVouched:'Vouched for by other people',checkVouchedNote:'Confirmed by the people named, not by Yoma.',
     checkSelf:'Self-declared',checkSelfNote:'In their own words. YoCV checked the wording against their answers. Nobody else has confirmed these lines.',
     checkSkillsLabel:'Skills',checkExperienceLabel:'Experience',checkNone:'Nothing in this group.',checkUntil:'Valid until {date}.',
-    checkBad:'This record could not be checked. Do not rely on it.',checkExpired:'This CV check has expired. Ask the person for a new one.',checkMissing:'There is no CV check with this code.',
+    checkBad:'This record could not be checked. Do not rely on it.',checkExpired:'This CV check has expired. Ask the person for a new one.',checkMissing:'There is no CV check with this code.',checkWithdrawn:'The person withdrew this check on {date}. Do not rely on it.',
+    errWithdrawSecret:'That withdraw secret does not match this check.',errWithdrawnAlready:'This check is already withdrawn.',
     checkJson:'Signed record (JSON)',checkKey:'Signing key'
   }};
   if(typeof module!=='undefined'&&module.exports)module.exports=COPY;else root.YoCVCopy=COPY;

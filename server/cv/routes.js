@@ -8,6 +8,7 @@
      POST /api/cv/skills        recombines the skills with fresh vouches, no model call
      POST /api/cv/docx          the CV the page built, as a Word file. No session, nothing stored.
      POST /api/cv/verify        a signed CV check for employers, with its QR (spec 2026-11-25-yocv-qr-verify-design)
+     POST /api/cv/verify/:id/withdraw  ends a check early with its withdraw secret (spec 2026-11-25-yocv-journey-close-design)
      GET  /cv-check/:id         the employer's page; /cv-check/:id.json the signed record. Both only with a sign key.
      POST /api/cv/draft         the RapidPro webhook: no account, no session, S3 skills only. Mounted only with
                                 YOCV_SERVICE_SECRET, which x-yocv-service-secret must match.
@@ -42,6 +43,8 @@ const CONFIRM_KINDS=['none','person','completion','vouch'];
 const COPY=copyFor();
 const DOCX_TYPE='application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 const DRAFT_NOTICE='Draft. Nothing is saved until the person confirms it.';
+// The listing the CV is sent to at the end of Step 4 (spec 2026-11-25-yocv-journey-close-design, section 2).
+const JOURNEY=Object.freeze(JSON.parse(fs.readFileSync(path.join(__dirname,'..','..','data','journey.json'),'utf8')));
 const PREPARED_FILE=path.join(__dirname,'..','..','tests','fixtures','cv-rejected.json');
 const YM=/^(\d{4})-(0[1-9]|1[0-2])$/;
 const str=v=>v==null?'':String(v);
@@ -196,7 +199,8 @@ function createCvRouter({config,provider,core,yoma,roleSkills,accountSource,card
     const sample=accountSource.kind==='sample';
     sendJSON(res,200,{copy:COPY,rules:RULES,roles:roleList(roleSkills),
       accounts:{source:accountSource.kind,personas:sample?accountSource.listPersonas().map(p=>({id:p.id,displayName:p.displayName,firstName:p.firstName??null,trade:p.trade,city:p.city??null})):[]},
-      mode:{mode:live?'live':'sample',provider:live?str(provider.name):'local',model:live?(provider.model??null):null}});
+      mode:{mode:live?'live':'sample',provider:live?str(provider.name):'local',model:live?(provider.model??null):null},
+      journey:JOURNEY});
   }
 
   async function menu(res,url){
@@ -374,10 +378,22 @@ function createCvRouter({config,provider,core,yoma,roleSkills,accountSource,card
     const monthsOf=m=>{const a=core.monthLabel(m?.start),b=core.monthLabel(m?.end);return !a?'':!b?t('cvMonthsOpen',{start:a}):a===b?a:t('cvMonthsRange',{start:a,end:b});};
     const out=buildCheck({session:s,cv,checkBullet,copy:COPY,checkId,nowMs,monthsOf,hasContact:text=>core.contactsIn(text).length>0});
     if(!out.record)return sendError(res,out.status,out.code,out.message,false,{fields:out.fields});
-    checkStore.put(checkId,signRecord(signKey,out.record,{now,sub:checkId}));
+    const withdrawSecret=random(16).toString('hex');
+    checkStore.put(checkId,signRecord(signKey,out.record,{now,sub:checkId}),withdrawSecret);
     s.checks=(s.checks||0)+1;
     const url=checkBase+'/cv-check/'+checkId;
-    sendJSON(res,200,{checkId,code:out.record.code,url,qrSvg:qrSvg(url,{cellSize:4,margin:4,level:'M'}),expiresAt:out.record.expiresAt});
+    sendJSON(res,200,{checkId,code:out.record.code,url,qrSvg:qrSvg(url,{cellSize:4,margin:4,level:'M'}),expiresAt:out.record.expiresAt,withdrawSecret});
+  }
+  // POST /api/cv/verify/:id/withdraw {withdrawSecret}: the person ends a check early. No CV session needed.
+  async function withdrawCheck(req,res,id){
+    const body=await readBody(req,res);
+    if(!body)return;
+    if(!CHECK_ID.test(id))return sendError(res,404,'not_found',COPY.checkMissing,false);
+    const at=new Date(now()).toISOString(),r=checkStore.withdraw(id,body.withdrawSecret,at);
+    if(r==='missing')return sendError(res,404,'not_found',COPY.checkMissing,false);
+    if(r==='forbidden')return sendError(res,403,'forbidden',COPY.errWithdrawSecret,false);
+    if(r==='withdrawn')return sendError(res,410,'withdrawn',COPY.errWithdrawnAlready,false);
+    sendJSON(res,200,{checkId:id,withdrawnAt:at});
   }
   // GET /cv-check/:id and :id.json. The signature is checked on every load; the page never trusts the file alone.
   function checkRoute(req,res,p){
@@ -385,14 +401,16 @@ function createCvRouter({config,provider,core,yoma,roleSkills,accountSource,card
     if(req.method!=='GET'&&req.method!=='HEAD')return sendError(res,405,'method_not_allowed','Method not allowed.',false);
     const jwt=CHECK_ID.test(id)?checkStore.get(id):null,json=Boolean(m?.[2]);
     const payload=jwt?verifyJwt(signKey,jwt):null,record=payload?.record;
-    const state=!jwt?'missing':!payload||payload.sub!==id||record?.checkId!==id?'bad':!(now()<Date.parse(record.expiresAt))?'expired':'ok';
-    // The JSON follows the page: nothing for a missing or changed record, 410 once expired.
+    const withdrawnAt=jwt?checkStore.withdrawnAt(id):null;
+    const state=!jwt?'missing':!payload||payload.sub!==id||record?.checkId!==id?'bad':withdrawnAt?'withdrawn':!(now()<Date.parse(record.expiresAt))?'expired':'ok';
+    // The JSON follows the page: nothing for a missing or changed record, 410 once expired or withdrawn.
     if(json){
       if(state==='ok')return sendJSON(res,200,{jwt,jwksUrl:'/.well-known/jwks.json'});
+      if(state==='withdrawn')return sendError(res,410,'withdrawn',COPY.checkWithdrawn.replace('{date}',withdrawnAt.slice(0,10)),false);
       return state==='expired'?sendError(res,410,'expired',COPY.checkExpired,false):sendError(res,404,'not_found',COPY.checkMissing,false);
     }
-    const status={missing:404,expired:410,bad:200,ok:200}[state];
-    return sendPage(res,status,checkPage({state,record,copy:COPY}));
+    const status={missing:404,expired:410,withdrawn:410,bad:200,ok:200}[state];
+    return sendPage(res,status,checkPage({state,record,copy:COPY,withdrawnAt}));
   }
   const checkBase=str(publicUrl).replace(/\/+$/,'');
   const checksOn=Boolean(signKey&&checkStore);
@@ -409,6 +427,8 @@ function createCvRouter({config,provider,core,yoma,roleSkills,accountSource,card
       return p==='/api/cv/config'?Promise.resolve(cvConfig(res)):menu(res,url);
     }
     if(checksOn&&p.startsWith('/cv-check/'))return Promise.resolve(checkRoute(req,res,p));
+    const w=checksOn?/^\/api\/cv\/verify\/([^/]+)\/withdraw$/.exec(p):null;
+    if(w)return m==='POST'?withdrawCheck(req,res,w[1]):notAllowed();
     if(p==='/demo/cv-rejected'&&simOn)return m==='GET'||m==='HEAD'?cvRejected(res):notAllowed();
     if(!Object.hasOwn(POST,p))return null;
     return m==='POST'?POST[p](req,res):notAllowed();
