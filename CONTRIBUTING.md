@@ -44,4 +44,4 @@ Conventional style, as in the history: `feat(vouch): ...`, `fix(yocv): ...`, `do
 
 ## Pull requests
 
-Fill in the template. CI runs the suite on Node 20 and 22 offline, then the live Yoma tests as a non-blocking job.
+Fill in the template, and say in it that `npm test` passed. The repo has no CI, so run the suite yourself before you open the pull request.

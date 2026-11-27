@@ -1,6 +1,5 @@
 # 🌟 YoCV prototype
 
-[![CI](https://github.com/greenglow7/yocv-prototype/actions/workflows/ci.yml/badge.svg)](https://github.com/greenglow7/yocv-prototype/actions/workflows/ci.yml)
 [![Node 20+](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](package.json)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
