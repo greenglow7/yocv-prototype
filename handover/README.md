@@ -14,6 +14,7 @@ This is a student prototype. It is not a Yoma or UNICEF product, and it is not p
 | [rubrics/cv-line-checks.md](rubrics/cv-line-checks.md) | When a suggested CV line is refused, the skill evidence levels S1 to S4, and what the checks do not catch. |
 | [test-cases/cv-lines.json](test-cases/cv-lines.json) | One CV line per rule, with the outcome the checks must give. `npm test` runs them. |
 | [cost-estimate.md](cost-estimate.md) | Tokens per call, cost per CV for three Claude models and a local model, and the assumptions to confirm. |
+| [qr-demo.md](qr-demo.md) | The QR check demo for GenU: what it shows, how to run it on a laptop and a phone, and what is real and what is mocked. |
 
 The prompts and the cost estimate are generated from the code by `npm run handover`. If you change a prompt in the code, run the script. `npm test` fails while a file is out of date.
 
@@ -31,7 +32,7 @@ Open `http://127.0.0.1:4173`. It opens signed in as Halima Yusuf, the fictional 
 
 - **Live AI.** Copy `.env.example` to `.env` and set `MODEL_PROVIDER` with its key. Claude, Azure OpenAI and any OpenAI-compatible endpoint work, a locally hosted model through Ollama included. The [main README](../README.md), section Development Setup, has the three configurations side by side.
 - **The demo pages.** Run `npm run seed:demo`, then start with `YOVOUCH_SIM=1`. The script is [presentation/demo-script.md](../presentation/demo-script.md).
-- **Scan the QR from a phone.** Start with `HOST=0.0.0.0` and `YOCARD_PUBLIC_URL=http://<your LAN IP>:4173`, then make the QR.
+- **Scan the QR from a phone.** Start with `HOST=0.0.0.0` and `YOCARD_PUBLIC_URL=http://<your LAN IP>:4173`, then make the QR. [qr-demo.md](qr-demo.md) walks through it step by step.
 - **Tests.** `npm test`. Two model tests are skipped without a key. `YOCV_LIVE_YOMA=0 npm test` also skips the two Yoma tests when you are offline.
 
 No keys or secrets are in the repo. `.env` and `data/cards/` (the signing key and stored cards) are git-ignored.
@@ -61,7 +62,7 @@ The full table, YoCard and YoVouch included, is in the main README under [Real v
 ## How it would come into GenU's systems
 
 1. **The CV service in Yoma's API.** [integration/yoma/](../integration/yoma/README.md) is a C# pack laid out at the paths it would take in Yoma's repository. It has the model client behind an interface, the CV service with the checks ported, a controller and tests. It reads only from Yoma's existing services and adds no table. It has not been compiled. Next: the Yoma API owner compiles it, runs the tests and reviews the role skill menus.
-2. **The screens in Yo-ID.** The four steps are plain HTML and JavaScript. They would be rebuilt in Yoma's web app on the team's shared design kit, and combined with the Liquid Thought YoID mobile sharing prototype. The CV and its QR would sit beside the public share link.
+2. **The screens in Yo-ID.** The four steps are plain HTML and JavaScript. They would be rebuilt in Yoma's web app on the team's shared design kit, and combined with the Liquid Thought YoID mobile sharing prototype. The CV and its QR would sit beside the public share link. Step 4 already has a phone share screen, **Show it on my phone**, and [the phone design](../docs/superpowers/specs/2026-11-27-yocv-phone-show-design.md) maps each YoCV piece onto a YoID mobile wallet.
 3. **The QR check.** Today it is signed with YoCard's key, and the person withdraws it with a secret held by the page. In Yoma it would be signed with Yoma's key and written to the person's YoID, so the person can see and withdraw it from any device. The **On your Yo-ID** list in Step 4 shows what that record would hold.
 4. **WhatsApp.** `POST /api/cv/draft` and [integration/rapidpro/yocv-draft-flow.json](../integration/rapidpro/yocv-draft-flow.json) let a RapidPro flow draft CV lines in a chat. The flow is untested against a RapidPro instance.
 

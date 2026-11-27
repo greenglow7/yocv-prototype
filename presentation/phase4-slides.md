@@ -29,6 +29,8 @@ For Jongmin's "What We Changed" slide. Each row is tied to a feedback point. The
 
 **YoID thread:** the CV check and the Job Application are recorded on Halima's YoID, `yoid-ng-7f3a0123`. Step 4 shows this as an **On your Yo-ID** list, a mocked write labelled "Designed, not written to Yoma". She can already withdraw a check: the employer's scan then says it was withdrawn.
 
+**Built for the phone, with Liquid Thought in mind:** an informal employer rarely gets a printed CV, so **Show it on my phone** puts the QR full screen on Halima's phone and the employer scans it with theirs. A real phone scan passed over Wi-Fi. Each YoCV piece maps onto a YoID mobile wallet: the CV check becomes a shared credential, and withdrawing it becomes revoking the share. **To confirm:** the Liquid Thought prototype link and its share format.
+
 ## Slide 2: Cost & Handover
 
 ### Cost estimate

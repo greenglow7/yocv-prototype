@@ -91,3 +91,17 @@ test('the handoff from SkillLens is named the same way as on the slides',()=>{
   assert.equal(handoffOf({walletId:'cred-002'},null,copy),'','no journey, no tag');
   assert.ok(s);
 });
+
+// Showing the check on the person's own phone (spec docs/superpowers/specs/2026-11-27-yocv-phone-show-design.md):
+// an informal employer scans the QR from the young person's screen, with no printed CV.
+test('Step 4 can show the QR full screen on the phone, with who can see it',()=>{
+  const fs=require('node:fs'),path=require('node:path'),read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8');
+  for(const k of ['verifyShow','showTitle','showCopy','showWho'])assert.ok(typeof copy[k]==='string'&&copy[k].length>0,k);
+  assert.ok(copy.showWho.startsWith('Who can see this: anyone with the link'),'the honesty line, word for word');
+  const html=read('index.html'),app=read('app.js'),css=read('styles.css');
+  assert.ok(/<dialog id="show-qr-dialog"[^>]*aria-labelledby="show-qr-title"/.test(html),'the dialog is in the page');
+  assert.ok(app.includes('data-action="show-qr"')&&app.includes('copy.verifyShow'),'the button sits under the QR');
+  assert.ok(app.includes("action==='show-qr'")&&app.includes('show-qr-dialog'),'the button opens the dialog');
+  for(const k of ['copy.showTitle','copy.showCopy','copy.showWho'])assert.ok(app.includes(k),k);
+  assert.ok(/\.show-qr-img\{[^}]*width:min\(/.test(css),'the QR fills the phone width, up to a cap');
+});

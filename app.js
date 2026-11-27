@@ -164,7 +164,7 @@ const longDate=iso=>{const t=Date.parse(iso);return Number.isFinite(t)?new Date(
 function verifyHTML(){
  if(state.offline)return '';
  const v=C.buildCv(state,copy).verify,stale=Boolean(state.verify)&&!v;
- const body=v?`<div class="verify-made"><img class="verify-qr" src="${E(qrSrc(v.qrSvg))}" alt="${E(copy.verifyScan)}" width="180" height="180"><div><p class="verify-code">${E(fill(copy.verifyCode,{code:v.code}))}</p><p class="field-help">${E(fill(copy.verifyUntil,{date:longDate(v.expiresAt)}))}</p><p class="field-help verify-url">${E(v.url)}</p><div class="action-row"><a class="secondary small" id="verify-open" href="${E(v.url)}" target="_blank" rel="noopener noreferrer">${E(copy.verifyOpen)}</a><button class="text-button" data-withdraw="${E(state.verify.checkId)}">${E(copy.verifyWithdraw)}</button></div></div></div>`
+ const body=v?`<div class="verify-made"><img class="verify-qr" src="${E(qrSrc(v.qrSvg))}" alt="${E(copy.verifyScan)}" width="180" height="180"><div><p class="verify-code">${E(fill(copy.verifyCode,{code:v.code}))}</p><p class="field-help">${E(fill(copy.verifyUntil,{date:longDate(v.expiresAt)}))}</p><p class="field-help verify-url">${E(v.url)}</p><div class="action-row"><a class="secondary small" id="verify-open" href="${E(v.url)}" target="_blank" rel="noopener noreferrer">${E(copy.verifyOpen)}</a><button class="secondary small" data-action="show-qr">${E(copy.verifyShow)}</button><button class="text-button" data-withdraw="${E(state.verify.checkId)}">${E(copy.verifyWithdraw)}</button></div></div></div>`
   :`${stale?`<p class="notice">${E(copy.verifyStale)}</p>`:''}<div class="action-row"><button class="secondary" data-action="make-qr" ${ui.busy?'disabled':''}>${E(ui.busy?copy.verifyMaking:copy.verifyMake)}</button></div>`;
  return `<section class="claim-card verify print-hide" aria-labelledby="verify-title"><h2 id="verify-title">${E(copy.verifyHeading)}</h2><p class="field-help">${E(copy.verifyLead)}</p>${body}</section>`;
 }
@@ -183,6 +183,13 @@ function yoidHTML(){
  const li=i=>`<li>${E(i.text)}${i.button?` <button class="text-button" data-withdraw="${E(i.checkId)}">${E(copy.verifyWithdraw)}</button>`:''}</li>`;
  const p=cfg?.journey?.person,yoid=p&&p.personaId===state.selector?.persona?`<p class="verify-code">${E(fill(copy.yoidId,{id:p.yoid}))}</p>`:'';
  return `<section class="claim-card yoid-record print-hide" aria-labelledby="yoid-record-title"><h2 id="yoid-record-title">${E(copy.yoidHeading)}</h2>${yoid}<p class="field-help">${E(copy.yoidNote)}</p><ul>${items.map(li).join('')}</ul></section>`;
+}
+/* The person shows the QR on their own phone to an informal employer, who scans it with theirs (spec 2026-11-27-yocv-phone-show-design). */
+function showQr(){
+ const v=C.buildCv(state,copy).verify,dlg=document.getElementById('show-qr-dialog');if(!v||!dlg)return;
+ document.getElementById('show-qr-title').textContent=copy.showTitle;
+ document.getElementById('show-qr-body').innerHTML=`<img class="show-qr-img" src="${E(qrSrc(v.qrSvg))}" alt="${E(copy.verifyScan)}"><p class="verify-code show-qr-code">${E(fill(copy.verifyCode,{code:v.code}))}</p><p>${E(copy.showCopy)}</p><p class="fine-print">${E(copy.showWho)}</p><p class="fine-print">${E(fill(copy.verifyUntil,{date:longDate(v.expiresAt)}))}</p>`;
+ dlg.showModal();
 }
 // The withdraw call needs only the check's secret, not the CV session, so it works after the session has ended.
 async function withdrawQr(checkId){
@@ -500,6 +507,7 @@ view.addEventListener('click',async event=>{
  if(action==='print')window.print();
  if(action==='download-docx')await downloadDocx();
  if(action==='make-qr')await makeQr();
+ if(action==='show-qr')showQr();
  if(action==='apply'&&C.canApply(state,copy)){state=C.applied(state,cfg.journey,new Date().toISOString());rerender();document.querySelector('#apply-title')?.focus?.();}
  if(action==='download-text')download('YoCV-CV.txt',C.buildCvText(C.buildCv(state,copy),copy),'text/plain;charset=utf-8');
  if(action==='download-record-html')download('YoCV-evidence.html',recordPage(C.buildCvRecord(state,copy)),'text/html;charset=utf-8');

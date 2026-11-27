@@ -62,7 +62,7 @@ OPENAI_STRUCTURED_OUTPUT=json_object
 
 **Say:** "This is the Job Application, the handoff back to Sunrise Solar, who wrote the job with RoleMap. It is a mock-up, and the page says nothing was sent. In Yoma it would be written to her YoID."
 
-**Optional, 45 seconds: the employer scans the QR.** Click **Make a QR code for employers** and scan it with a phone, or click **Open the employer view**. Needs `HOST=0.0.0.0` and `YOCARD_PUBLIC_URL=http://<laptop LAN IP>:4173` for a real phone scan.
+**Optional, 45 seconds: the employer scans the QR.** Click **Make a QR code for employers**, then **Show it on my phone**, and scan it with a phone, or click **Open the employer view**. Needs `HOST=0.0.0.0` and `YOCARD_PUBLIC_URL=http://<laptop LAN IP>:4173` for a real phone scan.
 
 **Say:** "Sunrise Solar scans this. Green is what Yoma recorded, the Skill Credential included. Grey is her own words, checked against her answers but confirmed by nobody. Her phone number is not on it." If you withdraw the check now, the scan says it was withdrawn.
 

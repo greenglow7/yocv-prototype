@@ -160,6 +160,7 @@
     verifyHeading:'A QR code for employers',verifyLead:'An employer scans it to see which lines Yoma confirmed and which are your own words. Anyone with the link can open it. It never shows your phone, email or town.',
     verifyMake:'Make a QR code for employers',verifyMaking:'Making the QR code',verifyOpen:'Open the employer view',verifyScan:'Scan to check this CV',
     verifyCode:'Check code {code}',verifyUntil:'The check lasts until {date}.',verifyStale:'You changed the CV after making the QR code. Make a new one.',
+    verifyShow:'Show it on my phone',showTitle:'Show this to the employer',showCopy:'Ask the employer to point their phone camera at this code. They see which lines Yoma confirmed and which are your own words.',showWho:'Who can see this: anyone with the link. It never shows your phone, email or town.',
     verifyWithdraw:'Withdraw this check',withdrawTitle:'Withdraw this check?',withdrawCopy:'Employers who scan this QR code will see that you withdrew it. It comes off your CV, and you can make a new one.',withdrawAction:'Withdraw',
     withdrawDone:'Check withdrawn. The QR code now says so.',errWithdraw:'The check could not be withdrawn. Try again in a moment.',
     applyHeading:'Apply to {title}',applyLead:'{organisation}, {place}. {asks}',applySample:'Fictional sample listing, not a real opportunity.',applySends:'This sends your CV and its check link.',

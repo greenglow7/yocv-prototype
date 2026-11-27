@@ -245,3 +245,34 @@ Branch `shared-mock-data`, sample mode, port 4180. Source: the team's `SHARED-MO
 | 7 | Real phone scan of Halima's CV check over Wi-Fi | Pass. See the QR section, row 4. |
 
 Added for YoCV, not in the shared mock data (to add to `shared-mock-data.json` and tell the team): the job's place (Kaduna); completion and issue dates for the courses and the Skill Credential (the tree planting date, 29 November 2026, is from the shared data); a sample phone, `+2348005550123`, and date of birth for age 20; her interview answers in `tests/fixtures/cv-halima.json`, including "about 20 customers a week" and "daily since November 2024"; the YoCV role **Solar installation assistant**; the Lightcast skill names (Photovoltaic Systems, Solar Panels, Working at Heights, Workplace Safety, Digital Literacy, Customer Service, Community Outreach, Mobile Device Troubleshooting). Talent Finder adds her availability and five other anonymous codes (A07, A19, A31, A44, A58).
+
+# YoCV on the phone: Show it on my phone, 2026-11-27
+
+Branch `yocv-phone-show`, sample mode, port 4180. Spec `docs/superpowers/specs/2026-11-27-yocv-phone-show-design.md`. The browser pane was set to 375 x 812 (mobile), and the page was driven with in-page script clicks and read as text.
+
+| # | Scenario | Result |
+| --- | --- | --- |
+| 1 | Halima, every record item ticked, **Solar installation assistant**, the phone repair entry from `tests/fixtures/cv-halima.json`, every line and skill accepted, Step 4, **Make a QR code for employers** | Pass. **Show it on my phone** sits under the QR next to **Open the employer view** and **Withdraw this check**. `scrollWidth === innerWidth` (375) on Step 4. |
+| 2 | **Show it on my phone** | Pass. The dialog **Show this to the employer** opens with the QR at 300 px on a white square, `Check code C5EC-A6BD`, the scan instruction, `Who can see this: anyone with the link. It never shows your phone, email or town.` and `The check lasts until 25 February 2027.` No sideways scroll in the dialog. The QR, drawn to a canvas and read with `BarcodeDetector`, decoded to the exact check URL. **Close** shuts it. |
+| 3 | The QR, the apply and the **On your Yo-ID** sections at 375 px | Pass. All three end at 359 px with no sideways scroll. This closes row 7 of the journey close section. |
+| 4 | The employer check page at 375 px | Pass. `scrollWidth` 375. Halima's six records under **Confirmed from Yoma**, the SkillLens credential among them; the phone repair line and Mobile Device Troubleshooting (Self-stated) under **Self-declared**; `Who can see this: anyone with the link` and `Not operated by Yoma or UNICEF`. |
+| 5 | A real phone scan of the full-screen QR | Not run in this pass. The same QR passed a real phone scan on 2026-11-25 (QR section, row 4); this screen only draws it larger. |
+
+# YoCV live model run for Halima, 2026-11-27
+
+A local model on this laptop (Ollama 0.40.16, `qwen3.5:9b`, nothing pulled), driven through the same HTTP calls the page makes: config, record (`halima`), menu, then `POST /api/cv/review` with the phone repair entry from `tests/fixtures/cv-halima.json` and every completion and credential ticked. The server was a scratch copy of `server.js` `main()` outside the repository, as in the 2026-11-19 section, row 9. The provider timeout was 120 s (then 300 s), and `reasoning_effort: "none"` was added to the request body. Nothing in the repository or `.env` changed. Provider env: `MODEL_PROVIDER=openai`, `OPENAI_BASE_URL=http://localhost:11434/v1`, `OPENAI_API_KEY=ollama`, `OPENAI_MODEL=qwen3.5:9b`.
+
+| # | Scenario | Result |
+| --- | --- | --- |
+| 1 | `OPENAI_STRUCTURED_OUTPUT=json_schema`, 120 s timeout | Pass. 200 in 57.8 s (the model call 50.0 s), generation `{mode: live, provider: openai-compatible, model: qwen3.5:9b}`. Accepted after every check: "Fixed phones and sold accessories to about 20 customers a week at my aunt's stall." Refused `weak_opening`: "Customers returned when their phone broke again." The model proposed Mobile Device Troubleshooting (quote "I fix phones") and Customer Service (quote "Customers come back to me"); both passed. Usage: 641 prompt tokens, 131 completion tokens. |
+| 2 | `json_object`, 120 s, then 300 s | Failed at 120 s with `provider_timeout` (126.8 s). Pass at 300 s: 200 in 112.2 s. Accepted: "Fixed phones and sold accessories at my aunt's stall in the market to about 20 customers a week." The outcome answer copied word for word was refused `weak_opening`. Usage: 862 prompt tokens, 266 completion tokens (pretty-printed JSON). |
+| 3 | The same input in sample mode (`MODEL_PROVIDER=local`) | Pass. 200 in 1.2 s. Template line: "Fix phones and sell phone accessories at my aunt's stall in the market for customers daily since November 2024, about 20 customers a week." |
+| 4 | Labels | Pass. The solar, safety and course skills are **Confirmed from Yoma** (the SkillLens credential among the sources); the skills the model drew from her words are **From your own account**; Mobile Device Troubleshooting, when her self-attested skill is ticked, also carries **Self-stated**. The model changed wording only, never a label. |
+
+What this shows: the model strengthens the line over the template. It uses the past tense, drops the repeated "for customers daily since November 2024", and adds two skills grounded in her words. Every line still passes the code checks, and Halima still reads each one back. The token use, about 640 in and 130 out, is close to the cost estimate's 760 and 150. That estimate counts Claude tokens, so this is a check, not a replacement.
+
+Open issues from this run:
+
+1. **A local model is too slow for the page on this laptop.** Each call took 50 to 110 s, against the provider's fixed 20 s timeout and the page's 30 s deadline, so the page would show the timeout error. The laptop was under load (about 5 tokens a second). For a live demo, use a hosted model (Claude Haiku 5.5 with a key in `.env`), or make the timeout and the reasoning setting configurable in a later task.
+2. **A place word masked as a name.** "Market", from the place "Kaduna Central Market", is in `knownWords`, so the plain word "market" in her answer was masked as `[name1]` before the model saw it. It was restored afterwards, so the line was right, but a common word in a place name should not be masked.
+3. **First person.** Both model lines keep "my aunt's", against the prompt's "No first person". No check catches it, and the template has it too. This is the known limitation from the shared mock data section, row 6.
