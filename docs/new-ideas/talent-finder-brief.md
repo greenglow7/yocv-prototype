@@ -1,6 +1,6 @@
 # Talent Finder: design brief
 
-Date: 2026-11-25. Status: new idea, mock-ups only. Mock-ups: `mockups/talent-finder/` (open `index.html` from disk). Slide text: `presentation/talent-finder-slides.md`.
+Date: 2026-11-25. Status: new idea, mock-ups only. Mock-ups: `mockups/talent-finder/`, online at https://greenglow7.github.io/yocv-prototype/mockups/talent-finder/ (or open `index.html` from disk). Slide text: `presentation/talent-finder-slides.md`.
 
 This is a student proposal for GenU, not a Yoma feature. Nothing here is built. The people, partner and listing in the mock-ups come from the team's shared mock data (BBS x GenU) and are fictional. GenU's AI use-case map has not been seen yet; check this brief against it before it goes further.
 

@@ -1,6 +1,6 @@
 # Talent Finder: slide text (draft)
 
-Two slides for the New Ideas section. Source: `docs/new-ideas/talent-finder-brief.md`. Screens: `mockups/talent-finder/`. Every screen carries the band "Mock-up. Not a working build. Fictional sample data." Keep it visible in any screenshot. Names, ids and numbers come from the team's shared mock data (BBS x GenU).
+Two slides for the New Ideas section. Source: `docs/new-ideas/talent-finder-brief.md`. Screens: `mockups/talent-finder/`, online at https://greenglow7.github.io/yocv-prototype/mockups/talent-finder/. Every screen carries the band "Mock-up. Not a working build. Fictional sample data." Keep it visible in any screenshot. Names, ids and numbers come from the team's shared mock data (BBS x GenU).
 
 ---
 
