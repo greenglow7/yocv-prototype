@@ -45,7 +45,7 @@ cd yocv-prototype
 npm start
 ```
 
-Then open `http://127.0.0.1:4173`. The page opens signed in as Halima Yusuf, the fictional person the team's four prototypes share, on the Yo-ID Overview. Without credentials the server runs in **sample mode**: the generator uses local templates, Yoma data is still live.
+Then open `http://127.0.0.1:4174`. The page opens signed in as Halima Yusuf, the fictional person the team's four prototypes share, on the Yo-ID Overview. Without credentials the server runs in **sample mode**: the generator uses local templates, Yoma data is still live.
 
 To enable **live AI mode**, copy `.env.example` to `.env` and pick the provider with `MODEL_PROVIDER`. Set to `azure`, `anthropic`, `openai` or `local`, it wins, and the server refuses to start without that provider's values. Left empty, the order is Azure if its three values are set, else Anthropic (Claude) if `ANTHROPIC_API_KEY` is set, else the OpenAI-compatible endpoint if `OPENAI_API_KEY` is set, else the local templates (sample mode). So a leftover `OPENAI_API_KEY=ollama` never beats a Claude key. So switching from Azure to a model on the laptop is a one-line change, and the Azure block can stay filled in.
 
@@ -71,7 +71,7 @@ Every variable the code reads (`server/config.js` reads `.env` from the working 
 
 | Variable | Default | Used for |
 | --- | --- | --- |
-| `PORT` | `4173` | Port the server listens on |
+| `PORT` | `4174` | Port the server listens on (4174 since the connected journey: PathFinder uses 4173) |
 | `HOST` | `127.0.0.1` | Address the server binds to |
 | `YOMA_API_BASE` | `https://api.yoma.world/api/v3` | Yoma public API base for skill lookups, opportunity searches and opportunity details; also the API a `YOMA_ACCESS_TOKEN` is sent to |
 | `YOMA_ACCESS_TOKEN` | empty | YoCard and YoCV: a bearer token switches the account source from sample personas to a real Yoma account. YoCV then also searches that account's wallet for its credentials |
@@ -97,7 +97,7 @@ Every variable the code reads (`server/config.js` reads `.env` from the working 
 | `YOVOUCH_ORG_KEY_<NAME>` | none (`.env.example` sets `YOVOUCH_ORG_KEY_SAMPLE_SKILLS_TRUST`) | One demo organisation key per variable for the referral page. `<NAME>` is the organisation's name in capitals with `_` for spaces, so `SAMPLE_SKILLS_TRUST` is `Sample Skills Trust`. Every page and line made with it says `Demo organisation key. A real key needs Yoma.` |
 | `YOCV_SERVICE_SECRET` | empty | Mounts `POST /api/cv/draft`, the YoCV draft webhook for a RapidPro flow. It answers 403 unless the header `x-yocv-service-secret` matches (constant-time compare). Empty: the route is not mounted |
 
-To open a card or scan a CV check from a phone on the same Wi-Fi, set `HOST=0.0.0.0` and `YOCARD_PUBLIC_URL=http://<your LAN IP>:4173` so the link and QR point at an address the phone can reach. Make the CV's QR after the server restarts with these values: a QR made before still points at `127.0.0.1`.
+To open a card or scan a CV check from a phone on the same Wi-Fi, set `HOST=0.0.0.0` and `YOCARD_PUBLIC_URL=http://<your LAN IP>:4174` so the link and QR point at an address the phone can reach. Make the CV's QR after the server restarts with these values: a QR made before still points at `127.0.0.1`.
 
 You can also open `index.html` straight from disk. The app then runs in **sample mode (offline)** on the browser copies of the rules (`cv-rules.js`), the copy (`cv-copy.js`) and the checks (`core.js`). With no server there is no person to sign in as: the greeting reads `Good morning` with no name, and the Overview, Wallet, Passport, Opportunities and Skills tabs show the offline notice. Step 1 needs the server, because the Yoma record, the sample accounts and the role menus come from it. Offline, Step 1 shows `Your Yoma record needs the YoCV server. You can still describe your work and build a CV.` and a plain role field. Steps 2 to 4 run in the browser: Review builds each line from the template and runs the same checks, and proposes no skills. The same fallback applies when the server goes away after the page loaded.
 

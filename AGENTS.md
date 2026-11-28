@@ -13,7 +13,7 @@ A student prototype for [Yoma](https://yoma.world), not a Yoma or UNICEF project
 ## Run and test
 
 ```sh
-npm start            # node server.js on http://127.0.0.1:4173
+npm start            # node server.js on http://127.0.0.1:4174
 npm test             # node --test tests/*.test.cjs
 YOCV_LIVE_YOMA=0 npm test   # offline: skips the two live Yoma tests
 ```

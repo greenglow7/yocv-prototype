@@ -28,9 +28,9 @@ You need Node 20 or later, and a laptop and a phone on the same Wi-Fi. No keys a
 2. Find the laptop's address on the Wi-Fi. On a Mac, run `ipconfig getifaddr en0`. On Windows, run `ipconfig` and read the IPv4 address. Below it is `192.168.1.20`.
 3. Start the server so the phone can reach it:
    ```sh
-   HOST=0.0.0.0 YOCARD_PUBLIC_URL=http://192.168.1.20:4173 YOVOUCH_SIM=1 npm start
+   HOST=0.0.0.0 YOCARD_PUBLIC_URL=http://192.168.1.20:4174 YOVOUCH_SIM=1 npm start
    ```
-4. On the laptop, open `http://192.168.1.20:4173/?as=halima#/cv`. Tick her record, choose **Solar installation assistant** and add her work: "Phone repair and sales" at Kaduna Central Market. Accept the lines and skills, then **Continue to your CV**.
+4. On the laptop, open `http://192.168.1.20:4174/?as=halima#/cv`. Tick her record, choose **Solar installation assistant** and add her work: "Phone repair and sales" at Kaduna Central Market. Accept the lines and skills, then **Continue to your CV**.
 5. Click **Make a QR code for employers**, then **Show it on my phone**.
 6. Scan the QR with the phone's camera and open the link.
 7. Back on the laptop, click **Withdraw this check**, then reload the page on the phone.

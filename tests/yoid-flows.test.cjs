@@ -77,7 +77,7 @@ async function boot({online=true,hash='',app='real'}={}){
   const ctx={
     document:dom.document,
     sessionStorage:{getItem:k=>storage.has(k)?storage.get(k):null,setItem:(k,v)=>storage.set(k,String(v)),removeItem:k=>storage.delete(k)},
-    location:{href:'http://127.0.0.1:4173/'+hash,hash,pathname:'/',search:''},
+    location:{href:'http://127.0.0.1:4174/'+hash,hash,pathname:'/',search:''},
     history:{replaceState:(s,t,url)=>{history.push(url);if(url.startsWith('#'))ctx.location.hash=url;}},
     fetch:async(url,opts={})=>{
       fetches.push({url,opts});

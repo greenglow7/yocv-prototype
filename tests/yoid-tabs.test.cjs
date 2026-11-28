@@ -18,7 +18,7 @@ function loadViews(){
   const ctx={
     document:{querySelector:()=>null,querySelectorAll:()=>[],getElementById:()=>null,addEventListener:noop},
     sessionStorage:{getItem:()=>null,setItem:noop,removeItem:noop},
-    location:{href:'http://127.0.0.1:4173/',hash:'',pathname:'/',search:''},
+    location:{href:'http://127.0.0.1:4174/',hash:'',pathname:'/',search:''},
     history:{replaceState:noop},
     // boot() asks for the config; the promise never settles, so nothing after it runs in the stub.
     fetch:()=>new Promise(noop),
