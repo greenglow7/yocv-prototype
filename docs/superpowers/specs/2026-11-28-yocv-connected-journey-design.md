@@ -16,6 +16,7 @@ SkillLens opens YoCV with:
 - With `journey=demo`, YoCV reads the nine contract params (`journey`, `from`, `yoid`, `listing`, `goal`, `plan`, `course`, `credential`, `return`). Each value is trimmed; an empty one, or one over 64 characters (2048 for `return`), is dropped.
 - The params leave the address, as `?as=` does, and stay in `sessionStorage` under `yocv.journey` for the tab. Hash routes and a reload keep them. A new tab without them has no journey.
 - Arriving on no route opens `#/cv`, so the first screen is the arriving card.
+- With `listing=opp-job-001`, the journey's job, Step 1 picks the target role it maps to, **Solar installation assistant** (`role` on the listing in `data/journey.json`), instead of the role for her trade (Market seller). She can still change it. Another listing, or no journey, keeps the role for her trade.
 - Without `journey=demo` nothing changes: no card, no thread, no extra key.
 
 ## 3. The arriving card

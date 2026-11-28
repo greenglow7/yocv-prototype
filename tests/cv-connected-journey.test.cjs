@@ -4,7 +4,7 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path');
-const {JOURNEY_KEYS,journeyParams,journeyReturn,journeyBackHref,journeyThread}=require('../core.js');
+const {JOURNEY_KEYS,journeyParams,journeyReturn,journeyBackHref,journeyThread,journeyRole}=require('../core.js');
 const copy=require('../cv-copy.js').en;
 const JOURNEY=require('../data/journey.json');
 const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8');
@@ -112,4 +112,15 @@ test('journeyParams also reads back the object the shell kept, and checks it aga
   assert.deepEqual(journeyParams({...p}),p);
   assert.equal(journeyParams({from:'skilllens'}),null,'no journey=demo, no journey');
   assert.deepEqual(journeyParams({journey:'demo',from:{x:1},yoid:'yoid-ng-7f3a0123'}),{journey:'demo',yoid:'yoid-ng-7f3a0123'},'only strings');
+});
+
+test('the journey\'s job picks its target role, Solar installation assistant, from the listing param',()=>{
+  const roles=Object.keys(require('../data/role-skills.json')).map(name=>({name}));
+  assert.equal(JOURNEY.listing.role,'Solar installation assistant','the role opp-job-001 maps to');
+  assert.ok(roles.some(r=>r.name===JOURNEY.listing.role),'the role is on the menu');
+  assert.equal(journeyRole(journeyParams(LINK),JOURNEY,roles),'Solar installation assistant');
+  assert.equal(journeyRole(null,JOURNEY,roles),'','no journey, no role');
+  assert.equal(journeyRole(journeyParams('?journey=demo&listing=opp-job-999'),JOURNEY,roles),'','another listing, no role');
+  assert.equal(journeyRole(journeyParams('?journey=demo&from=skilllens'),JOURNEY,roles),'','no listing param, no role');
+  assert.equal(journeyRole(journeyParams(LINK),JOURNEY,[{name:'Market seller'}]),'','a role not on the menu is not picked');
 });

@@ -307,6 +307,13 @@
     const q='journey=demo&from=yocv&yoid='+encodeURIComponent(trim(params.yoid)||trim(yoid))+'&application='+encodeURIComponent(trim(application));
     return base+sep+q+frag;
   }
+  // The target role for the journey's job: when the link's listing is the journey's listing (opp-job-001), the role it
+  // maps to (Solar installation assistant), if it is on the role menu. Otherwise '' and the role comes from the trade.
+  function journeyRole(params,journey,roles){
+    const l=journey?.listing,want=trim(l?.role);
+    if(!params||!want||trim(params.listing)!==trim(l.id))return '';
+    return (roles||[]).some(r=>r?.name===want)?want:'';
+  }
   // The four-step thread for the app at phase n: before n recorded, n in progress until its own action is done, after n next.
   const journeyThread=(names,phase,done)=>(names||[]).map((name,i)=>({name:String(name),state:i+1<phase||(i+1===phase&&done)?'recorded':i+1===phase?'in-progress':'next'}));
   // The mocked Yo-ID lines, oldest first. dateOf turns an ISO time into the date the page prints.
@@ -454,6 +461,6 @@
     });
     return {entries,skills:[],generation:{mode:'sample-offline',provider:'browser-local',model:null,durationMs:0}};
   }
-  const api={MONTHS,WEEKDAYS,escapeHTML,shortQuote,contactsIn,numbersIn,allowedNumbers,properNouns,maskNames,restoreNames,checkCvText,monthLabel,monthsBetween,templateBullet,profileLine,buildCv,renderCvHtml,buildCvText,buildCvRecord,cvFingerprint,renderRecordHtml,newCvState,withdrawnCheck,canApply,applied,handoffOf,JOURNEY_KEYS,journeyParams,journeyReturn,journeyBackHref,journeyThread,yoidItems,reviewPayload,decide,readyForCv,profileInput,offlineReview};
+  const api={MONTHS,WEEKDAYS,escapeHTML,shortQuote,contactsIn,numbersIn,allowedNumbers,properNouns,maskNames,restoreNames,checkCvText,monthLabel,monthsBetween,templateBullet,profileLine,buildCv,renderCvHtml,buildCvText,buildCvRecord,cvFingerprint,renderRecordHtml,newCvState,withdrawnCheck,canApply,applied,handoffOf,JOURNEY_KEYS,journeyParams,journeyReturn,journeyBackHref,journeyRole,journeyThread,yoidItems,reviewPayload,decide,readyForCv,profileInput,offlineReview};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.YoCV=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

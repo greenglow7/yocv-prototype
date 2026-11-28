@@ -448,7 +448,8 @@ async function loadMenu(role){
  if(state.step===0&&state.role===role)render();
 }
 /* The record the shell read (or null on sign out): every item ticked, the contact line prefilled from the Yoma
-   profile, the role picked from the persona's trade when none is chosen yet. */
+   profile, the role picked when none is chosen yet: in the connected journey the role the journey's job maps to,
+   otherwise the one for the persona's trade. */
 function applyRecord(record,selector,sessionId){
  Object.assign(state,{sessionId:sessionId??null,selector:selector??null,record:record??null});
  if(!record){state.include={completions:[],credentials:[],selfAttested:[]};sync();return;}
@@ -457,7 +458,7 @@ function applyRecord(record,selector,sessionId){
   contact:{...state.contact,name:u.displayName??'',phone:u.phoneNumber??'',town:u.city??''}});
  for(const f of ui.forms)if(f.confirm==='completion'&&!state.include.completions.includes(f.completionId))f.completionId='';
  const persona=cfg.accounts.personas.find(p=>p.id===selector?.persona),match=cfg.roles.find(r=>r.tradeId&&r.tradeId===persona?.trade);
- if(!state.role&&match)state.role=match.name;
+ if(!state.role)state.role=C.journeyRole(api?.journey,cfg.journey,cfg.roles)||match?.name||'';
  sync();
 }
 function useRecord(record,selector,sessionId){applyRecord(record,selector,sessionId);ui.error='';render();loadMenu(state.role);}
