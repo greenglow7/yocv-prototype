@@ -290,3 +290,13 @@ Branch `connected-journey`, sample mode (no model keys), `PORT=4174 node server.
 | 5 | 360 px | Pass. No sideways scroll; the thread wraps to two columns. |
 | 6 | `/?as=halima#/cv` in a fresh tab | Pass. No card, no thread; the `cred-002` tag is still shown. |
 | 7 | Console | Pass. No page errors. |
+
+## Fixes from the end-to-end test, 2026-11-28
+
+The four-app end-to-end run found three YoCV mismatches. Same setup as above (`journey.sh`, port 4174), Playwright (Chromium, 1440 x 1000) from the SkillLens link.
+
+| # | Scenario | Result |
+| --- | --- | --- |
+| 1 | Step 1 role with `listing=opp-job-001` | Pass. **Solar installation assistant** is preselected, not Market seller. `/?as=halima#/cv` without the journey still preselects Market seller. |
+| 2 | `cred-002` title | Pass. Step 1 shows `Solar PV Installation Basics: practical challenge passed`, the same as the arriving card and SkillLens. |
+| 3 | **Back to the listing** colours | Pass. Background `rgb(76, 173, 233)` (#4cade9), text `rgb(65, 32, 75)` (#41204b); on hover the same colours, slightly brighter. |
