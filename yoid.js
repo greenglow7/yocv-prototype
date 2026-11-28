@@ -1,7 +1,8 @@
 /* The Yo-ID shell (docs/superpowers/specs/2026-11-22-yoid-shell-design.md). It owns the signed-in person, the record,
    the hash route, the bar, the two drawers, the hero, the tab pages and the footer. app.js owns the CV steps and is
    mounted into the CV tab's container with the record handed to it. Routes: #/, #/wallet, #/passport,
-   #/opportunities, #/skills, #/cv and #/cv/2 to #/cv/4. Only the chosen person's id is kept in sessionStorage. */
+   #/opportunities, #/skills, #/cv and #/cv/2 to #/cv/4. Only the chosen person's id is kept in sessionStorage, and,
+   when the page was opened from the connected journey (?journey=demo), that link's params. */
 (()=>{
 'use strict';
 const C=window.YoCV,E=C.escapeHTML;
@@ -10,7 +11,7 @@ const $=s=>document.querySelector(s);
 const ROUTES=['#/','#/wallet','#/passport','#/opportunities','#/skills','#/cv'],DEADLINE_MS=30000;
 let copy=window.YoCVCopy.en;
 // person: {id, displayName, firstName, town, trade}. signedOut keeps the token account for Log in while hiding it.
-const S={cfg:null,person:null,record:null,selector:null,tab:null,step:0,offline:false,signedOut:false,busy:false,list:false,open:{},filter:'all',sub:'completed'};
+const S={cfg:null,journey:null,person:null,record:null,selector:null,tab:null,step:0,offline:false,signedOut:false,busy:false,list:false,open:{},filter:'all',sub:'completed'};
 let cv=null,pendingAction=null,toastTimer;
 const sample=()=>S.cfg?.accounts?.source==='sample';
 const who=()=>S.signedOut?null:S.person;
@@ -295,6 +296,21 @@ function chooseAccount(id){
  const d=draft();
  if(who()&&(d.step>0||d.dirty))confirm(copy.switchTitle,copy.switchCopy,copy.switchAccount,()=>signIn(id));else signIn(id);
 }
+/* The connected journey (spec 2026-11-28-yocv-connected-journey-design, journey contract v1). A link with journey=demo
+   is read once: its params leave the address, as ?as= does, and stay in sessionStorage for this tab, so hash routes and
+   a reload keep them. Arriving on no route opens the CV tab, where the arriving card is. No journey=demo: nothing changes. */
+const JOURNEY_KEY='yocv.journey';
+function resolveJourney(){
+ const url=new URL(location.href),fresh=C.journeyParams(url.search);
+ if(fresh){
+  for(const k of C.JOURNEY_KEYS)url.searchParams.delete(k);
+  if(!url.hash||url.hash==='#/')url.hash='#/cv';
+  history.replaceState(null,'',url.pathname+url.search+url.hash);
+  try{sessionStorage.setItem(JOURNEY_KEY,JSON.stringify(fresh));}catch{}
+  return fresh;
+ }
+ try{const kept=JSON.parse(sessionStorage.getItem(JOURNEY_KEY)||'null');return kept&&typeof kept==='object'?C.journeyParams(kept):null;}catch{return null;}
+}
 /* ?as=<id> signs in as that persona and leaves the address; else the stored person, else the first persona. */
 function resolvePerson(){
  const url=new URL(location.href),as=url.searchParams.get('as');
@@ -336,6 +352,7 @@ function bind(){
  });
 }
 async function boot(){
+ S.journey=resolveJourney();
  let cfg;
  try{
   const res=await fetch('/api/cv/config',{cache:'no-store'});
@@ -346,13 +363,13 @@ async function boot(){
   cfg={copy:window.YoCVCopy.en,rules:window.YoCVRules.RULES,roles:[],accounts:{source:null,personas:[]},mode:{mode:'sample',provider:'browser-local',model:null}};
  }
  S.cfg=cfg;copy=cfg.copy||copy;
- cv=window.YoCVApp.mount(document.querySelector('#view'),{copy,cfg,offline:S.offline,confirm,notify});
+ cv=window.YoCVApp.mount(document.querySelector('#view'),{copy,cfg,offline:S.offline,confirm,notify,journey:S.journey});
  bind();
  if(S.offline||!cfg.accounts.source){render();return;}
  const id=resolvePerson();
  if(sample()&&!id){render();return;}
  await signIn(id);
 }
-window.YoID={signIn,signOut,chooseAccount,openTab:r=>{location.hash=r;},render,person:()=>who(),record:()=>S.record,views};
+window.YoID={signIn,signOut,chooseAccount,openTab:r=>{location.hash=r;},render,person:()=>who(),record:()=>S.record,journey:()=>S.journey,views};
 boot();
 })();

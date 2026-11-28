@@ -168,6 +168,9 @@
     yoidHeading:'On your Yo-ID',yoidNote:'Designed, not written to Yoma. Yoma has no YoID write for these yet.',yoidCheck:'CV check {code}, made {made}, open until {until}.',
     yoidCheckWithdrawn:'CV check {code}, made {made}, withdrawn {date}.',yoidApplication:'{name}: {title} at {organisation}, {date}. Mock-up.',applicationName:'Job Application',
     yoidId:'Your YoID: {id}',handoffFrom:'{name}, from {from}',
+    // The connected journey (journey contract v1): the handoff cards and the YoID thread, word for word as the contract has them.
+    journeyFrom:'From {app} · Phase {n}',journeyBack:'Back to {app} · Phase {n}',journeyBackButton:'Back to the listing',journeyRecorded:'✓ Recorded on your YoID (mock-up)',
+    threadLabel:'YoID · {yoid} · mock-up',threadRecorded:'recorded',threadInProgress:'in progress',threadNext:'next',
     errVerify:'The QR code could not be made. Try again in a moment.',errVerifyLine:'A line on the CV no longer matches your answers. Go back to Review.',errVerifyReview:'Finish the review first.',errVerifyMany:'You have made the most QR codes this session allows. Use the last one.',
     checkTitle:'CV check',checkLead:'{name} shared this check. It shows what the YoCV prototype read from Yoma on {date}.',checkCodeLine:'Check code {code}. It should match the code printed on the CV.',
     checkConfirmed:'Confirmed from Yoma',checkConfirmedNote:'Yoma has a record of these: learning completed and credentials issued by the organisations named.',

@@ -25,9 +25,11 @@ test('index.html is the Yo-ID shell',()=>{
   assert.ok(!/©|All Rights Reserved|Terms of Service|Privacy Policy|help@yoma/.test(html));
   assert.ok(html.includes('A Yoma concept'),'the concept line survives in About');
 });
-test('yoid.js signs in on load, routes by hash and keeps one key in sessionStorage',()=>{
+test('yoid.js signs in on load, routes by hash and keeps the person key, plus the journey params when opened from the journey',()=>{
   assert.match(js,/sessionStorage\.getItem\('yoid\.person'\)/);assert.match(js,/sessionStorage\.setItem\('yoid\.person'/);assert.match(js,/sessionStorage\.removeItem\('yoid\.person'\)/);
-  assert.equal((js.match(/sessionStorage\.setItem\(/g)||[]).length,1,'one key');
+  // The connected journey (spec 2026-11-28-yocv-connected-journey-design) adds one key, written only for a journey=demo link.
+  assert.equal((js.match(/sessionStorage\.setItem\(/g)||[]).length,2,'the person key and the journey key');
+  assert.match(js,/sessionStorage\.setItem\(JOURNEY_KEY,/);assert.ok(js.includes("const JOURNEY_KEY='yocv.journey'"));
   assert.ok(js.includes("searchParams.get('as')")&&js.includes('history.replaceState'),'?as= handled and dropped');
   for(const r of ['#/','#/wallet','#/passport','#/opportunities','#/skills','#/cv'])assert.ok(js.includes("'"+r+"'"),r);
   assert.ok(js.includes("addEventListener('hashchange'"));

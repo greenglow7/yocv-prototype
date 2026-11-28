@@ -20,5 +20,29 @@
   "outgoing": {
     "name": "Job Application",
     "id": "app-001"
+  },
+  "connected": {
+    "note": "Journey contract v1 (2026-11-28): what the handoff cards and the YoID thread show when YoCV is opened with journey=demo. Phase 4 of four.",
+    "phase": 4,
+    "thread": [
+      "Saved Opportunity",
+      "Learning Plan",
+      "Skill Credential",
+      "Job Application"
+    ],
+    "arriving": {
+      "from": "SkillLens",
+      "phase": 3,
+      "name": "Skill Credential",
+      "id": "cred-002",
+      "title": "Solar PV Installation Basics: practical challenge passed"
+    },
+    "leaving": {
+      "to": "Ziqi",
+      "phase": 1,
+      "name": "Job Application",
+      "id": "app-001",
+      "title": "Application to Solar Installation Assistant (Trainee)"
+    }
   }
 }

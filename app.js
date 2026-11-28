@@ -174,7 +174,7 @@ const isoDay=iso=>longDate(iso)||String(iso??'').slice(0,10);
 function applyHTML(){
  const l=cfg?.journey?.listing;if(state.offline||!l)return '';
  const sent=state.application,can=C.canApply(state,copy);
- const body=sent?`<p class="notice" role="status">${E(fill(copy.applySent,{organisation:sent.organisation}))}</p>`
+ const body=sent?`<p class="notice" role="status">${E(fill(copy.applySent,{organisation:sent.organisation}))}</p>${leavingHTML()}`
   :`<p class="field-help">${E(can?copy.applySends:copy.applyNeedsQr)}</p><div class="action-row"><button class="primary" data-action="apply" ${can?'':'disabled'}>${E(copy.applyButton)}</button></div>`;
  return `<section class="claim-card apply print-hide" aria-labelledby="apply-title"><h2 id="apply-title" tabindex="-1">${E(fill(copy.applyHeading,{title:l.title}))}</h2><p>${E(fill(copy.applyLead,{organisation:l.organisation,place:l.place,asks:l.asks}))}</p>${l.sample?`<p class="field-help">${E(copy.applySample)}</p>`:''}${body}</section>`;
 }
@@ -183,6 +183,34 @@ function yoidHTML(){
  const li=i=>`<li>${E(i.text)}${i.button?` <button class="text-button" data-withdraw="${E(i.checkId)}">${E(copy.verifyWithdraw)}</button>`:''}</li>`;
  const p=cfg?.journey?.person,yoid=p&&p.personaId===state.selector?.persona?`<p class="verify-code">${E(fill(copy.yoidId,{id:p.yoid}))}</p>`:'';
  return `<section class="claim-card yoid-record print-hide" aria-labelledby="yoid-record-title"><h2 id="yoid-record-title">${E(copy.yoidHeading)}</h2>${yoid}<p class="field-help">${E(copy.yoidNote)}</p><ul>${items.map(li).join('')}</ul></section>`;
+}
+/* The connected journey (spec 2026-11-28-yocv-connected-journey-design, journey contract v1). Only when the shell was
+   opened with journey=demo, and online: the arriving card at the top of Step 1, the YoID thread above every step, and
+   after Apply the leaving card back to the Ziqi listing, in the same tab. The thread's state comes from the phase and
+   this page's own Apply; nothing is read from or written to a shared store. */
+const journeyOn=()=>Boolean(api?.journey&&cfg?.journey?.connected&&!state.offline);
+const TICK='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4L19 6"/></svg> ';
+const journeyYoid=()=>api.journey.yoid||cfg.journey.person?.yoid||'';
+function journeyCard({id,eyebrow,item,button=''}){
+ return `<section class="journey-card print-hide" aria-labelledby="${id}"><p class="journey-eyebrow">${E(eyebrow)}</p><h2 class="journey-title" id="${id}"><strong>${E(item.name)}</strong> <span class="journey-item">${E(item.title)}</span></h2>${button}<p class="journey-recorded">${E(copy.journeyRecorded)}</p></section>`;
+}
+function arrivingHTML(){
+ if(!journeyOn())return '';
+ const a=cfg.journey.connected.arriving;
+ return journeyCard({id:'journey-arriving-title',eyebrow:fill(copy.journeyFrom,{app:a.from,n:a.phase}),item:a});
+}
+function leavingHTML(){
+ if(!journeyOn()||!state.application)return '';
+ const l=cfg.journey.connected.leaving,href=C.journeyBackHref(api.journey,{application:state.application.id,yoid:journeyYoid()});
+ const button=href?`<a class="journey-button" id="journey-back" href="${E(href)}">${E(copy.journeyBackButton)}</a>`:'';
+ return journeyCard({id:'journey-leaving-title',eyebrow:fill(copy.journeyBack,{app:l.to,n:l.phase}),item:l,button});
+}
+function threadHTML(){
+ if(!journeyOn())return '';
+ const c=cfg.journey.connected,label=fill(copy.threadLabel,{yoid:journeyYoid()});
+ const words={recorded:copy.threadRecorded,'in-progress':copy.threadInProgress,next:copy.threadNext};
+ const li=t=>`<li class="journey-step ${t.state}"><span class="journey-step-name">${E(t.name)}</span><span class="journey-step-state">${t.state==='recorded'?TICK:''}${E(words[t.state])}</span></li>`;
+ return `<section class="journey-thread print-hide" aria-label="${E(label)}"><p class="journey-thread-label">${E(label)}</p><ol>${C.journeyThread(c.thread,c.phase,Boolean(state.application)).map(li).join('')}</ol></section>`;
 }
 /* The person shows the QR on their own phone to an informal employer, who scans it with theirs (spec 2026-11-27-yocv-phone-show-design). */
 function showQr(){
@@ -232,7 +260,7 @@ function focusSnapshot(){
 function focusRestore(f){if(!f)return;try{const el=view.querySelector(f.sel);if(!el||el.disabled)return;el.focus({preventScroll:true});if(f.range)el.setSelectionRange(...f.range);}catch{}}
 // Every render tells the shell where the draft stands (the Overview CV card, the hero line and the footer mode label).
 function announce(){document.dispatchEvent(new CustomEvent('yocv:draft',{detail:{...draftStatus(),offline:state.offline}}));}
-function render(){if(!cfg)return;const f=focusSnapshot();view.innerHTML=[recordStep,workStep,reviewStep,cvStep][state.step]();view.setAttribute('aria-busy',String(ui.busy));focusRestore(f);announce();}
+function render(){if(!cfg)return;const f=focusSnapshot();view.innerHTML=(state.step===0?arrivingHTML():'')+threadHTML()+[recordStep,workStep,reviewStep,cvStep][state.step]();view.setAttribute('aria-busy',String(ui.busy));focusRestore(f);announce();}
 // A step change writes the hash (#/cv, #/cv/2 to #/cv/4) so Back works; the shell's hashchange then finds the step
 // already shown. fromHash is the shell calling back for a hash it read, so nothing is written again.
 function go(step,{fromHash=false}={}){

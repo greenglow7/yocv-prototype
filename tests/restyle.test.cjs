@@ -8,7 +8,7 @@ const path=require('node:path');
 const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8');
 const PAGES=['index.html','card.html','app.js','card.js','yoid.js'];
 const SHEETS=['styles.css','card.css'];
-const TOKENS=['--ink:#020304','--muted:#545859','--line:#dce0e5','--page:#f3f6fa','--panel:#ffffff','--accent:#41204b','--accent-shade:#54365d','--accent-tint:#e7d4ed','--accent-soft:#c3a2cd','--green:#387f6a','--recorded:#2b6a57','--recorded-tint:#e6f5f3','--orange:#f9ab3e','--orange-tint:#fdeed8','--gold:#d48414','--awaiting:#8a5a00','--awaiting-tint:#fdeed8','--stated-tint:#f3f6fa','--blue-tint:#edf6fd','--blue-dark:#2487c5','--type-learning:#007cb4','--type-yoid:#a3195b','--type-default:#5a6675','--error:#b3261e','--error-tint:#ffe9ea'];
+const TOKENS=['--ink:#020304','--muted:#545859','--line:#dce0e5','--page:#f3f6fa','--panel:#ffffff','--accent:#41204b','--accent-shade:#54365d','--accent-tint:#e7d4ed','--accent-soft:#c3a2cd','--green:#387f6a','--recorded:#2b6a57','--recorded-tint:#e6f5f3','--orange:#f9ab3e','--orange-tint:#fdeed8','--gold:#d48414','--awaiting:#8a5a00','--awaiting-tint:#fdeed8','--stated-tint:#f3f6fa','--blue-tint:#edf6fd','--blue:#4cade9','--blue-dark:#2487c5','--type-learning:#007cb4','--type-yoid:#a3195b','--type-default:#5a6675','--error:#b3261e','--error-tint:#ffe9ea'];
 const SHADOW='--shadow:0 2px 15px -3px rgba(0,0,0,.07),0 10px 20px -2px rgba(0,0,0,.04)';
 const RADII=['8px','12px','16px','18px','9999px','50%','0'];
 const FONT_LINK='https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Open+Sans:wght@400;600;700&display=swap';
