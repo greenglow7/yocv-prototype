@@ -25,7 +25,7 @@ For Jongmin's "What We Changed" slide. Each row is tied to a feedback point. The
 
 **What arrives from Phase 3 (SkillLens):** the **Skill Credential** `cred-002`, "Solar PV Basics: practical challenge passed". Step 1 and the Passport tab show it tagged "Skill Credential, from SkillLens", and the CV lists it under **Confirmed from Yoma**.
 
-**What Phase 4 hands on:** the **Job Application** `app-001` to `opp-job-001`, the Saved Opportunity from Phase 1. Step 4 ends with **Apply to Solar Installation Assistant (Trainee)**, which sends the CV and its check link (a mock-up: nothing is sent). The listing and the handoff names sit in one file, `data/journey.json`.
+**What Phase 4 hands on:** the **Job Application** `app-001` to `opp-job-001`, the Saved Opportunity from Phase 1. Step 4 ends with **Apply to Solar Installation Assistant (Trainee)**, which sends the CV and its check link (a mock-up: nothing is sent). The listing and the handoff names sit in one file, `data/journey.json`. In the connected journey the card **Back to Ziqi · Phase 1** then links back to the same Ziqi listing, which shows the Job Application received.
 
 **YoID thread:** the CV check and the Job Application are recorded on Halima's YoID, `yoid-ng-7f3a0123`. Step 4 shows this as an **On your Yo-ID** list, a mocked write labelled "Designed, not written to Yoma". She can already withdraw a check: the employer's scan then says it was withdrawn.
 

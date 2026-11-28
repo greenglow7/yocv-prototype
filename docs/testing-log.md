@@ -276,3 +276,17 @@ Open issues from this run:
 1. **A local model is too slow for the page on this laptop.** Each call took 50 to 110 s, against the provider's fixed 20 s timeout and the page's 30 s deadline, so the page would show the timeout error. The laptop was under load (about 5 tokens a second). For a live demo, use a hosted model (Claude Haiku 5.5 with a key in `.env`), or make the timeout and the reasoning setting configurable in a later task.
 2. **A place word masked as a name.** "Market", from the place "Kaduna Central Market", is in `knownWords`, so the plain word "market" in her answer was masked as `[name1]` before the model saw it. It was restored afterwards, so the line was right, but a common word in a place name should not be masked.
 3. **First person.** Both model lines keep "my aunt's", against the prompt's "No first person". No check catches it, and the template has it too. This is the known limitation from the shared mock data section, row 6.
+
+# YoCV in the connected journey, 2026-11-28
+
+Branch `connected-journey`, sample mode (no model keys), `PORT=4174 node server.js`, Yoma unreachable from the test machine. Spec `docs/superpowers/specs/2026-11-28-yocv-connected-journey-design.md`. Driven with Playwright (Chromium, 1280 x 900, then 360 x 800) from the SkillLens link with `return=http://localhost:3000/opportunities/c0a7e000-0000-4000-8000-000000000301`.
+
+| # | Scenario | Result |
+| --- | --- | --- |
+| 1 | Open the SkillLens link | Pass. Signed in as Halima; the address becomes `/#/cv`; `sessionStorage` holds `yoid.person` and `yocv.journey` with the nine params. |
+| 2 | Arriving card and thread on Step 1 | Pass. `From SkillLens · Phase 3`, **Skill Credential**, `Solar PV Installation Basics: practical challenge passed`, `✓ Recorded on your YoID (mock-up)`. Thread: three recorded, Job Application in progress. `cred-002` tagged **Skill Credential, from SkillLens**. |
+| 3 | Steps 1 to 4 with the phone repair entry, every line accepted, QR made, **Send my application** | Pass. Leaving card `Back to Ziqi · Phase 1`, **Job Application**, `Application to Solar Installation Assistant (Trainee)`, **Back to the listing**. Thread: all four recorded. |
+| 4 | The back link | Pass. `http://localhost:3000/opportunities/c0a7e000-0000-4000-8000-000000000301?journey=demo&from=yocv&yoid=yoid-ng-7f3a0123&application=app-001`, no `target`; a click navigates the same tab, no new tab. |
+| 5 | 360 px | Pass. No sideways scroll; the thread wraps to two columns. |
+| 6 | `/?as=halima#/cv` in a fresh tab | Pass. No card, no thread; the `cred-002` tag is still shown. |
+| 7 | Console | Pass. No page errors. |
