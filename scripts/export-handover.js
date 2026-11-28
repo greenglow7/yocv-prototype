@@ -19,7 +19,7 @@ function cvSample(){
   const e=fixture.entry;
   const fields={title:e.title,what:e.what,forWhom:e.forWhom,frequency:e.frequency,months:e.months,number:e.number,outcome:e.outcome};
   const {fields:masked}=core.maskNames(fields,{role:fixture.role,verbs:RULES.verbs,known:[]});
-  return buildCvMessages({role:fixture.role,entry:masked,menuNames:MENU,learningTitles:['Solar PV Basics: practical challenge passed','Working Safely at Height']});
+  return buildCvMessages({role:fixture.role,entry:masked,menuNames:MENU,learningTitles:['Solar PV Installation Basics: practical challenge passed','Working Safely at Height']});
 }
 
 // Every sample follows the team's shared person, Halima (shared mock data, 2026-11-25).

@@ -23,7 +23,7 @@ For Jongmin's "What We Changed" slide. Each row is tied to a feedback point. The
 
 **In the story:** Halima builds a CV from her verified credentials and her self-declared phone repair work, makes a QR check, and applies to the Solar Installation Assistant (Trainee) job at Sunrise Solar Ltd that she saved in Phase 1.
 
-**What arrives from Phase 3 (SkillLens):** the **Skill Credential** `cred-002`, "Solar PV Basics: practical challenge passed". Step 1 and the Passport tab show it tagged "Skill Credential, from SkillLens", and the CV lists it under **Confirmed from Yoma**.
+**What arrives from Phase 3 (SkillLens):** the **Skill Credential** `cred-002`, "Solar PV Installation Basics: practical challenge passed". Step 1 and the Passport tab show it tagged "Skill Credential, from SkillLens", and the CV lists it under **Confirmed from Yoma**.
 
 **What Phase 4 hands on:** the **Job Application** `app-001` to `opp-job-001`, the Saved Opportunity from Phase 1. Step 4 ends with **Apply to Solar Installation Assistant (Trainee)**, which sends the CV and its check link (a mock-up: nothing is sent). The listing and the handoff names sit in one file, `data/journey.json`. In the connected journey the card **Back to Ziqi · Phase 1** then links back to the same Ziqi listing, which shows the Job Application received.
 

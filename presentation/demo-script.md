@@ -34,7 +34,7 @@ OPENAI_STRUCTURED_OUTPUT=json_object
 
 **Say:** "This is Halima's Yo-ID. She saved the solar trainee job in Phase 1, followed her Learning Plan in Phase 2 and passed the SkillLens challenge in Phase 3. Yoma's own dashboard promises a CV built from her record; here it is."
 
-**Do:** click **Open CV**. Step 1, **Confirmed from Yoma**, shows her record, already read: five completions from Passport to Earning and Kaduna Green Youth Network, and five credentials. Point at **Solar PV Basics: practical challenge passed**, tagged **Skill Credential, from SkillLens**. Leave everything ticked. Choose **Solar installation assistant**.
+**Do:** click **Open CV**. Step 1, **Confirmed from Yoma**, shows her record, already read: five completions from Passport to Earning and Kaduna Green Youth Network, and five credentials. Point at **Solar PV Installation Basics: practical challenge passed**, tagged **Skill Credential, from SkillLens**. Leave everything ticked. Choose **Solar installation assistant**.
 
 **Say:** "This is the Skill Credential Charisse just showed, arriving from SkillLens. The CV is built from what Yoma records. Nothing in the record can be edited here."
 

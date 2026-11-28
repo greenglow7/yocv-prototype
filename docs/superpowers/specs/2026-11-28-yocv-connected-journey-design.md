@@ -28,7 +28,7 @@ At the top of Step 1, only in journey mode and online:
 
 `cred-002` in Step 1 and the Passport tab keeps its tag **Skill Credential, from SkillLens**.
 
-The persona's own credential title in `server/card/personas.json` is still "Solar PV Basics: practical challenge passed". The card uses the contract's item title. The team should pick one.
+The persona's own credential title in `server/card/personas.json` is the contract's title too, "Solar PV Installation Basics: practical challenge passed", the same as SkillLens. It was "Solar PV Basics: practical challenge passed" until the end-to-end test of 2026-11-28 found the mismatch.
 
 ## 4. The YoID thread
 

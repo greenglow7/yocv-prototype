@@ -46,7 +46,7 @@ number: about 20 customers a week
 outcome: Customers come back to me when their phone breaks again.
 <<<END>>>
 
-Learning on Yoma (context only, do not mention): Solar PV Basics: practical challenge passed; Working Safely at Height
+Learning on Yoma (context only, do not mention): Solar PV Installation Basics: practical challenge passed; Working Safely at Height
 
 Skill list (choose only from these names):
 - Photovoltaic Systems
