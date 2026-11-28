@@ -48,7 +48,7 @@ Only an absolute `http:` or `https:` return is followed. Anything else hides the
 
 ## 6. Look
 
-White card, purple heading `#41204b`, green recorded text `#387f6a`, blue button `#4cade9`, Nunito headings, Open Sans body, 12 px radius. The blue joins the tokens as `--blue`. The button text is ink, not white, because white on that blue reads at 2.6:1.
+White card, purple heading `#41204b`, green recorded text `#387f6a`, blue button `#4cade9`, Nunito headings, Open Sans body, 12 px radius. The blue joins the tokens as `--blue`. The button text is purple `#41204b` (5.5:1 on the blue), the decision for all four prototypes; it was ink until the end-to-end test of 2026-11-28. Not white, because white on that blue reads at 2.6:1. The hover only brightens the blue a little.
 
 ## 7. Data and copy
 

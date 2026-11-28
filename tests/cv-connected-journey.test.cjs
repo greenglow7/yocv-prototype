@@ -124,3 +124,13 @@ test('the journey\'s job picks its target role, Solar installation assistant, fr
   assert.equal(journeyRole(journeyParams('?journey=demo&from=skilllens'),JOURNEY,roles),'','no listing param, no role');
   assert.equal(journeyRole(journeyParams(LINK),JOURNEY,[{name:'Market seller'}]),'','a role not on the menu is not picked');
 });
+
+test('the Back to the listing button is Yoma blue with Yoma purple text, as in the other three prototypes',()=>{
+  const css=read('styles.css');
+  assert.match(css,/--blue:#4cade9/i);assert.match(css,/--accent:#41204b/i);
+  const rule=/\.journey-card \.journey-button\{([^}]*)\}/.exec(css)[1];
+  assert.match(rule,/background:var\(--blue\)/);assert.match(rule,/(^|;)color:var\(--accent\)/);
+  const hover=/\.journey-card \.journey-button:hover\{([^}]*)\}/.exec(css)[1];
+  assert.ok(!/background:/.test(hover)&&!/color:var\(--panel\)/.test(hover),'hover keeps blue and purple');
+  for(const [,body] of css.matchAll(/a\.journey-button(?::hover)?\{([^}]*)\}/g))assert.match(body,/color:var\(--accent\)/,'the #view override keeps purple too');
+});
