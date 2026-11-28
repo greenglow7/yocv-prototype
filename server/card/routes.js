@@ -210,7 +210,7 @@ function maskSnapshot(snapshot,now){
 
 function createCardRouter({config,accountSource,provider,store,key,yoma,publicUrl,now=Date.now,random=crypto.randomBytes,readJSONBody=defaultReadJSONBody,maxInFlight=MAX_IN_FLIGHT,outbox=null,transcriber=undefined}={}){
   if(!accountSource||!store||!key)throw new Error('createCardRouter needs accountSource, store and key');
-  const base=str(publicUrl||('http://'+(config?.host||'127.0.0.1')+':'+(config?.port||4173))).replace(/\/+$/,'');
+  const base=str(publicUrl||('http://'+(config?.host||'127.0.0.1')+':'+(config?.port||4174))).replace(/\/+$/,'');
   const system=buildVouchSystem({config,store,key,accountSource,provider,publicUrl:base,now,random,outbox,transcriber});
   const vouchRouter=createVouchRouter(system);
   // Retention (spec 9.7): hourly, never holding the process open. Tests call runSweep directly.

@@ -28,11 +28,11 @@ cd yocv-prototype
 npm start
 ```
 
-Open `http://127.0.0.1:4173`. It opens signed in as Halima Yusuf, the fictional person the four prototypes share (the team's shared mock data). The other six sample people are under Switch account. With no keys it runs in sample mode: CV lines come from templates, and Yoma data is still read live from Yoma's public API.
+Open `http://127.0.0.1:4174`. It opens signed in as Halima Yusuf, the fictional person the four prototypes share (the team's shared mock data). The other six sample people are under Switch account. With no keys it runs in sample mode: CV lines come from templates, and Yoma data is still read live from Yoma's public API.
 
 - **Live AI.** Copy `.env.example` to `.env` and set `MODEL_PROVIDER` with its key. Claude, Azure OpenAI and any OpenAI-compatible endpoint work, a locally hosted model through Ollama included. The [main README](../README.md), section Development Setup, has the three configurations side by side.
 - **The demo pages.** Run `npm run seed:demo`, then start with `YOVOUCH_SIM=1`. The script is [presentation/demo-script.md](../presentation/demo-script.md).
-- **Scan the QR from a phone.** Start with `HOST=0.0.0.0` and `YOCARD_PUBLIC_URL=http://<your LAN IP>:4173`, then make the QR. [qr-demo.md](qr-demo.md) walks through it step by step.
+- **Scan the QR from a phone.** Start with `HOST=0.0.0.0` and `YOCARD_PUBLIC_URL=http://<your LAN IP>:4174`, then make the QR. [qr-demo.md](qr-demo.md) walks through it step by step.
 - **Tests.** `npm test`. Two model tests are skipped without a key. `YOCV_LIVE_YOMA=0 npm test` also skips the two Yoma tests when you are offline.
 
 No keys or secrets are in the repo. `.env` and `data/cards/` (the signing key and stored cards) are git-ignored.

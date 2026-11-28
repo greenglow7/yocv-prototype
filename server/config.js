@@ -11,7 +11,7 @@ const DEFAULTS={
   anthropicModel:'claude-opus-5-5',
   anthropicBaseUrl:'https://api.anthropic.com',
   yomaBase:'https://api.yoma.world/api/v3',
-  port:4173,
+  port:4174,
   host:'127.0.0.1'
 };
 

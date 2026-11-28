@@ -6,8 +6,8 @@ The YoCV demo follows the team's shared mock data (2026-11-25): **Halima Yusuf**
 
 1. Put `YOVOUCH_SIM=1` in `.env`. The simulators and the `/demo` pages need it, and a gateway secret turns them off.
 2. Run `node scripts/seed-demo.js`. YoCV does not need it for Halima; the YoCard and YoVouch demos below do. It publishes Thandi's card and adds her three customer vouches with sample numbers.
-3. Run `npm start` and open `http://127.0.0.1:4173`. The page opens signed in as Halima on the Yo-ID Overview. If another person is signed in, open the avatar menu, choose **Switch account** and pick **Halima Yusuf**, or open `http://127.0.0.1:4173/?as=halima`. Click **Reset** in the footer so no CV draft is left from a rehearsal. Note the mode label in the footer: **Live AI · <model>** or **Sample mode**. Say which one you are in.
-4. Open a second tab on `http://127.0.0.1:4173/demo/cv-rejected`, the prepared refused suggestion.
+3. Run `npm start` and open `http://127.0.0.1:4174`. The page opens signed in as Halima on the Yo-ID Overview. If another person is signed in, open the avatar menu, choose **Switch account** and pick **Halima Yusuf**, or open `http://127.0.0.1:4174/?as=halima`. Click **Reset** in the footer so no CV draft is left from a rehearsal. Note the mode label in the footer: **Live AI · <model>** or **Sample mode**. Say which one you are in.
+4. Open a second tab on `http://127.0.0.1:4174/demo/cv-rejected`, the prepared refused suggestion.
 5. Keep these `.env` lines ready for the live-model switch. The first choice is Claude: it needs only a key, and `effort` is set low for the 20 s deadline. It has not been run live on the build laptop, so rehearse it as described below. The banner then reads **Live AI · claude-haiku-5-5**.
 
 ```
@@ -34,7 +34,7 @@ OPENAI_STRUCTURED_OUTPUT=json_object
 
 **Say:** "This is Halima's Yo-ID. She saved the solar trainee job in Phase 1, followed her Learning Plan in Phase 2 and passed the SkillLens challenge in Phase 3. Yoma's own dashboard promises a CV built from her record; here it is."
 
-**Do:** click **Open CV**. Step 1, **Confirmed from Yoma**, shows her record, already read: five completions from Passport to Earning and Kaduna Green Youth Network, and five credentials. Point at **Solar PV Basics: practical challenge passed**, tagged **Skill Credential, from SkillLens**. Leave everything ticked. Choose **Solar installation assistant**.
+**Do:** click **Open CV**. Step 1, **Confirmed from Yoma**, shows her record, already read: five completions from Passport to Earning and Kaduna Green Youth Network, and five credentials. Point at **Solar PV Installation Basics: practical challenge passed**, tagged **Skill Credential, from SkillLens**. Leave everything ticked. Choose **Solar installation assistant**.
 
 **Say:** "This is the Skill Credential Charisse just showed, arriving from SkillLens. The CV is built from what Yoma records. Nothing in the record can be edited here."
 
@@ -62,7 +62,7 @@ OPENAI_STRUCTURED_OUTPUT=json_object
 
 **Say:** "This is the Job Application, the handoff back to Sunrise Solar, who wrote the job with RoleMap. It is a mock-up, and the page says nothing was sent. In Yoma it would be written to her YoID."
 
-**Optional, 45 seconds: the employer scans the QR.** Click **Make a QR code for employers**, then **Show it on my phone**, and scan it with a phone, or click **Open the employer view**. Needs `HOST=0.0.0.0` and `YOCARD_PUBLIC_URL=http://<laptop LAN IP>:4173` for a real phone scan.
+**Optional, 45 seconds: the employer scans the QR.** Click **Make a QR code for employers**, then **Show it on my phone**, and scan it with a phone, or click **Open the employer view**. Needs `HOST=0.0.0.0` and `YOCARD_PUBLIC_URL=http://<laptop LAN IP>:4174` for a real phone scan.
 
 **Say:** "Sunrise Solar scans this. Green is what Yoma recorded, the Skill Credential included. Grey is her own words, checked against her answers but confirmed by nobody. Her phone number is not on it." If you withdraw the check now, the scan says it was withdrawn.
 
@@ -84,7 +84,7 @@ If the model call fails live (the app shows `provider_timeout` or "The server di
 
 # YoCard — three-minute live demonstration
 
-Before presenting: `npm start`, open `http://127.0.0.1:4173/card.html`. Have a second phone or a second browser window ready for the customer view.
+Before presenting: `npm start`, open `http://127.0.0.1:4174/card.html`. Have a second phone or a second browser window ready for the customer view.
 
 ## 0:00–0:25 — Why a card
 
@@ -135,7 +135,7 @@ Six beats, two phones and a laptop on the same Wi-Fi (spec section 14). Say the 
 
 ## Preparation
 
-1. On the laptop, set `HOST=0.0.0.0`, `YOCARD_PUBLIC_URL` to the laptop's LAN address (for example `http://192.168.1.20:4173`) and `YOVOUCH_SIM=1`. Leave `YOVOUCH_GATEWAY_SECRET` unset, or the simulator routes are not mounted.
+1. On the laptop, set `HOST=0.0.0.0`, `YOCARD_PUBLIC_URL` to the laptop's LAN address (for example `http://192.168.1.20:4174`) and `YOVOUCH_SIM=1`. Leave `YOVOUCH_GATEWAY_SECRET` unset, or the simulator routes are not mounted.
 2. Run `node scripts/seed-demo.js`. It prints the `/my` link of every prepared card (Thandi, Sipho, Bongani, Amara, Ayo, Bola, Chidi) and the id of the inbox reply. Keep that output open.
 3. Run `npm start`.
 4. Five minutes before beat 2, run `node scripts/seed-demo.js --old-code`. It writes `data/cards/demo-old-code.svg`, Thandi's QR three steps back, captioned with the time it was made. This run seeds a fresh set of cards and its `demo.json` replaces the first one, so use the `/my` links this run prints from here on. Open the SVG on the laptop. It is never served by the app. A code can live 180 seconds, so the screenshot must be at least three minutes old when it is scanned.

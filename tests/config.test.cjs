@@ -47,7 +47,7 @@ test('loadConfig defaults to local provider with documented defaults',()=>{
  assert.equal(cfg.openai,null);
  assert.equal(cfg.anthropic,null);
  assert.equal(cfg.yomaBase,'https://api.yoma.world/api/v3');
- assert.equal(cfg.port,4173);
+ assert.equal(cfg.port,4174);
  assert.equal(cfg.host,'127.0.0.1');
 });
 test('loadConfig picks azure when endpoint, key and deployment are present',()=>{
@@ -101,7 +101,7 @@ test('loadConfig treats blank values as unset',()=>{
 });
 test('loadConfig falls back to the default port when PORT is not a number',()=>{
  const cfg=config.loadConfig({env:{PORT:'abc'},cwd:tmpDir()});
- assert.equal(cfg.port,4173);
+ assert.equal(cfg.port,4174);
 });
 test('loadConfig gives the YoVouch defaults and reads YOVOUCH_SIM',()=>{
  const cfg=config.loadConfig({env:{},cwd:tmpDir()});

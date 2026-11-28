@@ -16,6 +16,7 @@ const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8');
 const SRC={yoid:read('yoid.js'),app:read('app.js')};
 const copy=require('../cv-copy.js').en;
 const rules=require('../cv-rules.js').RULES;
+const JOURNEY=require('../data/journey.json');
 const records={};let personas=[];
 test.before(async()=>{
   const config={...loadConfig({env:{},cwd:fs.mkdtempSync(path.join(os.tmpdir(),'yoid-flows-'))}),yomaAccessToken:''};
@@ -70,15 +71,17 @@ function stubApp(){
 }
 /* Boot the shell: online or with no server, at a hash, with the real app.js or the stub. The record read can be held
    back (net.hold) and released later (net.release()). */
-async function boot({online=true,hash='',app='real'}={}){
-  const dom=makeDom(),storage=new Map(),history=[],fetches=[];
+async function boot({online=true,hash='',app='real',search='',stored={},journey=false,roles=[]}={}){
+  const dom=makeDom(),storage=new Map(Object.entries(stored)),history=[],fetches=[];
   const net={online,hold:false,release:null};
-  const cfg={copy,rules,roles:[],accounts:{source:'sample',personas},mode:{mode:'sample',provider:'local',model:null}};
+  const cfg={copy,rules,roles,accounts:{source:'sample',personas},mode:{mode:'sample',provider:'local',model:null},...(journey?{journey:JOURNEY}:{})};
   const ctx={
     document:dom.document,
     sessionStorage:{getItem:k=>storage.has(k)?storage.get(k):null,setItem:(k,v)=>storage.set(k,String(v)),removeItem:k=>storage.delete(k)},
-    location:{href:'http://127.0.0.1:4173/'+hash,hash,pathname:'/',search:''},
-    history:{replaceState:(s,t,url)=>{history.push(url);if(url.startsWith('#'))ctx.location.hash=url;}},
+    location:{href:'http://127.0.0.1:4174/'+search+hash,hash,pathname:'/',search},
+    // A path replaces the whole address (the shell strips ?as= and the journey params); a fragment only the hash.
+    history:{replaceState:(s,t,url)=>{history.push(url);if(url.startsWith('#'))ctx.location.hash=url;
+      else if(url.startsWith('/')){const u=new URL(url,'http://127.0.0.1:4174');Object.assign(ctx.location,{href:u.href,search:u.search,hash:u.hash});}}},
     fetch:async(url,opts={})=>{
       fetches.push({url,opts});
       if(!net.online)throw new TypeError('Failed to fetch');
@@ -260,4 +263,52 @@ test('Switch account keeps keyboard focus inside the drawer on open and on close
   s.dom.click(button({action:'switch'}));
   assert.ok(!s.drawer().includes('account-row'),'the list closed');
   assert.ok(s.dom.activeElement?.tag?.includes('data-action="switch"'),'focus back on the Switch account pill, got '+s.dom.activeElement?.tag);
+});
+
+/* The connected journey (spec 2026-11-28-yocv-connected-journey-design, journey contract v1): SkillLens opens YoCV
+   with ?as=halima and the contract params. */
+const RETURN='http://localhost:3000/opportunities/c0a7e000-0000-4000-8000-000000000301';
+const LINK='?as=halima&journey=demo&from=skilllens&yoid=yoid-ng-7f3a0123&listing=opp-job-001&goal=job&plan=plan-001'
+  +'&course=opp-course-001&credential=cred-002&return='+encodeURIComponent(RETURN);
+// The role menu as GET /api/cv/config serves it, for the tests that look at the role picked.
+const ROLES=require('../server/cv/menu.js').roleList(require('../data/role-skills.json'));
+test('the SkillLens link signs Halima in, keeps the journey params for the tab and opens the CV with the arriving card',async()=>{
+  const s=await boot({search:LINK,journey:true,roles:ROLES});
+  assert.equal(s.YoID.person().id,'halima');
+  const kept=JSON.parse(s.storage.get('yocv.journey'));
+  assert.deepEqual(kept,{journey:'demo',from:'skilllens',yoid:'yoid-ng-7f3a0123',listing:'opp-job-001',goal:'job',plan:'plan-001',course:'opp-course-001',credential:'cred-002',return:RETURN});
+  assert.deepEqual(s.YoID.journey(),kept);
+  assert.equal(s.ctx.location.search,'','the params leave the address, as ?as= does');
+  assert.equal(s.ctx.location.hash,'#/cv','arriving on no route opens the CV tab');
+  const v=s.cvView();
+  for(const text of ['From SkillLens · Phase 3','Skill Credential','Solar PV Installation Basics: practical challenge passed','✓ Recorded on your YoID (mock-up)','YoID · yoid-ng-7f3a0123 · mock-up'])
+    assert.ok(v.includes(text),text);
+  assert.ok(v.indexOf('journey-card')<v.indexOf('step-title'),'the card is at the start of the CV flow');
+  assert.ok(v.includes('Skill Credential, from SkillLens'),'cred-002 carries its handoff tag');
+  assert.deepEqual([...v.matchAll(/journey-step (\S+)"/g)].map(m=>m[1]),['recorded','recorded','recorded','in-progress']);
+  assert.ok(v.includes('<option value="Solar installation assistant" selected>'),'the journey\'s job picks its target role');
+  assert.ok(!v.includes('<option value="Market seller" selected>'),'not her trade\'s role');
+});
+test('a hash route or a reload in the same tab keeps the journey from sessionStorage',async()=>{
+  const first=await boot({search:LINK,journey:true});
+  const s=await boot({hash:'#/cv',stored:Object.fromEntries(first.storage),journey:true});
+  assert.equal(s.YoID.journey().return,RETURN);
+  assert.ok(s.cvView().includes('From SkillLens · Phase 3'));
+  s.show('#/cv');assert.ok(s.cvView().includes('YoID · yoid-ng-7f3a0123 · mock-up'));
+});
+test('without journey=demo nothing changes: no card, no thread, nothing more in sessionStorage',async()=>{
+  for(const search of ['','?as=halima','?as=halima&from=skilllens&credential=cred-002&return='+encodeURIComponent(RETURN)]){
+    const s=await boot({search,hash:'#/cv',journey:true,roles:ROLES});
+    assert.equal(s.YoID.journey(),null,search);
+    assert.deepEqual([...s.storage.keys()],['yoid.person'],search);
+    const v=s.cvView();
+    assert.ok(!v.includes('journey-card')&&!v.includes('journey-thread'),search);
+    assert.ok(v.includes('Skill Credential, from SkillLens'),'the handoff tag was there before the journey params, and stays');
+    assert.ok(v.includes('<option value="Market seller" selected>'),'her trade\'s role, as before: '+search);
+  }
+});
+test('the journey shows nothing when the server is not reachable',async()=>{
+  const s=await boot({search:LINK,online:false,journey:true});
+  s.show('#/cv');
+  assert.ok(!s.cvView().includes('journey-card'));
 });

@@ -164,7 +164,7 @@
         "status": "Issued",
         "issuer": "SkillLens",
         "issuerLogoURL": null,
-        "title": "Solar PV Basics: practical challenge passed",
+        "title": "Solar PV Installation Basics: practical challenge passed",
         "dateIssued": "2026-11-03T11:20:00+00:00",
         "attributes": [
           {"name": "Opportunity_Skills", "nameDisplay": "Skills", "valueDisplay": "Photovoltaic Systems, Solar Panels", "group": null, "subGroup": null, "sortOrder": null, "itemsDisplay": [{"name": "Photovoltaic Systems"}, {"name": "Solar Panels"}]}

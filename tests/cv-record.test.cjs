@@ -106,7 +106,7 @@ test('readCvRecord reads Halima as the shared mock data has her',async()=>{
   assert.ok(r.completions.every(c=>c.opportunityId===null),'fictional, so no Yoma opportunity id');
   assert.deepEqual(r.credentials.map(c=>c.walletId),['cred-005','cred-001','cred-004','cred-003','cred-002']);
   const skill=r.credentials.find(c=>c.walletId==='cred-002');
-  assert.equal(skill.title,'Solar PV Basics: practical challenge passed'); assert.equal(skill.issuer,'SkillLens');
+  assert.equal(skill.title,'Solar PV Installation Basics: practical challenge passed','the contract and SkillLens title'); assert.equal(skill.issuer,'SkillLens');
   assert.equal(skill.completionId,null,'the Skill Credential stands on its own, not on a course');
   assert.deepEqual(skill.skills,['Photovoltaic Systems','Solar Panels']);
   assert.equal(r.credentials.find(c=>c.walletId==='cred-003').completionId,r.completions[3].evidenceId);
